@@ -2,10 +2,10 @@
 
 [![CI](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml/badge.svg)](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml)
 
-> **对外名称：待定**（候选与商店查重结果见 [store/naming.md](store/naming.md)）。
+> **对外名称：TopClip — 读长文，不掉线**（命名过程与查重见 [store/naming.md](store/naming.md)）。
 > 仓库名 `web-sticky-scroll` 保持不变，作为技术标识（GitHub Pages 的隐私政策链接依赖它，上架时要用）。
 
-**读到哪一节、这一节在讲什么，一直挂在眼前。**
+**TopClip —— 读长文，不掉线。**
 
 走神的原因通常不是"找不到章节"，而是"忘了这一节在讲什么"。往下滚两屏，目光还在字上，脑子已经丢了上下文——
 这节属于哪一章？作者在论证什么？这个扩展把当前章节标题**原样**钉在页面顶部（页面自己的字体、字号、字重、行高、颜色），

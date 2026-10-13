@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Web Sticky Scroll — 网页吸顶层级面包屑",
-  "description": "像 VS Code Sticky Scroll 一样阅读网页：滚动时在页面顶部显示当前章节层级面包屑，支持点击回溯与悬停大纲。",
-  "version": "0.4.0",
+  "name": "TopClip — 读长文，不掉线",
+  "description": "读长文不掉线：把当前章节标题原样吸在页面顶部，提醒你这一节在讲什么。悬停展开完整目录，附整篇阅读进度。",
+  "version": "0.5.0",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon16.png",
