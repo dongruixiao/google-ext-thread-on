@@ -402,6 +402,37 @@ try {
   await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);
   await options.waitForTimeout(500);
   await page.bringToFront();
+  // 上级路径：内联显示（不占第二行），条高不变
+  const readBar = () =>
+    page.evaluate(() => {
+      const shadow = document.getElementById('__web_sticky_scroll_host__')?.shadowRoot;
+      const bar = shadow?.querySelector('.wss-bar')?.getBoundingClientRect();
+      const path = shadow?.querySelector('.wss-bar-path');
+      return {
+        height: bar ? Math.round(bar.height) : 0,
+        pathVisible: path ? !path.hidden : false,
+        pathText: path && !path.hidden ? path.textContent.trim() : null,
+      };
+    });
+  await page.evaluate(() => {
+    const heading = document.getElementById('s2-1');
+    // 只越过头一点点：确保当前标题是这个小节，而不是它后面的下一节
+    window.scrollTo(0, heading.getBoundingClientRect().top + window.scrollY + 40);
+  });
+  await page.waitForTimeout(400);
+  const pathOff = await readBar();
+  await options.selectOption('#pathMode', 'always');
+  await page.waitForTimeout(600);
+  const pathOn = await readBar();
+  await options.selectOption('#pathMode', 'adaptive');
+  check(
+    '上级路径内联显示且不改变条高',
+    pathOn.pathVisible === true &&
+      Math.abs(pathOn.height - pathOff.height) <= 2 &&
+      (pathOn.pathText ?? '').length > 0,
+    { pathOff, pathOn },
+  );
+
   const optionsState = await options.evaluate(() => ({
     sections: document.querySelectorAll('section h2').length,
     appearance: document.querySelector('#appearance')?.value,

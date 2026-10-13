@@ -3,7 +3,7 @@ import type { HeadingNode } from './extractor';
 import { BAR_PADDING_BLOCK, cloneHeading, estimateHeadingHeight } from './heading-clone';
 import type { Appearance, BarWidth, PillPosition, ThemeMode } from '../shared/settings';
 import { HOST_ID } from '../shared/constants';
-import { buildVisiblePath, type PathOptions } from './path';
+import { buildVisiblePath, decideInlinePath, type PathOptions } from './path';
 import type { PageStyle } from './palette';
 import type { TrackerSnapshot } from './tracker';
 
@@ -45,6 +45,7 @@ export class StickyUI {
   private root: HTMLDivElement | null = null;
   private crumbs: HTMLOListElement | null = null;
   private headingSlot: HTMLElement | null = null;
+  private inlinePath: HTMLElement | null = null;
   private drawer: HTMLDivElement | null = null;
   private drawerPath: HTMLDivElement | null = null;
   private drawerProgress: HTMLElement | null = null;
@@ -60,6 +61,7 @@ export class StickyUI {
   private appearance: Appearance = 'bar';
   private barWidth: BarWidth = 'full';
   private pathOptions: PathOptions = { ...DEFAULT_PATH_OPTIONS };
+  private pathMode: 'off' | 'adaptive' | 'always' = 'adaptive';
   private snapshot: TrackerSnapshot = { ...EMPTY_SNAPSHOT };
   private presentation: Presentation = { ...DEFAULT_PRESENTATION };
 
@@ -99,6 +101,7 @@ export class StickyUI {
       <div class="wss-bar" part="bar">
         <div class="wss-bar-sheet" aria-hidden="true"></div>
         <div class="wss-bar-inner">
+          <div class="wss-bar-path" hidden></div>
           <div class="wss-bar-heading" data-wss-role="heading" role="button" tabindex="0"
                aria-label="展开或固定文章目录"></div>
           <span class="wss-bar-caret" aria-hidden="true">
@@ -129,6 +132,7 @@ export class StickyUI {
     this.root = root;
     this.crumbs = root.querySelector<HTMLOListElement>('.wss-pill > .wss-crumbs');
     this.headingSlot = root.querySelector<HTMLElement>('.wss-bar-heading');
+    this.inlinePath = root.querySelector<HTMLElement>('.wss-bar-path');
     this.drawer = root.querySelector<HTMLDivElement>('.wss-drawer');
     this.drawerPath = root.querySelector<HTMLDivElement>('.wss-drawer-path');
     this.drawerProgress = root.querySelector<HTMLElement>('.wss-drawer-progress');
@@ -176,6 +180,7 @@ export class StickyUI {
     this.root = null;
     this.crumbs = null;
     this.headingSlot = null;
+    this.inlinePath = null;
     this.drawer = null;
     this.drawerPath = null;
     this.drawerProgress = null;
@@ -259,6 +264,11 @@ export class StickyUI {
     this.crumbsKey = '';
   }
 
+  setPathMode(mode: 'off' | 'adaptive' | 'always'): void {
+    this.pathMode = mode;
+    this.crumbsKey = '';
+  }
+
   update(snapshot: TrackerSnapshot): void {
     this.snapshot = snapshot;
     this.render();
@@ -302,6 +312,7 @@ export class StickyUI {
     if (presentation.compact && this.drawerOpen) this.closeDrawer();
 
     this.ensureHeadingClone(snapshot.index);
+    this.renderInlinePath(snapshot);
 
     const key = [
       snapshot.path.join('>'),
@@ -331,6 +342,59 @@ export class StickyUI {
   }
 
   /** 吸顶主体：把网页里的当前标题原样克隆进条里 */
+  /**
+   * 上级路径：不做两行堆叠（太占视觉），而是在必要时把最近几级上级
+   * 以小字内联在标题左侧；条高完全不变。
+   */
+  private renderInlinePath(snapshot: TrackerSnapshot): void {
+    const host = this.inlinePath;
+    if (!host) return;
+    host.replaceChildren();
+
+    const parentIndex = snapshot.path[snapshot.path.length - 2];
+    const parent = parentIndex !== undefined ? this.headings[parentIndex] : undefined;
+    const parentDistance = parent ? Math.round(-parent.element.getBoundingClientRect().bottom) : 0;
+
+    const decision = decideInlinePath({
+      mode: this.pathMode,
+      path: snapshot.path,
+      levels: this.levels,
+      hideArticleTitle: this.pathOptions.hideArticleTitle,
+      maxChips: 2,
+      parentDistance,
+      viewportHeight: window.innerHeight,
+    });
+
+    if (!decision.show || this.presentation.compact) {
+      host.hidden = true;
+      return;
+    }
+    host.hidden = false;
+
+    if (decision.trimmed > 0) {
+      const ellipsis = document.createElement('span');
+      ellipsis.className = 'wss-path-more';
+      ellipsis.textContent = '…';
+      host.appendChild(ellipsis);
+    }
+    decision.indexes.forEach((headingIndex, position) => {
+      const node = this.headings[headingIndex];
+      if (!node) return;
+      if (position > 0 || decision.trimmed > 0) {
+        const separator = document.createElement('span');
+        separator.className = 'wss-path-sep';
+        separator.textContent = '›';
+        host.appendChild(separator);
+      }
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'wss-path-chip';
+      chip.dataset.wssIndex = String(headingIndex);
+      chip.textContent = node.text || '(无标题)';
+      chip.title = node.text;
+      host.appendChild(chip);
+    });
+  }
   private ensureHeadingClone(index: number): void {
     const slot = this.headingSlot;
     if (!slot) return;

@@ -9,6 +9,8 @@ export type SiteAccess = 'all' | 'blocklist' | 'allowlist';
 export type Appearance = 'bar' | 'pill';
 /** 吸顶条宽度：full 满宽 / column 与正文列对齐 */
 export type BarWidth = 'full' | 'column';
+/** 上级路径在吸顶条里的出现方式：off 不显示 / adaptive 按需 / always 总是显示 */
+export type PathMode = 'off' | 'adaptive' | 'always';
 
 export interface WssSettings {
   version: number;
@@ -32,6 +34,8 @@ export interface WssSettings {
   appearance: Appearance;
   /** 吸顶条宽度 */
   barWidth: BarWidth;
+  /** 上级路径显示方式 */
+  pathMode: PathMode;
   /** 站点访问策略 */
   siteAccess: SiteAccess;
   /** 站点规则列表（黑名单 / 白名单） */
@@ -53,6 +57,7 @@ export const DEFAULT_SETTINGS: WssSettings = {
   pageTocMode: 'adapt',
   appearance: 'bar',
   barWidth: 'full',
+  pathMode: 'adaptive',
   siteAccess: 'all',
   sites: [],
 };
@@ -64,6 +69,7 @@ const TOC_MODES: readonly PageTocMode[] = ['adapt', 'full'];
 const SITE_ACCESS: readonly SiteAccess[] = ['all', 'blocklist', 'allowlist'];
 const APPEARANCES: readonly Appearance[] = ['bar', 'pill'];
 const BAR_WIDTHS: readonly BarWidth[] = ['full', 'column'];
+const PATH_MODES: readonly PathMode[] = ['off', 'adaptive', 'always'];
 
 const MIN_OFFSET = -20;
 const MAX_OFFSET = 400;
@@ -132,6 +138,7 @@ export function normalizeSettings(raw: unknown): WssSettings {
     pageTocMode: pick(input.pageTocMode, TOC_MODES, DEFAULT_SETTINGS.pageTocMode),
     appearance: pick(input.appearance, APPEARANCES, DEFAULT_SETTINGS.appearance),
     barWidth: pick(input.barWidth, BAR_WIDTHS, DEFAULT_SETTINGS.barWidth),
+    pathMode: pick(input.pathMode, PATH_MODES, DEFAULT_SETTINGS.pathMode),
     siteAccess: pick(input.siteAccess, SITE_ACCESS, DEFAULT_SETTINGS.siteAccess),
     sites: normalizeSites(input.sites),
   };

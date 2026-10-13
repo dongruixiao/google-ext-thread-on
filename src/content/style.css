@@ -152,6 +152,54 @@
 }
 
 /* 克隆进来的标题：样式全部来自页面，这里只负责占位与裁切 */
+.wss-bar-path {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 42%;
+  margin-right: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.wss-bar-path[hidden] {
+  display: none;
+}
+
+.wss-path-chip {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: calc(var(--wss-title-size) * 0.72);
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--wss-page-fg) 52%, transparent);
+  padding: 3px 5px;
+  border-radius: 6px;
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.12s ease, background-color 0.12s ease;
+}
+
+.wss-path-chip:hover,
+.wss-path-chip:focus-visible {
+  color: var(--wss-page-fg);
+  background: color-mix(in srgb, var(--wss-page-fg) 8%, transparent);
+  outline: none;
+}
+
+.wss-path-sep,
+.wss-path-more {
+  flex: none;
+  color: color-mix(in srgb, var(--wss-page-fg) 34%, transparent);
+  font-size: calc(var(--wss-title-size) * 0.66);
+}
+
 .wss-bar-heading {
   display: flex;
   align-items: center;
