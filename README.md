@@ -178,6 +178,9 @@ web-sticky-scroll/
 
 ## 开发
 
+- **不想编译**：到 [Releases](https://github.com/dongruixiao/web-sticky-scroll/releases) 下载 `web-sticky-scroll-<版本>.zip`，
+  解压后到 `chrome://extensions` 开启开发者模式 →「加载已解压的扩展程序」→ 选解压出来的文件夹即可
+
 ```bash
 npm install
 

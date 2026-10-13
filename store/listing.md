@@ -52,7 +52,7 @@
 - 是否收集用户数据：不收集
 - 是否使用远程代码：否（所有代码随包分发，无 CDN、无 eval、无动态加载脚本）
 - 是否使用分析 / 统计：否
-- 隐私政策链接：把 store/privacy.md 的内容托管到任意公开地址（例如项目 GitHub Pages）后填写
+- 隐私政策链接：https://dongruixiao.github.io/web-sticky-scroll/privacy.html （已用项目 GitHub Pages 托管，直接填这个）
 
 ## 素材清单
 
@@ -61,7 +61,7 @@
 | 商店图标 | 128×128 PNG | icons/icon128.png |
 | 截图 | 1280×800 PNG，1–5 张 | store/screenshots/（npm run screenshots 生成） |
 | 小型宣传图 | 440×280 PNG（可选） | 可不填 |
-| 隐私政策链接 | 公开 URL | 自行托管 store/privacy.md |
+| 隐私政策链接 | 公开 URL | https://dongruixiao.github.io/web-sticky-scroll/privacy.html |
 
 ## 上传与发布流程
 
