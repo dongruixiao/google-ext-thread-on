@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml/badge.svg)](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml)
 
-> **对外名称（Chrome 应用商店）：顶阅 — 网页章节吸顶导航**
+> **对外名称：待定**（候选与商店查重结果见 [store/naming.md](store/naming.md)）。
 > 仓库名 `web-sticky-scroll` 保持不变，作为技术标识（GitHub Pages 的隐私政策链接依赖它，上架时要用）。
 
 把 VS Code 的 Sticky Scroll 体验带到网页阅读里：向下滚动时，当前小节的标题会被「吸」在页面顶部——

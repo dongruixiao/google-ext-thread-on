@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "顶阅 — 网页章节吸顶导航",
-  "description": "读长文不迷路：当前章节标题原样吸在页面顶部，悬停展开层级目录。适用于技术文档、学术论文、法律条文与万字长文。",
+  "name": "Web Sticky Scroll — 网页吸顶层级面包屑",
+  "description": "像 VS Code Sticky Scroll 一样阅读网页：滚动时在页面顶部显示当前章节层级面包屑，支持点击回溯与悬停大纲。",
   "version": "0.4.0",
   "minimum_chrome_version": "116",
   "icons": {
