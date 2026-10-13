@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Web Sticky Scroll · E2E Fixture</title>
+    <style>
+      body { margin: 0; font: 16px/1.8 system-ui, sans-serif; color: #111; }
+      .topbar { position: fixed; inset: 0 0 auto 0; height: 56px; background: #fff; border-bottom: 1px solid #ddd; display: flex; align-items: center; padding: 0 20px; z-index: 10; }
+      .layout { display: grid; grid-template-columns: minmax(0, 720px) 220px; gap: 40px; justify-content: center; padding: 96px 24px 200px; }
+      .toc { position: sticky; top: 84px; align-self: start; max-height: calc(100vh - 120px); overflow: auto; padding: 14px 16px; background: #f5f6fa; border-radius: 12px; font-size: 13.5px; }
+      .toc h2 { margin: 0 0 6px; font-size: 14px; }
+      .toc a { display: block; color: #4f46e5; text-decoration: none; padding: 3px 0; }
+      aside.note { padding: 14px 16px; background: #fff7e6; border-radius: 12px; margin-top: 16px; font-size: 13.5px; }
+      footer { padding: 40px 24px 80px; text-align: center; color: #666; }
+      h2 { margin-top: 56px; }
+      /* 固定左栏：不应被当成站点顶部导航条 */
+      .left-rail { position: fixed; top: 0; left: 0; bottom: 0; width: 110px; background: #eef0f5; border-right: 1px solid #dfe3ec; font-size: 12px; color: #667; padding: 70px 8px 8px; box-sizing: border-box; }
+      /* 正文里的粘性元素：滑到顶部时也不该带偏吸顶条 */
+      /* 故意比正文列更宽（超过视口 60%），用来验证“正文内元素一律无视”这条规则 */
+      .sticky-toolbar { position: sticky; top: 0; z-index: 5; margin: 12px -40px 18px; padding: 8px 12px; background: #fff7e6; border: 1px solid #f0dcae; border-radius: 8px; font-size: 13px; color: #7a5c14; }
+    </style>
+  </head>
+  <body>
+    <div class="left-rail">固定左栏 110px</div>
+    <div class="topbar">站点顶栏（fixed，高度 56px）</div>
+    <div class="layout">
+      <main>
+        <article class="post-content">
+          <h1>端到端验证用文章</h1>
+          <p>
+            这个页面用于验证打包后的扩展能否在真实浏览器中正常工作：注入、层级计算、点击回溯、显示策略与原站目录适配
+            都会在这里被逐一检查。为了让插件的“智能阅读模式”判定为文章页，每个小节都保留了足够长的正文，
+            因为判定规则要求存在足够深的正文水位或足够长的独立小节。
+          </p>
+          <div class="sticky-toolbar">正文内粘性工具条（sticky top: 0）</div>
+          <h2 id="s1">第一节：背景与动机</h2>
+          <p>
+            长篇文章在滚动过程中最容易丢失上下文。读者向下滚动若干屏之后，往往已经不记得当前小节隶属于哪一个章节，
+            而侧边目录又需要视线横向来回移动。粘性面包屑的价值在于零成本上下文：它不需要读者主动寻找，
+            也不需要把视线从正文移开，只是在需要时出现在视野边缘，让“我正在读什么”这件事始终成立。
+          </p>
+          <p>
+            这里保留足够长的正文，用来越过插件的智能阅读模式阈值；否则页面会被判定成列表页而保持静默，
+            端到端测试也就无法观察到任何界面。同时这段文字也用于验证：当页面存在原站目录时，
+            插件是否愿意退让成极简的当前小节指示器，而不是和原站目录抢同一份注意力。
+          </p>
+          <h3 id="s1-1">小节一：更细的层级</h3>
+          <p>
+            三级标题用来验证层级链：滚动到这里时，面包屑应当包含它所属的二级标题，而不是直接跳到文章标题。
+            这一段同样需要足够长，避免小节水位判定被误伤；足够的长度也能让滚动状态更稳定，
+            便于自动断言在连续滚动中的表现，而不是只在极端位置才能观察到正确的路径。
+          </p>
+          <h2 id="s2">第二节：实现方式</h2>
+          <p>
+            实现分为三步：识别正文容器与标题树、根据滚动位置计算活跃标题、把结果渲染到 Shadow DOM。
+            三步之间通过纯数据传递，边界清晰，便于分别测试与替换，也方便在出现问题时快速定位是哪一步的偏差。
+            正文容器识别优先使用语义标签，其次使用常见类名，最后回退到整个文档并额外过滤站点框架。
+          </p>
+          <p>
+            滚动监听使用被动事件与 requestAnimationFrame 节流，渲染层只在路径或阅读进度变化时更新 DOM，
+            因此在长文档上也不会带来明显开销。跳转使用原生的平滑滚动，并通过临时的 scroll-margin-top
+            让标题停在胶囊下方，既不污染页面长期样式，也不需要修改宿主页面的任何类名。
+          </p>
+          <h3 id="s2-1">小节二：边界处理</h3>
+          <p>
+            固定顶栏高度通过顶部取样探测，胶囊自动贴在顶栏下方；标题缺少 id 时会生成占位标识，
+            跳转不依赖原生锚点；原站目录可见时插件退让为极简指示器；页面滚动到底部时最后一个标题直接生效。
+            这些边界行为都需要在真实浏览器里验证，因为它们的正确性依赖布局与滚动，而不仅仅是数据变换。
+          </p>
+          <h2 id="s3">第三节：验证清单</h2>
+          <p>
+            需要验证的行为包括：滚动时路径实时更新、点击面包屑能平滑回溯、悬停展开大纲、页面顶部保持静默、
+            列表页不误激活。这一节保持足够长度，让文档在垂直方向上具备可滚动空间，
+            否则底部的兜底逻辑会提前介入，干扰对滚动行为的观察。
+          </p>
+          <p>
+            段落数量的增加也让当前小节与上一小节之间的切换点更清晰，便于自动断言面包屑与页面内容是否一致。
+            如果路径推导出错，通常表现为多一级或少一级，肉眼即可发现，而自动断言则能稳定复现这种偏差。
+          </p>
+          <h3 id="s3-1">小节三：收尾</h3>
+          <p>
+            当页面滚动到底部时，最后一个标题即使无法越过基准线也应当被认定为当前章节，
+            否则读者在文末会看到空白的面包屑。这条兜底逻辑由滚动追踪器负责，
+            并通过“下一个标题是否已经进入视口”来判断是否可以让它提前生效。
+          </p>
+        </article>
+      </main>
+      <div>
+        <nav class="toc" id="site-toc" aria-label="文章目录">
+          <h2>目录</h2>
+          <a href="#s1">第一节：背景与动机</a>
+          <a href="#s2">第二节：实现方式</a>
+          <a href="#s2-1">小节二：边界处理</a>
+          <a href="#s3">第三节：验证清单</a>
+          <a href="#s3-1">小节三：收尾</a>
+        </nav>
+        <aside class="note">
+          <h3>侧边栏干扰标题</h3>
+          <p>这里的标题不应出现在面包屑或大纲里。</p>
+        </aside>
+      </div>
+    </div>
+    <footer>
+      <h3>页脚干扰标题</h3>
+    </footer>
+  </body>
+</html>

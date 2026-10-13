@@ -1,0 +1,577 @@
+/* 通过 ?inline 注入 Shadow DOM，与宿主页面样式完全隔离 */
+
+:host {
+  all: initial;
+}
+
+.wss-root {
+  position: fixed;
+  z-index: 2147483600;
+  pointer-events: none;
+  font-family: var(--wss-page-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+      'Hiragino Sans GB', 'Microsoft YaHei', sans-serif);
+  font-size: 13px;
+  line-height: 1.2;
+  -webkit-font-smoothing: antialiased;
+
+  /* 页面配色（由 JS 采样写入），失败时退回主题色 */
+  --wss-page-bg: var(--wss-surface);
+  --wss-page-fg: var(--wss-fg);
+  --wss-title-size: 17px;
+  --wss-title-weight: 600;
+  --wss-letter-spacing: normal;
+  --wss-bar-height: 44px;
+  --wss-col-left: 16px;
+  --wss-col-width: calc(100vw - 32px);
+  --wss-col-right: 16px;
+
+  --wss-fg: #0f172a;
+  --wss-surface: #ffffff;
+  --wss-bg: rgba(255, 255, 255, 0.76);
+  --wss-border: rgba(15, 23, 42, 0.1);
+  --wss-shadow: 0 12px 32px -16px rgba(15, 23, 42, 0.5), 0 2px 6px -2px rgba(15, 23, 42, 0.14);
+  --wss-muted: rgba(15, 23, 42, 0.58);
+  --wss-accent: #4f46e5;
+  --wss-accent-soft: rgba(79, 70, 229, 0.14);
+  --wss-hover: rgba(15, 23, 42, 0.07);
+
+  opacity: 1;
+  translate: 0 0;
+  transition: opacity 0.18s ease, translate 0.18s ease, visibility 0s;
+}
+
+.wss-root[data-theme='dark'] {
+  --wss-fg: #e9eaf3;
+  --wss-surface: #14161d;
+  --wss-bg: rgba(18, 20, 28, 0.76);
+  --wss-border: rgba(255, 255, 255, 0.14);
+  --wss-shadow: 0 14px 34px -16px rgba(0, 0, 0, 0.75), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+  --wss-muted: rgba(233, 234, 243, 0.62);
+  --wss-accent: #8b8cf9;
+  --wss-accent-soft: rgba(139, 140, 249, 0.2);
+  --wss-hover: rgba(255, 255, 255, 0.08);
+}
+
+.wss-root[data-visible='false'] {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease, translate 0.18s ease, visibility 0s 0.18s;
+}
+
+/* 静止一段时间后降低存在感；悬停/聚焦即恢复 */
+.wss-root[data-dim='true'] {
+  opacity: 0.45;
+}
+
+.wss-root[data-dim='true']:hover,
+.wss-root[data-dim='true']:focus-within {
+  opacity: 1;
+}
+
+/* ── 形态切换 ───────────────────────────────────────── */
+
+.wss-root[data-appearance='pill'] {
+  top: var(--wss-top, 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.wss-root[data-appearance='pill'][data-position='top-right'] {
+  left: auto;
+  right: 16px;
+  transform: none;
+  align-items: flex-end;
+}
+
+.wss-root[data-appearance='pill'] .wss-bar {
+  display: none;
+}
+
+.wss-root[data-appearance='bar'] {
+  top: var(--wss-top, 0px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wss-root[data-appearance='bar'] .wss-pill {
+  display: none;
+}
+
+.wss-root[data-appearance='bar'][data-visible='false'] {
+  /* 用固定位移而不是 -100%：抽屉常驻在 root 里，-100% 会连带多滑很多 */
+  translate: 0 -48px;
+}
+
+.wss-root[data-appearance='pill'][data-visible='false'] {
+  translate: 0 -8px;
+}
+
+.wss-root[data-visible='false'] :is(.wss-pill, .wss-bar-inner, .wss-drawer) {
+  pointer-events: none;
+}
+
+/* ── 吸顶条：贴边实心，标题原样搬进来 ───────────────── */
+
+.wss-bar {
+  position: relative;
+  width: 100%;
+  height: var(--wss-bar-height);
+  box-sizing: border-box;
+  pointer-events: none;
+  transition: height 0.18s ease;
+}
+
+.wss-bar-sheet {
+  position: absolute;
+  inset: 0;
+  background: var(--wss-page-bg);
+  border-bottom: 1px solid color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
+  box-shadow: 0 6px 16px -14px color-mix(in srgb, var(--wss-page-fg) 60%, transparent);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+}
+
+.wss-bar-inner {
+  position: relative;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding-left: var(--wss-col-left);
+  padding-right: var(--wss-col-right);
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* 克隆进来的标题：样式全部来自页面，这里只负责占位与裁切 */
+.wss-bar-heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.wss-bar-heading > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wss-bar-heading[data-wss-role='heading'] {
+  cursor: pointer;
+}
+
+.wss-bar-heading:focus-visible {
+  outline: 2px solid var(--wss-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* 可点击提示：悬停时出现的小箭头，钉住时翻转 */
+.wss-bar-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  border-radius: 6px;
+  color: color-mix(in srgb, var(--wss-page-fg) 55%, transparent);
+  opacity: 0;
+  transition: opacity 0.12s ease, rotate 0.18s ease, background-color 0.12s ease;
+}
+
+.wss-bar-inner:hover .wss-bar-caret,
+.wss-bar-inner:focus-within .wss-bar-caret,
+.wss-root[data-pinned='true'] .wss-bar-caret {
+  opacity: 0.85;
+}
+
+.wss-bar-inner:hover .wss-bar-caret:hover {
+  background: color-mix(in srgb, var(--wss-page-fg) 10%, transparent);
+}
+
+.wss-root[data-pinned='true'] .wss-bar-caret {
+  rotate: 180deg;
+  opacity: 1;
+}
+
+/* 与正文列对齐的窄条形态 */
+.wss-root[data-bar-width='column'] .wss-bar {
+  margin-left: var(--wss-col-left);
+  margin-right: var(--wss-col-right);
+  width: auto;
+}
+
+.wss-root[data-bar-width='column'] .wss-bar-sheet {
+  border: 1px solid color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
+  border-radius: 0 0 12px 12px;
+  box-shadow: var(--wss-shadow);
+}
+
+.wss-root[data-bar-width='column'] .wss-bar-inner {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+/* ── 悬浮胶囊 ───────────────────────────────────────── */
+
+.wss-pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 12px 0 10px;
+  border-radius: 999px;
+  background: var(--wss-bg);
+  border: 1px solid var(--wss-border);
+  box-shadow: var(--wss-shadow);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  max-width: min(76vw, 720px);
+  pointer-events: auto;
+  cursor: default;
+  user-select: none;
+}
+
+.wss-icon {
+  display: inline-flex;
+  flex: none;
+  opacity: 0.72;
+  color: var(--wss-accent);
+}
+
+/* ── 面包屑（胶囊与抽屉路径共用） ───────────────────── */
+
+.wss-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.wss-crumbs > li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.wss-sep {
+  flex: none;
+  padding: 0 2px;
+  color: var(--wss-muted);
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.wss-crumb {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  padding: 5px 7px;
+  border-radius: 7px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.68;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.wss-crumb:hover {
+  opacity: 1;
+  background: var(--wss-hover);
+}
+
+.wss-crumb:focus-visible {
+  outline: 2px solid var(--wss-accent);
+  outline-offset: 1px;
+}
+
+.wss-crumb[data-role='current'] {
+  opacity: 1;
+  font-weight: 600;
+}
+
+/* 被折叠的祖先层级：悬停或键盘聚焦时展开 */
+.wss-crumbs > li.is-ancestor {
+  display: none;
+}
+
+.wss-pill:hover .wss-crumbs > li.is-ancestor,
+.wss-pill:focus-within .wss-crumbs > li.is-ancestor {
+  display: flex;
+}
+
+.wss-more {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  padding: 5px 6px;
+  border-radius: 7px;
+  cursor: default;
+  opacity: 0.6;
+}
+
+.wss-pill:hover .wss-more-item,
+.wss-pill:focus-within .wss-more-item,
+.wss-root[data-compact='true'] .wss-more-item,
+.wss-root[data-compact='true'] .wss-crumbs > li.is-ancestor {
+  display: none;
+}
+
+/* ── 进度条：整篇文章的阅读进度，通栏贴在条底 ───────── */
+
+.wss-progress {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--wss-hover);
+}
+
+.wss-progress > i {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--wss-accent), #a855f7);
+  transition: width 0.12s linear;
+}
+
+.wss-root[data-appearance='bar'] .wss-progress {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
+}
+
+.wss-root[data-bar-width='column'] .wss-progress {
+  height: 2px;
+  border-radius: 0 0 12px 12px;
+}
+
+/* ── 悬停大纲：顶部是上级路径，下面是全文目录 ───────── */
+
+.wss-below {
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.wss-root[data-appearance='bar'] .wss-below {
+  align-self: flex-start;
+  margin-left: var(--wss-col-left);
+  margin-right: var(--wss-col-right);
+  max-width: min(var(--wss-col-width), 360px);
+}
+
+.wss-drawer {
+  width: 280px;
+  max-width: min(84vw, 320px);
+  max-height: min(62vh, 560px);
+  box-sizing: border-box;
+  padding: 8px;
+  margin-top: 6px;
+  overflow: auto;
+  border-radius: 14px;
+  /* 97% 而不是全透明：没有 GPU 合成（backdrop-filter 失效）时也不会透出底下文字 */
+  background: color-mix(in srgb, var(--wss-page-bg) 97%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
+  box-shadow: var(--wss-shadow);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  pointer-events: auto;
+  opacity: 0;
+  translate: 0 -6px;
+  visibility: hidden;
+  transition: opacity 0.16s ease, translate 0.16s ease, visibility 0s 0.16s;
+  scrollbar-width: thin;
+  color: var(--wss-page-fg);
+}
+
+.wss-drawer.is-open {
+  opacity: 1;
+  translate: 0 0;
+  visibility: visible;
+  transition: opacity 0.16s ease, translate 0.16s ease, visibility 0s;
+}
+
+.wss-drawer-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 8px 8px;
+}
+
+.wss-drawer-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--wss-page-fg) 52%, transparent);
+}
+
+.wss-drawer-progress {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--wss-accent);
+}
+
+.wss-drawer-path {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 2px 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
+  overflow: hidden;
+  font-size: 11.5px;
+}
+
+.wss-drawer-path[hidden] {
+  display: none;
+}
+
+.wss-drawer-path .wss-crumb {
+  max-width: 12ch;
+  padding: 3px 5px;
+  color: color-mix(in srgb, var(--wss-page-fg) 62%, transparent);
+  font-size: 11.5px;
+}
+
+.wss-drawer-path .wss-crumb:hover {
+  color: var(--wss-page-fg);
+  background: color-mix(in srgb, var(--wss-page-fg) 8%, transparent);
+}
+
+/* ── 大纲：按标题树嵌套，用细线画层级 ───────────────── */
+
+.wss-outline {
+  padding-bottom: 2px;
+}
+
+.wss-outline-level {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 子级缩进 + 一条层级引导线 */
+.wss-outline-level[data-depth] {
+  margin-left: 11px;
+  padding-left: 9px;
+  border-left: 1px solid color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
+}
+
+.wss-outline-item {
+  position: relative;
+}
+
+.wss-row {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+  color: color-mix(in srgb, var(--wss-page-fg) 58%, transparent);
+  padding: 6px 10px 6px 14px;
+  border-radius: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.wss-row::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 4px;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wss-page-fg) 26%, transparent);
+  transition: background-color 0.15s ease, scale 0.15s ease;
+}
+
+.wss-row:hover {
+  background: color-mix(in srgb, var(--wss-page-fg) 8%, transparent);
+  color: var(--wss-page-fg);
+}
+
+.wss-row:focus-visible {
+  outline: 2px solid var(--wss-accent);
+  outline-offset: -1px;
+}
+
+.wss-row[data-in-path='true'] {
+  color: var(--wss-page-fg);
+}
+
+.wss-row[data-in-path='true']::before {
+  background: color-mix(in srgb, var(--wss-accent) 60%, transparent);
+}
+
+.wss-row[data-current='true'] {
+  background: var(--wss-accent-soft);
+  color: var(--wss-page-fg);
+  font-weight: 600;
+}
+
+.wss-row[data-current='true']::before {
+  background: var(--wss-accent);
+  scale: 1.4;
+}
+
+.wss-drawer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.wss-drawer::-webkit-scrollbar-thumb {
+  background: var(--wss-hover);
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wss-root,
+  .wss-pill,
+  .wss-bar,
+  .wss-drawer,
+  .wss-progress > i,
+  .wss-crumb,
+  .wss-row {
+    transition: none;
+  }
+}

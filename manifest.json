@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "Web Sticky Scroll — 网页吸顶层级面包屑",
+  "description": "像 VS Code Sticky Scroll 一样阅读网页：滚动时在页面顶部显示当前章节层级面包屑，支持点击回溯与悬停大纲。",
+  "version": "0.3.0",
+  "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Web Sticky Scroll",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.ts",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
+  "commands": {
+    "toggle-site": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "在当前站点启用 / 禁用吸顶面包屑"
+    },
+    "toggle-global": {
+      "suggested_key": {
+        "default": "Alt+Shift+W"
+      },
+      "description": "全局启用 / 禁用吸顶面包屑"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "permissions": ["storage"]
+}

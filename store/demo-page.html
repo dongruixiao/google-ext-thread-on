@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>用状态机重写播放器控制层 · 示例博客</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding-top: 56px;
+        background: #fbfbfd;
+        color: #1a1d26;
+        font: 17px/1.85 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+      }
+      header {
+        position: fixed;
+        inset: 0 0 auto 0;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 32px;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        font-size: 14px;
+        color: #5c6478;
+      }
+      header strong { color: #111827; font-size: 15px; }
+      header nav { margin-left: auto; display: flex; gap: 20px; }
+      main { max-width: 720px; margin: 0 auto; padding: 48px 24px 160px; }
+      h1 { font-size: 34px; line-height: 1.35; margin: 0 0 10px; letter-spacing: -0.01em; }
+      .meta { color: #8b93a7; font-size: 14px; margin: 0 0 32px; }
+      h2 { font-size: 24px; line-height: 1.5; margin: 56px 0 14px; letter-spacing: -0.01em; }
+      h3 { font-size: 19px; margin: 34px 0 10px; }
+      p { margin: 0 0 18px; }
+      pre {
+        margin: 0 0 24px;
+        padding: 16px 18px;
+        border-radius: 12px;
+        background: #14161d;
+        color: #e8eaf3;
+        font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+        overflow: auto;
+      }
+      blockquote {
+        margin: 0 0 22px;
+        padding: 4px 0 4px 16px;
+        border-left: 3px solid #6366f1;
+        color: #4b5266;
+      }
+      body.dark {
+        background: #101218;
+        color: #e7e9f2;
+      }
+      body.dark header {
+        background: rgba(18, 20, 27, 0.9);
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+        color: #a8afc4;
+      }
+      body.dark header strong { color: #f2f3f8; }
+      body.dark h1, body.dark h2, body.dark h3 { color: #f4f5fa; }
+      body.dark .meta { color: #7d859b; }
+      body.dark blockquote { color: #b9bfd1; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>示例博客</strong>
+      <nav><span>文章</span><span>标签</span><span>关于</span></nav>
+    </header>
+    <main>
+      <article class="post-content">
+        <h1>用状态机重写播放器控制层</h1>
+        <p class="meta">2026-10-12 · 14 分钟阅读</p>
+
+        <p>
+          播放器控制层是最容易写成面条代码的地方：暂停、缓冲、拖动进度、切集、投屏、倍速、
+          字幕切换，这些状态彼此耦合，任何一个操作都可能触发其它状态的连锁反应。
+          这篇文章记录我们如何用显式状态机把这些行为重新组织，让每个分支都能被单独推理和测试。
+        </p>
+
+        <h2 id="why">为什么需要状态机</h2>
+        <p>
+          传统的布尔标记写法会很快失控：isPlaying、isBuffering、isSeeking、isEnded 四个标记
+          理论上能组合出十六种状态，而其中只有五种是合法的。当非法状态出现时，
+          界面上就会同时出现加载动画和播放按钮，用户点击后行为完全无法预测。
+        </p>
+        <p>
+          状态机的价值在于把「合法状态的集合」写成代码本身。一旦状态被限制在五个节点之内，
+          我们就能枚举所有迁移路径，把每一个迁移都作为一条测试用例固定下来，
+          而不是依赖某位同事对旧代码的记忆。
+        </p>
+
+        <h3>从布尔标记到显式状态</h3>
+        <p>
+          第一步是把布尔标记替换成一个字符串状态：idle、loading、playing、paused、error。
+          这一步本身不会改变行为，但它让所有分支第一次变得可见，
+          我们也就是在这次重写里发现了三个从未被覆盖的死分支。
+        </p>
+
+        <h2 id="design">设计状态与事件</h2>
+        <p>
+          状态机由三部分组成：状态集合、事件集合、迁移函数。状态代表某一时刻播放器的完整描述，
+          事件代表来自外部世界的输入——用户操作、网络回调、定时器触发都算事件。
+          迁移函数是纯函数：给定当前状态与事件，返回下一个状态与需要执行的副作用。
+        </p>
+
+        <pre><code>type State = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+type Event =
+  | { type: 'PLAY_REQUESTED' }
+  | { type: 'MEDIA_READY' }
+  | { type: 'MEDIA_ENDED' }
+  | { type: 'ERROR'; message: string };
+
+function reduce(state: State, event: Event): { next: State; effects: Effect[] } {
+  switch (state) {
+    case 'idle':
+      if (event.type === 'PLAY_REQUESTED') return { next: 'loading', effects: [load()] };
+      break;
+    case 'loading':
+      if (event.type === 'MEDIA_READY') return { next: 'playing', effects: [play()] };
+      if (event.type === 'ERROR') return { next: 'error', effects: [report(event.message)] };
+      break;
+    // …
+  }
+  return { next: state, effects: [] };
+}</code></pre>
+
+        <p>
+          把副作用写成返回值而不是直接调用，是这套设计里最关键的一步：
+          状态机本身变成可测试的纯逻辑，真正碰 DOM 与网络的代码被压缩到很薄的执行器里。
+        </p>
+
+        <h3>错误也要是状态</h3>
+        <p>
+          很多实现把错误当成异常往上抛，结果是每个调用点都要写一遍兜底逻辑。
+          把错误建模成一个状态之后，「重试」就只是 error 状态下的一条普通迁移，
+          界面的展示也统一由状态决定，不再需要在各处捕获异常。
+        </p>
+
+        <h2 id="migration">迁移过程中的三个坑</h2>
+        <p>
+          重写播放器控制层并不是一次可以悄悄完成的重构，它牵涉到埋点、A/B 实验与线上灰度。
+          我们在两周内分三步切换，这里记录其中三个真正让人头疼的问题。
+        </p>
+
+        <h3>事件乱序</h3>
+        <p>
+          网络回调与用户操作会以任意顺序到达：用户在 loading 阶段就要暂停，
+          而 MEDIA_READY 可能在这之后才回来。状态机对此的处理很直接——
+          在 loading 状态下收到 PAUSE_REQUESTED 时记录一个「期望暂停」的标记，
+          等 MEDIA_READY 到达后直接进入 paused，而不是播放一秒再暂停。
+        </p>
+
+        <blockquote>
+          把「用户的意图」和「系统的状态」分开记录，是解决乱序问题的通用手段。
+        </blockquote>
+
+        <h3>投屏与本地播放的差异</h3>
+        <p>
+          投屏之后，播放进度不再由本地时钟决定，进度回调的频率也从每秒一次降到几秒一次。
+          我们给状态机补了一条 remote 维度，把本地与远端的差异限制在效果执行器里，
+          状态与迁移逻辑保持不变。
+        </p>
+
+        <h2 id="result">结果与数值</h2>
+        <p>
+          重写完成后，播放相关的线上报错下降了 74%，与播放状态相关的客服反馈从每周十余条降到个位数；
+          更直观的收益是新增功能的速度：接入倍速与字幕切换只用了两天，
+          而在旧实现里，类似的改动通常需要一周以上。
+        </p>
+
+        <h3>测试覆盖</h3>
+        <p>
+          我们为每条迁移写了单元测试，用一个简单的表格驱动：给定状态与事件，
+          断言下一个状态与需要执行的副作用。这份表同时也是文档，
+          新人接手时先读它，再读代码。
+        </p>
+      </article>
+    </main>
+    <script>
+      // 截图脚本用 ?dark=1 切换深色版本
+      if (new URLSearchParams(location.search).has('dark')) {
+        document.body.classList.add('dark');
+      }
+    </script>
+  </body>
+</html>

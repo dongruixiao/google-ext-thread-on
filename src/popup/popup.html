@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web Sticky Scroll</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fg: #0f172a;
+        --muted: rgba(15, 23, 42, 0.58);
+        --bg: #ffffff;
+        --card: rgba(15, 23, 42, 0.035);
+        --border: rgba(15, 23, 42, 0.12);
+        --accent: #4f46e5;
+        --accent-soft: rgba(79, 70, 229, 0.12);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fg: #e9eaf3;
+          --muted: rgba(233, 234, 243, 0.6);
+          --bg: #14161d;
+          --card: rgba(255, 255, 255, 0.05);
+          --border: rgba(255, 255, 255, 0.14);
+          --accent: #8b8cf9;
+          --accent-soft: rgba(139, 140, 249, 0.16);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        width: 304px;
+        padding: 14px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+          'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .logo {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        background: linear-gradient(140deg, #4f46e5, #7c3aed);
+        color: #fff;
+        flex: none;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      header p {
+        margin: 0;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 10px;
+        padding: 7px 10px;
+        border-radius: 9px;
+        background: var(--card);
+        color: var(--muted);
+        font-size: 11.5px;
+        line-height: 1.45;
+      }
+
+      .status strong {
+        color: var(--fg);
+        font-weight: 600;
+      }
+
+      .status .current {
+        display: block;
+        max-width: 260px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--fg);
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: var(--card);
+        margin-bottom: 8px;
+      }
+
+      .row > span {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .row small {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      select {
+        font: inherit;
+        color: inherit;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 4px 6px;
+        max-width: 150px;
+      }
+
+      .switch input {
+        appearance: none;
+        width: 36px;
+        height: 20px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        position: relative;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+        flex: none;
+      }
+
+      .switch input::after {
+        content: '';
+        position: absolute;
+        top: 1px;
+        left: 1px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--muted);
+        transition: translate 0.15s ease, background-color 0.15s ease;
+      }
+
+      .switch input:checked {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
+
+      .switch input:checked::after {
+        translate: 16px 0;
+        background: var(--accent);
+      }
+
+      button {
+        font: inherit;
+        padding: 7px 10px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--fg);
+        cursor: pointer;
+        transition: background-color 0.15s ease, filter 0.15s ease;
+      }
+
+      button:hover {
+        background: var(--card);
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 2px;
+      }
+
+      .actions button {
+        flex: 1;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+
+      .primary:hover {
+        filter: brightness(1.08);
+        background: var(--accent);
+      }
+
+      footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 10.5px;
+      }
+
+      .link {
+        border: 0;
+        padding: 2px 4px;
+        color: var(--accent);
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <path
+            d="M2.75 4h10.5M2.75 8h7.5M2.75 12h4.5"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+            fill="none"
+          />
+        </svg>
+      </div>
+      <div>
+        <h1>Web Sticky Scroll</h1>
+        <p>网页吸顶层级面包屑</p>
+      </div>
+    </header>
+
+    <div class="status" id="status">正在检测当前页面…</div>
+
+    <label class="row switch">
+      <span>启用吸顶面包屑</span>
+      <input id="enabled" type="checkbox" />
+    </label>
+
+    <label class="row">
+      <span>
+        外观形态
+        <small id="appearanceHint">吸顶条：贴着顶栏，像页面自带</small>
+      </span>
+      <select id="appearance">
+        <option value="bar">吸顶条</option>
+        <option value="pill">悬浮胶囊</option>
+      </select>
+    </label>
+
+    <label class="row">
+      <span>
+        显示策略
+        <small id="policyHint">向下滚动浮现，向上滚动让位</small>
+      </span>
+      <select id="displayPolicy">
+        <option value="smart">智能</option>
+        <option value="always">常驻</option>
+        <option value="peek">轻提示</option>
+      </select>
+    </label>
+
+    <div class="actions">
+      <button id="site" type="button">在此站点禁用</button>
+      <button id="rescan" type="button">重新扫描</button>
+    </div>
+
+    <footer>
+      <button class="link" id="options" type="button">更多设置</button>
+      <span id="version">v0.3.0</span>
+    </footer>
+
+    <script type="module" src="./popup.ts"></script>
+  </body>
+</html>
