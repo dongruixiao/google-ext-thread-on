@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml/badge.svg)](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml)
 
+> **对外名称（Chrome 应用商店）：顶阅 — 网页章节吸顶导航**
+> 仓库名 `web-sticky-scroll` 保持不变，作为技术标识（GitHub Pages 的隐私政策链接依赖它，上架时要用）。
+
 把 VS Code 的 Sticky Scroll 体验带到网页阅读里：向下滚动时，当前小节的标题会被「吸」在页面顶部——
 钉在站点导航栏下方、和正文列对齐，而且**标题是它本人**：字体、字号、字重、行高、颜色全部与页面上渲染的一模一样，
 网页本身一个字节都不改。鼠标悬停可展开全文大纲与上级层级，点击即可回溯。
@@ -82,6 +85,21 @@
 
 - **设置 → 站点规则**：改成「仅在下列网站生效」，插件就只在你指定的站点工作
 - **popup**：对当前站点一键「在此站点禁用」；在没激活的页面上可以「强制启用」（判定失败时的兜底）
+
+## 适用场景（含实测结果与不适用的情况）
+
+| 场景 | 状态 |
+| --- | --- |
+| 技术文档（MDN / Python / React / Vite） | ✅ 实测正确激活 |
+| 学术论文 HTML 版（arXiv / ar5iv） | ✅ 实测正确激活（识别 `article.ltx_document`，索引 23 个章节标题） |
+| 法律条文（结构清晰的条文页，如 Cornell LII） | ✅ 实测正确激活 |
+| Wikipedia / GitHub README | ✅ 实测正确激活 |
+| 中文长文（知乎、公众号等） | ⚠️ 部分站点有登录墙/反爬，需在真实浏览器确认；判定失败时可在 popup 里「强制启用本页」 |
+| 列表页 / 搜索结果 / 营销首页 | ✅ 实测保持静默 |
+| **PDF（含 arXiv 的 PDF 版）** | ❌ 不支持：Chrome 的 PDF 阅读器不在网页 DOM 里，扩展无法介入 |
+| 没有小节标题的长文（不少新闻与深度报道） | ❌ 没有可吸顶的对象，保持静默 |
+
+一句话：**适用于"网页里带章节结构的长文"**；有没有目录都行（有目录时自动让位），但没有小节标题或不是网页正文时，它不会有任何动作。
 
 ## 交互
 
@@ -204,7 +222,7 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 
 ## 发布前检查清单
 
-- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.3.0）
+- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.4.0）
 - [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 扩展端到端 / 真实站点激活范围）
 - [ ] 确认权限仅 `storage`，`content_scripts.matches` 只覆盖 `http/https`
 - [ ] 更新截图：`npm run screenshots`（输出 1280×800 到 store/screenshots）

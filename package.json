@@ -1,9 +1,9 @@
 {
   "name": "web-sticky-scroll",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
-  "description": "Web Sticky Scroll —— 网页吸顶层级面包屑（类 VS Code Sticky Scroll 的阅读体验）",
+  "description": "顶阅 —— 网页章节吸顶导航（类 VS Code Sticky Scroll 的阅读体验）",
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build",

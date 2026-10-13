@@ -466,7 +466,7 @@ try {
     appearance: document.querySelector('#appearance')?.value ?? '',
     siteButtonDisabled: document.querySelector('#site')?.disabled ?? true,
   }));
-  check('popup 正常渲染', popupState.title.includes('Web Sticky Scroll'), popupState);
+  check('popup 正常渲染', popupState.title.includes('顶阅'), popupState);
   check('popup 能读到当前站点', popupState.siteButtonDisabled === false, popupState);
 
   await popup.evaluate(() => document.querySelector('#site').click());
