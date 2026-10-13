@@ -413,8 +413,13 @@ try {
       return {
         height: bar ? Math.round(bar.height) : 0,
         titleLeft: clone ? Math.round(clone.getBoundingClientRect().left) : null,
+        pathLeft: path && !path.hidden ? Math.round(path.getBoundingClientRect().left) : null,
         pathRight: path && !path.hidden ? Math.round(path.getBoundingClientRect().right) : null,
         columnLeft: inner ? Math.round(Number.parseFloat(getComputedStyle(inner).paddingLeft)) : null,
+        columnRight: inner
+          ? Math.round(window.innerWidth - Number.parseFloat(getComputedStyle(inner).paddingRight))
+          : null,
+        placement: path?.dataset.placement ?? null,
         pathVisible: path ? !path.hidden : false,
         pathText: path && !path.hidden ? path.textContent.trim() : null,
       };
@@ -443,6 +448,52 @@ try {
       (pathOn.pathText ?? '').length > 0,
     { pathOff, pathOn },
   );
+
+  // 布局适配①：左窄右宽的文章 → 路径自动去右侧空白，标题位置仍不变
+  const originalViewport = page.viewportSize() ?? { width: 1280, height: 800 };
+  await page.setViewportSize({ width: 700, height: 800 });
+  await options.selectOption('#pathMode', 'off');
+  await page.waitForTimeout(700);
+  const narrowOff = await readBar();
+  await options.selectOption('#pathMode', 'always');
+  await page.waitForTimeout(700);
+  const narrowOn = await readBar();
+  check(
+    '左窄右宽时路径改用右侧空白，标题位置不变',
+    narrowOn.pathVisible === true &&
+      narrowOn.placement === 'right-gutter' &&
+      narrowOn.pathLeft !== null &&
+      narrowOn.columnRight !== null &&
+      narrowOn.pathLeft >= narrowOn.columnRight + 8 &&
+      narrowOff.titleLeft !== null &&
+      narrowOn.titleLeft !== null &&
+      Math.abs(narrowOn.titleLeft - narrowOff.titleLeft) <= 1,
+    { narrowOff, narrowOn },
+  );
+
+  // 布局适配②：两侧都没空白（列宽模式）→ 退回条内右侧，且它先让步
+  await page.setViewportSize(originalViewport);
+  await options.selectOption('#barWidth', 'column');
+  await page.waitForTimeout(700);
+  const inlineOn = await readBar();
+  await options.selectOption('#pathMode', 'off');
+  await page.waitForTimeout(700);
+  const inlineOff = await readBar();
+  check(
+    '两侧都没有空白时路径回到条内右侧，标题仍不让位',
+    inlineOn.pathVisible === true &&
+      inlineOn.placement === 'inline' &&
+      inlineOn.pathLeft !== null &&
+      inlineOn.columnLeft !== null &&
+      inlineOn.pathLeft >= inlineOn.columnLeft - 1 &&
+      inlineOff.titleLeft !== null &&
+      inlineOn.titleLeft !== null &&
+      Math.abs(inlineOn.titleLeft - inlineOff.titleLeft) <= 1,
+    { inlineOff, inlineOn },
+  );
+  await options.selectOption('#barWidth', 'full');
+  await options.selectOption('#pathMode', 'adaptive');
+  await page.waitForTimeout(400);
 
   const optionsState = await options.evaluate(() => ({
     sections: document.querySelectorAll('section h2').length,

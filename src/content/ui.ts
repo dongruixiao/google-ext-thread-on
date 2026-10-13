@@ -3,7 +3,7 @@ import type { HeadingNode } from './extractor';
 import { BAR_PADDING_BLOCK, cloneHeading, estimateHeadingHeight } from './heading-clone';
 import type { Appearance, BarWidth, PillPosition, ThemeMode } from '../shared/settings';
 import { HOST_ID } from '../shared/constants';
-import { buildVisiblePath, decideInlinePath, type PathOptions } from './path';
+import { buildVisiblePath, decideInlinePath, decidePathPlacement, type PathOptions } from './path';
 import type { PageStyle } from './palette';
 import type { TrackerSnapshot } from './tracker';
 
@@ -50,6 +50,7 @@ export class StickyUI {
   private headingSlot: HTMLElement | null = null;
   private inlinePath: HTMLElement | null = null;
   private columnLeft = 0;
+  private columnRight = 0;
   private drawer: HTMLDivElement | null = null;
   private drawerPath: HTMLDivElement | null = null;
   private drawerProgress: HTMLElement | null = null;
@@ -226,6 +227,7 @@ export class StickyUI {
   setBarWidth(width: BarWidth): void {
     this.barWidth = width;
     if (this.root) this.root.dataset.barWidth = width;
+    this.render();
   }
 
   /** 正文列的位置：吸顶条按它对齐，看起来像是文章自己的标题栏 */
@@ -234,6 +236,7 @@ export class StickyUI {
     if (!root) return;
     if (!column) {
       this.columnLeft = 0;
+      this.columnRight = 0;
       root.style.removeProperty('--wss-col-left');
       root.style.removeProperty('--wss-col-width');
       root.style.removeProperty('--wss-col-right');
@@ -243,6 +246,7 @@ export class StickyUI {
     const left = Math.max(0, Math.min(column.left, viewport));
     const right = Math.max(left, Math.min(column.right, viewport));
     this.columnLeft = Math.round(left);
+    this.columnRight = Math.round(viewport - right);
     root.style.setProperty('--wss-col-left', `${Math.round(left)}px`);
     root.style.setProperty('--wss-col-width', `${Math.round(right - left)}px`);
     root.style.setProperty('--wss-col-right', `${Math.round(viewport - right)}px`);
@@ -273,6 +277,7 @@ export class StickyUI {
   setPathMode(mode: 'off' | 'adaptive' | 'always'): void {
     this.pathMode = mode;
     this.crumbsKey = '';
+    this.render();
   }
 
   update(snapshot: TrackerSnapshot): void {
@@ -371,13 +376,20 @@ export class StickyUI {
       viewportHeight: window.innerHeight,
     });
 
-    // 只放进正文列左侧的空白边距：标题的位置与宽度都不受任何影响
-    const hasGutter = this.barWidth === 'full' && this.columnLeft >= MIN_GUTTER_WIDTH;
-    if (!decision.show || this.presentation.compact || !hasGutter) {
+    // 放哪儿交给布局判断：左空白 → 右空白 → 条内右侧（它先让步，标题不让）
+    const placement = decidePathPlacement({
+      mode: this.pathMode,
+      barWidth: this.barWidth,
+      columnLeft: this.columnLeft,
+      columnRight: this.columnRight,
+      minGutter: MIN_GUTTER_WIDTH,
+    });
+    if (!decision.show || this.presentation.compact || placement === 'none') {
       host.hidden = true;
       return;
     }
     host.hidden = false;
+    host.dataset.placement = placement;
 
     if (decision.trimmed > 0) {
       const ellipsis = document.createElement('span');

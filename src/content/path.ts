@@ -95,3 +95,31 @@ export function decideInlinePath(options: InlinePathOptions): InlinePathDecision
   const visible = ancestors.slice(-options.maxChips);
   return { show: true, indexes: visible, trimmed: ancestors.length - visible.length };
 }
+
+export type PathPlacement = 'left-gutter' | 'right-gutter' | 'inline' | 'none';
+
+export interface PlacementOptions {
+  mode: 'off' | 'adaptive' | 'always';
+  /** 吸顶条的宽度形态：满宽时条外才有空白可用 */
+  barWidth: 'full' | 'column';
+  /** 正文列左侧 / 右侧的空白边距（px） */
+  columnLeft: number;
+  columnRight: number;
+  /** 认为“这条空白够用”的最小宽度 */
+  minGutter: number;
+}
+
+/**
+ * 上级路径放哪儿？各种网页布局都要能落得下，优先级从“完全不打扰标题”开始降级：
+ * 1. 左侧空白足够 → 放进左侧空白（绝对定位，不参与布局）
+ * 2. 左侧不够但右侧够 → 放进右侧空白（同样绝对定位）
+ * 3. 两侧都没有（满宽文章、窄窗口、列宽模式）→ 退回条内右侧的空地：
+ *    它是 flex 子项且 flex-shrink 极大，空间不够时**它先缩小、先消失**，标题的位置与宽度永远不让步
+ */
+export function decidePathPlacement(options: PlacementOptions): PathPlacement {
+  if (options.mode === 'off') return 'none';
+  if (options.barWidth === 'column') return 'inline';
+  if (options.columnLeft >= options.minGutter) return 'left-gutter';
+  if (options.columnRight >= options.minGutter) return 'right-gutter';
+  return 'inline';
+}

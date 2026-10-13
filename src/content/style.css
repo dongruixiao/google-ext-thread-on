@@ -156,15 +156,43 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  /* 绝对定位到正文列左侧的空白边距里：不参与布局，标题的位置与宽度完全不受影响 */
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* ① 左侧空白够：绝对定位进去，完全不参与布局 */
+.wss-bar-path[data-placement='left-gutter'] {
   position: absolute;
   top: 50%;
   right: calc(100% - var(--wss-col-left) + 10px);
   translate: 0 -50%;
   max-width: calc(var(--wss-col-left) - 18px);
-  overflow: hidden;
-  white-space: nowrap;
   justify-content: flex-end;
+}
+
+/* ② 左侧不够、右侧够：换成右侧空白（左窄右宽的文章布局） */
+.wss-bar-path[data-placement='right-gutter'] {
+  position: absolute;
+  top: 50%;
+  left: calc(100% - var(--wss-col-right) + 10px);
+  translate: 0 -50%;
+  max-width: calc(var(--wss-col-right) - 18px);
+  justify-content: flex-start;
+}
+
+/* ③ 两侧都没有空白（满宽文章 / 窄窗口 / 列宽模式）：退回条内右侧的空地。
+      flex-shrink 极大 = 空间不够时它先缩小先消失，标题的位置与宽度永远不变 */
+.wss-bar-path[data-placement='inline'] {
+  position: static;
+  margin-left: auto;
+  flex: 0 1000 auto;
+  min-width: 0;
+  max-width: 30%;
+  justify-content: flex-end;
+}
+
+.wss-bar-path[data-placement='inline'] .wss-path-chip {
+  min-width: 0;
 }
 
 .wss-bar-path[hidden] {

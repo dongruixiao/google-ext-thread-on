@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildVisiblePath } from './path';
-import { decideInlinePath } from './path';
+import { decideInlinePath, decidePathPlacement } from './path';
 
 const LEVELS = [1, 2, 3, 3];
 
@@ -107,5 +107,29 @@ describe('decideInlinePath', () => {
   it('没有上级时不显示', () => {
     const result = decideInlinePath({ ...base, mode: 'always', path: [0, 1] });
     expect(result.show).toBe(false);
+  });
+});
+
+describe('decidePathPlacement', () => {
+  const base = { mode: 'always' as const, barWidth: 'full' as const, columnLeft: 0, columnRight: 0, minGutter: 96 };
+
+  it('关闭时不放在任何地方', () => {
+    expect(decidePathPlacement({ ...base, mode: 'off', columnLeft: 300 })).toBe('none');
+  });
+
+  it('左侧空白够 → 左侧', () => {
+    expect(decidePathPlacement({ ...base, columnLeft: 150, columnRight: 150 })).toBe('left-gutter');
+  });
+
+  it('左侧不够但右侧够 → 右侧（适配左窄右宽的布局）', () => {
+    expect(decidePathPlacement({ ...base, columnLeft: 40, columnRight: 300 })).toBe('right-gutter');
+  });
+
+  it('两侧都窄 → 退回条内右侧，由它先让步', () => {
+    expect(decidePathPlacement({ ...base, columnLeft: 24, columnRight: 24 })).toBe('inline');
+  });
+
+  it('列宽模式没有条外空白 → 条内右侧', () => {
+    expect(decidePathPlacement({ ...base, barWidth: 'column', columnLeft: 200, columnRight: 200 })).toBe('inline');
   });
 });
