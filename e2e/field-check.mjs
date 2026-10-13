@@ -84,6 +84,31 @@ const inspect = (page) =>
       ? [...document.querySelectorAll('h1,h2,h3,h4')].find((node) => node.textContent.trim() === shownHeading)
       : null;
 
+    // 参考列：用网页自己的段落算出正文文字列（与插件实现无关）
+    const columnRef = (() => {
+      let best = [];
+      for (const scope of document.querySelectorAll('main, article, [role="main"]')) {
+        const paragraphs = [...scope.querySelectorAll('p')].filter((paragraph) => {
+          if (
+            paragraph.closest(
+              'nav, aside, footer, header, [role="navigation"], [role="complementary"], #__web_sticky_scroll_host__',
+            )
+          ) {
+            return false;
+          }
+          const rect = paragraph.getBoundingClientRect();
+          return rect.width >= 160 && rect.height > 0;
+        });
+        if (paragraphs.length > best.length) best = paragraphs;
+      }
+      if (best.length === 0) return null;
+      const lefts = best.map((p) => Math.round(p.getBoundingClientRect().left)).sort((a, b) => a - b);
+      const rights = best.map((p) => Math.round(p.getBoundingClientRect().right)).sort((a, b) => a - b);
+      const mid = Math.floor(lefts.length / 2);
+      return { left: lefts[mid], right: rights[mid], count: best.length };
+    })();
+    const cloneLeft = clone ? Math.round(clone.getBoundingClientRect().left) : null;
+
     // 结构指标：用来区分「长文」和「导航/营销/搜索页」
     const metrics = (() => {
       if (!scope) return null;
@@ -131,6 +156,10 @@ const inspect = (page) =>
       dockTop: Number.isFinite(dockTop) ? Math.round(dockTop) : null,
       siteHeader,
       shownHeading: shownHeading ? shownHeading.slice(0, 24) : null,
+      columnRef,
+      cloneLeft,
+      // 吸顶标题与正文文字列的偏差（越接近 0 越好）
+      alignmentDelta: cloneLeft !== null && columnRef ? cloneLeft - columnRef.left : null,
       shownHeadingOffset: source ? Math.round(source.getBoundingClientRect().top - (Number.isFinite(dockTop) ? dockTop : 0)) : null,
       scrollY: Math.round(window.scrollY),
       docHeight: Math.round(document.documentElement.scrollHeight),
@@ -181,6 +210,12 @@ for (const target of targets) {
     // 以插件自己的判定为准（页面正文可能在首屏之外，用“条是否可见”会误判）
     const statsText = entry.deeper.stats ?? entry.scrolled.stats ?? '';
     const activated = /(^|\s)art=1(\s|$)/.test(statsText);
+    const alignment = entry.deeper.alignmentDelta ?? entry.scrolled.alignmentDelta ?? null;
+    const barVisible = entry.deeper.visible === 'true' || entry.scrolled.visible === 'true';
+    entry.alignmentDelta = alignment;
+    // 只在“真的显示了”的页面上校验对齐：与正文文字列偏差 ≤ 8px
+    entry.aligned = !barVisible || alignment === null ? null : Math.abs(alignment) <= 8;
+    if (entry.aligned === false) mismatches += 1;
     entry.barVisible = entry.deeper.visible === 'true' || entry.scrolled.visible === 'true';
     entry.activated = activated;
     entry.pass = target.expect === 'active' ? activated : !activated;
@@ -199,6 +234,8 @@ for (const target of targets) {
       `scope=${entry.scrolled?.scope ?? '-'}`,
       `headings=${entry.scrolled?.headings ?? 0}`,
       `activated=${entry.activated ?? '-'}`,
+      `alignΔ=${entry.alignmentDelta ?? '-'}`,
+      entry.aligned === false ? '✗错位' : entry.aligned ? '✓对齐' : '',
       entry.failed ? `FAILED ${entry.failed}` : '',
     ].join(' '),
   );

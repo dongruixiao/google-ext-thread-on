@@ -325,19 +325,40 @@ class StickyScrollApp {
       .map((heading) => toBox(heading.element))
       .filter((box): box is Box => box !== null);
 
+    const paragraphBoxes: Box[] = [];
     const blockBoxes: Box[] = [];
     for (const block of index.scope.querySelectorAll<HTMLElement>('p, pre, blockquote, li')) {
       if (blockBoxes.length >= 80) break;
       if (block.closest(`#${HOST_ID}`)) continue;
       if (block.closest(SITE_CHROME_SELECTOR)) continue;
       const box = toBox(block);
-      if (box && box.width >= 120) blockBoxes.push(box);
+      if (!box || box.width < 120) continue;
+      if (block.tagName === 'P') paragraphBoxes.push(box);
+      else blockBoxes.push(box);
+    }
+
+    // 兜底用容器内容盒（扣掉内边距与边框），而不是外框
+    const scopeElement = index.scope;
+    const scopeRect = scopeElement.getBoundingClientRect();
+    const scopeStyle = getComputedStyle(scopeElement);
+    let scopeBox: Box | null = null;
+    if (scopeRect.width > 0) {
+      const left =
+        scopeRect.left +
+        (Number.parseFloat(scopeStyle.paddingLeft) || 0) +
+        (Number.parseFloat(scopeStyle.borderLeftWidth) || 0);
+      const right =
+        scopeRect.right -
+        (Number.parseFloat(scopeStyle.paddingRight) || 0) -
+        (Number.parseFloat(scopeStyle.borderRightWidth) || 0);
+      scopeBox = { left, right, width: right - left };
     }
 
     return deriveColumnBox({
       headingBoxes,
+      paragraphBoxes,
       blockBoxes,
-      scopeBox: toBox(index.scope),
+      scopeBox,
       viewportWidth: window.innerWidth,
     });
   }

@@ -18,9 +18,11 @@ export interface Box {
 export interface ColumnInput {
   /** 正文列里的标题矩形（已按正文容器与噪音区过滤过） */
   headingBoxes: Box[];
-  /** 内容块矩形（段落、代码块、引用等） */
+  /** 正文段落矩形（<p>，最贴近文字列） */
+  paragraphBoxes: Box[];
+  /** 其它内容块矩形（代码块、引用、列表项等），用于补足右缘 */
   blockBoxes: Box[];
-  /** 兜底：正文容器自身的矩形 */
+  /** 兜底：正文容器自身的内容盒（已扣掉内边距与边框） */
   scopeBox: Box | null;
   viewportWidth: number;
 }
@@ -43,11 +45,15 @@ function isValid(box: Box): boolean {
 
 export function deriveColumnBox(input: ColumnInput): Box | null {
   const headings = input.headingBoxes.filter(isValid);
+  const paragraphs = input.paragraphBoxes.filter(isValid);
   const blocks = input.blockBoxes.filter(isValid);
 
-  if (headings.length >= 2) {
-    const left = median(headings.map((box) => box.left));
-    const inColumn = blocks.filter(
+  // 左缘：标题与段落的左缘一起取中位数 —— 数量多的一方自然占优势，
+  // 单边异常（标题出血排版 / 段落缩进）都会被另一边的多数票纠正。
+  const lefts = [...headings.map((box) => box.left), ...paragraphs.map((box) => box.left)];
+  if (lefts.length >= 2) {
+    const left = median(lefts);
+    const inColumn = [...paragraphs, ...blocks].filter(
       (box) => Math.abs(box.left - left) <= COLUMN_TOLERANCE && box.width >= 120,
     );
     const right = inColumn.length >= 2
