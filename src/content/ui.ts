@@ -34,6 +34,9 @@ const DEFAULT_PATH_OPTIONS: PathOptions = { hideArticleTitle: true, maxCrumbs: 3
 
 const HOVER_TARGET = '.wss-pill, .wss-bar-inner, .wss-drawer';
 
+/** 正文列左侧边距至少这么宽，才把上级路径放进那条空白里 */
+const MIN_GUTTER_WIDTH = 96;
+
 /**
  * Shadow DOM 渲染层，支持两种形态：
  * - bar：吸顶条。把当前标题**原样克隆**进来（字体、字号、颜色全部照搬页面），
@@ -46,6 +49,7 @@ export class StickyUI {
   private crumbs: HTMLOListElement | null = null;
   private headingSlot: HTMLElement | null = null;
   private inlinePath: HTMLElement | null = null;
+  private columnLeft = 0;
   private drawer: HTMLDivElement | null = null;
   private drawerPath: HTMLDivElement | null = null;
   private drawerProgress: HTMLElement | null = null;
@@ -101,12 +105,12 @@ export class StickyUI {
       <div class="wss-bar" part="bar">
         <div class="wss-bar-sheet" aria-hidden="true"></div>
         <div class="wss-bar-inner">
-          <div class="wss-bar-path" hidden></div>
           <div class="wss-bar-heading" data-wss-role="heading" role="button" tabindex="0"
                aria-label="展开或固定文章目录"></div>
           <span class="wss-bar-caret" aria-hidden="true">
             <svg width="12" height="12" viewBox="0 0 16 16"><path d="M4 6.5 8 10.5l4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
           </span>
+          <div class="wss-bar-path" hidden></div>
           <span class="wss-progress" aria-hidden="true"><i></i></span>
         </div>
       </div>
@@ -229,6 +233,7 @@ export class StickyUI {
     const root = this.root;
     if (!root) return;
     if (!column) {
+      this.columnLeft = 0;
       root.style.removeProperty('--wss-col-left');
       root.style.removeProperty('--wss-col-width');
       root.style.removeProperty('--wss-col-right');
@@ -237,6 +242,7 @@ export class StickyUI {
     const viewport = window.innerWidth;
     const left = Math.max(0, Math.min(column.left, viewport));
     const right = Math.max(left, Math.min(column.right, viewport));
+    this.columnLeft = Math.round(left);
     root.style.setProperty('--wss-col-left', `${Math.round(left)}px`);
     root.style.setProperty('--wss-col-width', `${Math.round(right - left)}px`);
     root.style.setProperty('--wss-col-right', `${Math.round(viewport - right)}px`);
@@ -365,7 +371,9 @@ export class StickyUI {
       viewportHeight: window.innerHeight,
     });
 
-    if (!decision.show || this.presentation.compact) {
+    // 只放进正文列左侧的空白边距：标题的位置与宽度都不受任何影响
+    const hasGutter = this.barWidth === 'full' && this.columnLeft >= MIN_GUTTER_WIDTH;
+    if (!decision.show || this.presentation.compact || !hasGutter) {
       host.hidden = true;
       return;
     }

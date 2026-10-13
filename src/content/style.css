@@ -156,12 +156,15 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 42%;
-  margin-right: 8px;
+  /* 绝对定位到正文列左侧的空白边距里：不参与布局，标题的位置与宽度完全不受影响 */
+  position: absolute;
+  top: 50%;
+  right: calc(100% - var(--wss-col-left) + 10px);
+  translate: 0 -50%;
+  max-width: calc(var(--wss-col-left) - 18px);
   overflow: hidden;
   white-space: nowrap;
+  justify-content: flex-end;
 }
 
 .wss-bar-path[hidden] {

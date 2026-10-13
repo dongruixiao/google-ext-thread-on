@@ -408,8 +408,13 @@ try {
       const shadow = document.getElementById('__web_sticky_scroll_host__')?.shadowRoot;
       const bar = shadow?.querySelector('.wss-bar')?.getBoundingClientRect();
       const path = shadow?.querySelector('.wss-bar-path');
+      const clone = shadow?.querySelector('[data-wss-clone="true"]');
+      const inner = shadow?.querySelector('.wss-bar-inner');
       return {
         height: bar ? Math.round(bar.height) : 0,
+        titleLeft: clone ? Math.round(clone.getBoundingClientRect().left) : null,
+        pathRight: path && !path.hidden ? Math.round(path.getBoundingClientRect().right) : null,
+        columnLeft: inner ? Math.round(Number.parseFloat(getComputedStyle(inner).paddingLeft)) : null,
         pathVisible: path ? !path.hidden : false,
         pathText: path && !path.hidden ? path.textContent.trim() : null,
       };
@@ -426,9 +431,15 @@ try {
   const pathOn = await readBar();
   await options.selectOption('#pathMode', 'adaptive');
   check(
-    '上级路径内联显示且不改变条高',
+    '上级路径出现在左侧空白里：标题位置、宽度、条高都不受影响',
     pathOn.pathVisible === true &&
       Math.abs(pathOn.height - pathOff.height) <= 2 &&
+      pathOn.titleLeft !== null &&
+      pathOff.titleLeft !== null &&
+      Math.abs(pathOn.titleLeft - pathOff.titleLeft) <= 1 &&
+      pathOn.pathRight !== null &&
+      pathOn.columnLeft !== null &&
+      pathOn.pathRight <= pathOn.columnLeft &&
       (pathOn.pathText ?? '').length > 0,
     { pathOff, pathOn },
   );
