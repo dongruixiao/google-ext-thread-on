@@ -1,9 +1,10 @@
 import styleText from './style.css?inline';
 import type { HeadingNode } from './extractor';
+import { buildVisiblePath, type PathOptions } from './path';
 import { BAR_PADDING_BLOCK, cloneHeading, estimateHeadingHeight } from './heading-clone';
 import type { Appearance, BarWidth, PillPosition, ThemeMode } from '../shared/settings';
 import { HOST_ID } from '../shared/constants';
-import { buildVisiblePath, decideInlinePath, decidePathPlacement, type PathOptions } from './path';
+
 import type { PageStyle } from './palette';
 import type { TrackerSnapshot } from './tracker';
 
@@ -34,9 +35,6 @@ const DEFAULT_PATH_OPTIONS: PathOptions = { hideArticleTitle: true, maxCrumbs: 3
 
 const HOVER_TARGET = '.wss-pill, .wss-bar-inner, .wss-drawer';
 
-/** 正文列左侧边距至少这么宽，才把上级路径放进那条空白里 */
-const MIN_GUTTER_WIDTH = 96;
-
 /**
  * Shadow DOM 渲染层，支持两种形态：
  * - bar：吸顶条。把当前标题**原样克隆**进来（字体、字号、颜色全部照搬页面），
@@ -48,9 +46,6 @@ export class StickyUI {
   private root: HTMLDivElement | null = null;
   private crumbs: HTMLOListElement | null = null;
   private headingSlot: HTMLElement | null = null;
-  private inlinePath: HTMLElement | null = null;
-  private columnLeft = 0;
-  private columnRight = 0;
   private drawer: HTMLDivElement | null = null;
   private drawerPath: HTMLDivElement | null = null;
   private drawerProgress: HTMLElement | null = null;
@@ -66,7 +61,6 @@ export class StickyUI {
   private appearance: Appearance = 'bar';
   private barWidth: BarWidth = 'full';
   private pathOptions: PathOptions = { ...DEFAULT_PATH_OPTIONS };
-  private pathMode: 'off' | 'adaptive' | 'always' = 'adaptive';
   private snapshot: TrackerSnapshot = { ...EMPTY_SNAPSHOT };
   private presentation: Presentation = { ...DEFAULT_PRESENTATION };
 
@@ -111,7 +105,6 @@ export class StickyUI {
           <span class="wss-bar-caret" aria-hidden="true">
             <svg width="12" height="12" viewBox="0 0 16 16"><path d="M4 6.5 8 10.5l4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
           </span>
-          <div class="wss-bar-path" hidden></div>
           <span class="wss-progress" aria-hidden="true"><i></i></span>
         </div>
       </div>
@@ -137,7 +130,6 @@ export class StickyUI {
     this.root = root;
     this.crumbs = root.querySelector<HTMLOListElement>('.wss-pill > .wss-crumbs');
     this.headingSlot = root.querySelector<HTMLElement>('.wss-bar-heading');
-    this.inlinePath = root.querySelector<HTMLElement>('.wss-bar-path');
     this.drawer = root.querySelector<HTMLDivElement>('.wss-drawer');
     this.drawerPath = root.querySelector<HTMLDivElement>('.wss-drawer-path');
     this.drawerProgress = root.querySelector<HTMLElement>('.wss-drawer-progress');
@@ -185,7 +177,6 @@ export class StickyUI {
     this.root = null;
     this.crumbs = null;
     this.headingSlot = null;
-    this.inlinePath = null;
     this.drawer = null;
     this.drawerPath = null;
     this.drawerProgress = null;
@@ -235,8 +226,6 @@ export class StickyUI {
     const root = this.root;
     if (!root) return;
     if (!column) {
-      this.columnLeft = 0;
-      this.columnRight = 0;
       root.style.removeProperty('--wss-col-left');
       root.style.removeProperty('--wss-col-width');
       root.style.removeProperty('--wss-col-right');
@@ -245,8 +234,6 @@ export class StickyUI {
     const viewport = window.innerWidth;
     const left = Math.max(0, Math.min(column.left, viewport));
     const right = Math.max(left, Math.min(column.right, viewport));
-    this.columnLeft = Math.round(left);
-    this.columnRight = Math.round(viewport - right);
     root.style.setProperty('--wss-col-left', `${Math.round(left)}px`);
     root.style.setProperty('--wss-col-width', `${Math.round(right - left)}px`);
     root.style.setProperty('--wss-col-right', `${Math.round(viewport - right)}px`);
@@ -272,12 +259,6 @@ export class StickyUI {
   setPathOptions(options: Partial<PathOptions>): void {
     this.pathOptions = { ...this.pathOptions, ...options };
     this.crumbsKey = '';
-  }
-
-  setPathMode(mode: 'off' | 'adaptive' | 'always'): void {
-    this.pathMode = mode;
-    this.crumbsKey = '';
-    this.render();
   }
 
   update(snapshot: TrackerSnapshot): void {
@@ -323,7 +304,6 @@ export class StickyUI {
     if (presentation.compact && this.drawerOpen) this.closeDrawer();
 
     this.ensureHeadingClone(snapshot.index);
-    this.renderInlinePath(snapshot);
 
     const key = [
       snapshot.path.join('>'),
@@ -353,68 +333,6 @@ export class StickyUI {
   }
 
   /** 吸顶主体：把网页里的当前标题原样克隆进条里 */
-  /**
-   * 上级路径：不做两行堆叠（太占视觉），而是在必要时把最近几级上级
-   * 以小字内联在标题左侧；条高完全不变。
-   */
-  private renderInlinePath(snapshot: TrackerSnapshot): void {
-    const host = this.inlinePath;
-    if (!host) return;
-    host.replaceChildren();
-
-    const parentIndex = snapshot.path[snapshot.path.length - 2];
-    const parent = parentIndex !== undefined ? this.headings[parentIndex] : undefined;
-    const parentDistance = parent ? Math.round(-parent.element.getBoundingClientRect().bottom) : 0;
-
-    const decision = decideInlinePath({
-      mode: this.pathMode,
-      path: snapshot.path,
-      levels: this.levels,
-      hideArticleTitle: this.pathOptions.hideArticleTitle,
-      maxChips: 2,
-      parentDistance,
-      viewportHeight: window.innerHeight,
-    });
-
-    // 放哪儿交给布局判断：左空白 → 右空白 → 条内右侧（它先让步，标题不让）
-    const placement = decidePathPlacement({
-      mode: this.pathMode,
-      barWidth: this.barWidth,
-      columnLeft: this.columnLeft,
-      columnRight: this.columnRight,
-      minGutter: MIN_GUTTER_WIDTH,
-    });
-    if (!decision.show || this.presentation.compact || placement === 'none') {
-      host.hidden = true;
-      return;
-    }
-    host.hidden = false;
-    host.dataset.placement = placement;
-
-    if (decision.trimmed > 0) {
-      const ellipsis = document.createElement('span');
-      ellipsis.className = 'wss-path-more';
-      ellipsis.textContent = '…';
-      host.appendChild(ellipsis);
-    }
-    decision.indexes.forEach((headingIndex, position) => {
-      const node = this.headings[headingIndex];
-      if (!node) return;
-      if (position > 0 || decision.trimmed > 0) {
-        const separator = document.createElement('span');
-        separator.className = 'wss-path-sep';
-        separator.textContent = '›';
-        host.appendChild(separator);
-      }
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'wss-path-chip';
-      chip.dataset.wssIndex = String(headingIndex);
-      chip.textContent = node.text || '(无标题)';
-      chip.title = node.text;
-      host.appendChild(chip);
-    });
-  }
   private ensureHeadingClone(index: number): void {
     const slot = this.headingSlot;
     if (!slot) return;

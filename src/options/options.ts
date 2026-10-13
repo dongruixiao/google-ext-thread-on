@@ -8,7 +8,6 @@ import {
   type BarWidth,
   type DisplayPolicy,
   type PageTocMode,
-  type PathMode,
   type PillPosition,
   type SiteAccess,
   type ThemeMode,
@@ -31,7 +30,6 @@ const policySelect = getElement<HTMLSelectElement>('#displayPolicy');
 const hideTitleInput = getElement<HTMLInputElement>('#hideArticleTitle');
 const maxCrumbsSelect = getElement<HTMLSelectElement>('#maxCrumbs');
 const tocModeSelect = getElement<HTMLSelectElement>('#pageTocMode');
-const pathModeSelect = getElement<HTMLSelectElement>('#pathMode');
 const siteAccessSelect = getElement<HTMLSelectElement>('#siteAccess');
 const sitesTextarea = getElement<HTMLTextAreaElement>('#sites');
 const siteInput = getElement<HTMLInputElement>('#siteInput');
@@ -67,7 +65,6 @@ function render(): void {
   hideTitleInput.checked = settings.hideArticleTitle;
   maxCrumbsSelect.value = String(settings.maxCrumbs);
   tocModeSelect.value = settings.pageTocMode;
-  pathModeSelect.value = settings.pathMode;
   siteAccessSelect.value = settings.siteAccess;
   sitesTextarea.value = settings.sites.join('\n');
 }
@@ -89,7 +86,6 @@ function collect(): WssSettings {
     hideArticleTitle: hideTitleInput.checked,
     maxCrumbs: Number.parseInt(maxCrumbsSelect.value, 10),
     pageTocMode: tocModeSelect.value as PageTocMode,
-    pathMode: pathModeSelect.value as PathMode,
     siteAccess: siteAccessSelect.value as SiteAccess,
     sites,
   });
@@ -150,7 +146,6 @@ async function main(): Promise<void> {
     hideTitleInput,
     maxCrumbsSelect,
     tocModeSelect,
-    pathModeSelect,
     siteAccessSelect,
   ]) {
     element.addEventListener('change', () => commit());

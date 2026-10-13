@@ -287,7 +287,6 @@ class StickyScrollApp {
     this.updateLayoutMetrics();
     this.ui?.setAppearance(this.settings.appearance);
     this.ui?.setBarWidth(this.settings.barWidth);
-    this.ui?.setPathMode(this.settings.pathMode);
     this.ui?.setTop(this.pillTop());
     this.ui?.setPosition(this.settings.position);
     this.ui?.setTheme(this.settings.theme);
