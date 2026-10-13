@@ -63,7 +63,7 @@ const HEURISTIC_SELECTOR = [
 ].join(',');
 
 /** 站点框架与噪音区域：其中的标题不应进入面包屑 */
-const SITE_CHROME_SELECTOR = [
+export const SITE_CHROME_SELECTOR = [
   'nav',
   'aside',
   'footer',

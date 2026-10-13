@@ -17,7 +17,13 @@ import {
   subscribeSettings,
   type WssSettings,
 } from '../shared/settings';
-import { buildHeadingIndex, headingSignature, type HeadingIndex } from './extractor';
+import {
+  SITE_CHROME_SELECTOR,
+  buildHeadingIndex,
+  headingSignature,
+  type HeadingIndex,
+} from './extractor';
+import { deriveColumnBox, type Box } from './column';
 import {
   classifyTopChrome,
   hasSurface,
@@ -305,11 +311,35 @@ class StickyScrollApp {
 
   /** 正文列的位置：吸顶条按它对齐，看起来像文章自己的标题栏 */
   private columnBox(): { left: number; right: number; width: number } | null {
-    const scope = this.index?.scope;
-    if (!scope) return null;
-    const rect = scope.getBoundingClientRect();
-    if (!Number.isFinite(rect.left) || rect.width < 260) return null;
-    return { left: rect.left, right: rect.right, width: rect.width };
+    const index = this.index;
+    if (!index) return null;
+
+    const toBox = (element: Element): Box | null => {
+      const rect = element.getBoundingClientRect();
+      if (!Number.isFinite(rect.left) || !Number.isFinite(rect.right) || rect.width <= 0) return null;
+      return { left: rect.left, right: rect.right, width: rect.width };
+    };
+
+    // 正文列从内容本身量：标题的左缘 + 同列段落的右缘
+    const headingBoxes = index.headings
+      .map((heading) => toBox(heading.element))
+      .filter((box): box is Box => box !== null);
+
+    const blockBoxes: Box[] = [];
+    for (const block of index.scope.querySelectorAll<HTMLElement>('p, pre, blockquote, li')) {
+      if (blockBoxes.length >= 80) break;
+      if (block.closest(`#${HOST_ID}`)) continue;
+      if (block.closest(SITE_CHROME_SELECTOR)) continue;
+      const box = toBox(block);
+      if (box && box.width >= 120) blockBoxes.push(box);
+    }
+
+    return deriveColumnBox({
+      headingBoxes,
+      blockBoxes,
+      scopeBox: toBox(index.scope),
+      viewportWidth: window.innerWidth,
+    });
   }
 
   /** 采样正文配色：优先用二级标题（最常见的正文小节标题）的排版 */

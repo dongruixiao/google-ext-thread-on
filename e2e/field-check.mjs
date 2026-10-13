@@ -25,6 +25,8 @@ const DEFAULT_TARGETS = [
   { name: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Web_browser', expect: 'active' },
   { name: 'GitHub README', url: 'https://github.com/vitejs/vite', expect: 'active' },
   { name: 'Vite 官网文档', url: 'https://vite.dev/guide/', expect: 'active' },
+  // 整宽 main 里塞了左侧目录的文档站：吸顶标题必须对齐正文列，而不是贴视口左边
+  { name: 'pi.dev 文档', url: 'https://pi.dev/docs/latest', expect: 'active' },
   // 不该激活：列表页、搜索结果、营销首页
   { name: 'HN 列表', url: 'https://news.ycombinator.com/', expect: 'silent' },
   { name: 'MDN 目录页', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide', expect: 'silent' },
