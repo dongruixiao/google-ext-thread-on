@@ -1,5 +1,7 @@
 # Web Sticky Scroll
 
+[![CI](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml/badge.svg)](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml)
+
 把 VS Code 的 Sticky Scroll 体验带到网页阅读里：向下滚动时，当前小节的标题会被「吸」在页面顶部——
 钉在站点导航栏下方、和正文列对齐，而且**标题是它本人**：字体、字号、字重、行高、颜色全部与页面上渲染的一模一样，
 网页本身一个字节都不改。鼠标悬停可展开全文大纲与上级层级，点击即可回溯。
