@@ -12,6 +12,7 @@ function candidate(overrides: Partial<ChromeCandidate> = {}): ChromeCandidate {
     positioned: true,
     insideContent: false,
     opaque: true,
+    dialog: false,
     visible: true,
     ...overrides,
   };
@@ -67,5 +68,22 @@ describe('classifyTopChrome', () => {
   it('非 fixed/sticky 的元素一律不算站点框架', () => {
     const result = classifyTopChrome([candidate({ positioned: false })], VIEWPORT);
     expect(result).toEqual({ bottom: 0, blocked: false });
+  });
+
+  it('站点搜索面板 / 对话框盖住顶部时让位', () => {
+    const dialog = candidate({
+      dialog: true,
+      positioned: false,
+      top: 0,
+      bottom: 400,
+      width: 520,
+      height: 400,
+    });
+    expect(classifyTopChrome([dialog], VIEWPORT)).toEqual({ bottom: 0, blocked: true });
+  });
+
+  it('又小又矮的弹层不值得让位', () => {
+    const tiny = candidate({ dialog: true, positioned: false, width: 120, height: 40, bottom: 40 });
+    expect(classifyTopChrome([tiny], VIEWPORT)).toEqual({ bottom: 0, blocked: false });
   });
 });

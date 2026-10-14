@@ -397,6 +397,43 @@ try {
   const afterJump = await probe(page);
   check('跳转后吸顶条保持可见', afterJump.visible === 'true', afterJump);
 
+  // 浏览器页面查找（Ctrl/⌘+F）：不能压住查找条，也不能挡住被滚到顶部的命中文字
+  await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true }));
+  });
+  await page.waitForTimeout(400);
+  const findModeOn = await probe(page);
+  await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  });
+  await page.waitForTimeout(400);
+  const findModeOff = await probe(page);
+  check(
+    '页面查找时自动收起，Esc 后恢复',
+    findModeOn.visible === 'false' && findModeOff.visible === 'true',
+    { duringFind: findModeOn.visible, afterEsc: findModeOff.visible },
+  );
+
+  // 站点搜索面板 / 对话框盖住顶部 → 让位（与站点无关的通用规则）
+  await page.evaluate(() => {
+    const dialog = document.createElement('div');
+    dialog.id = 'e2e-dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.style.cssText =
+      'position:fixed;top:0;left:0;width:520px;height:400px;background:#fff;z-index:999999';
+    document.body.appendChild(dialog);
+  });
+  await page.waitForTimeout(1400);
+  const dialogOpen = await probe(page);
+  await page.evaluate(() => document.getElementById('e2e-dialog')?.remove());
+  await page.waitForTimeout(1400);
+  const dialogClosed = await probe(page);
+  check(
+    '站点弹层盖住顶部时让位，关闭后恢复',
+    dialogOpen.visible === 'false' && dialogClosed.visible === 'true',
+    { dialogOpen: dialogOpen.visible, dialogClosed: dialogClosed.visible },
+  );
+
   // options：切显示策略为智能、形态切回胶囊 → 页面实时响应
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);

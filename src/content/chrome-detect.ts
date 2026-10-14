@@ -21,6 +21,8 @@ export interface ChromeCandidate {
   insideContent: boolean;
   /** 是否有实色背景或背景图（用于识别遮罩层） */
   opaque: boolean;
+  /** 是否是页面弹层（dialog / aria-modal / role=dialog） */
+  dialog: boolean;
   visible: boolean;
 }
 
@@ -44,6 +46,9 @@ const MIN_BAR_WIDTH_RATIO = 0.6;
 const MAX_BAR_HEIGHT_RATIO = 0.35;
 /** 遮罩层至少要覆盖视口这个比例的高度 */
 const MIN_BLOCKER_HEIGHT_RATIO = 0.6;
+/** 弹层（站点搜索面板、对话框）至少要有这么大，才值得让位 */
+const MIN_DIALOG_WIDTH_RATIO = 0.2;
+const MIN_DIALOG_HEIGHT = 80;
 
 export function classifyTopChrome(candidates: ChromeCandidate[], viewport: Viewport): TopChrome {
   const cap = viewport.height * MAX_BAR_HEIGHT_RATIO;
@@ -51,7 +56,19 @@ export function classifyTopChrome(candidates: ChromeCandidate[], viewport: Viewp
   let blocked = false;
 
   for (const candidate of candidates) {
-    if (!candidate.visible || !candidate.positioned) continue;
+    if (!candidate.visible) continue;
+
+    // 页面弹层：搜索面板 / 对话框 / aria-modal，只要盖住顶部就让位
+    if (
+      candidate.dialog &&
+      candidate.width >= viewport.width * MIN_DIALOG_WIDTH_RATIO &&
+      candidate.height >= MIN_DIALOG_HEIGHT
+    ) {
+      blocked = true;
+      continue;
+    }
+
+    if (!candidate.positioned) continue;
     if (candidate.insideContent) continue; // 正文里的 sticky 属于内容，不是站点框架
     if (candidate.top > PROBE_TOLERANCE || candidate.bottom <= 0) continue;
     if (candidate.width < viewport.width * MIN_BAR_WIDTH_RATIO) continue; // 横向条，不是侧栏

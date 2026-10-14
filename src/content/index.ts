@@ -51,6 +51,9 @@ class StickyScrollApp {
   private overlayHeight = 0;
   /** 顶部被遮罩层挡住（对话框 / cookie 墙），此时收起 UI */
   private overlayBlocked = false;
+  /** 用户正在用浏览器的页面查找（Ctrl/⌘+F）：收起 UI，别挡住查找条与命中的文字 */
+  private findMode = false;
+  private findTimer = 0;
 
   // 显示策略状态
   private snapshot: TrackerSnapshot | null = null;
@@ -158,6 +161,11 @@ class StickyScrollApp {
       window.clearTimeout(timer);
       window.clearInterval(timer);
     }
+    if (this.findTimer !== 0) {
+      window.clearTimeout(this.findTimer);
+      this.findTimer = 0;
+    }
+    this.findMode = false;
     this.reindexTimer = 0;
     this.layoutTimer = 0;
     this.urlTimer = 0;
@@ -256,6 +264,8 @@ class StickyScrollApp {
     window.addEventListener('hashchange', this.scheduleLayoutRefresh);
     // 后台标签页里 rAF 不会运行，回到前台时补一次状态刷新
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    window.addEventListener('keydown', this.handleGlobalKeyDown, true);
+    window.addEventListener('pointerdown', this.handleGlobalPointerDown, true);
   }
 
   private unobserve(): void {
@@ -263,6 +273,8 @@ class StickyScrollApp {
     window.removeEventListener('popstate', this.scheduleReindex);
     window.removeEventListener('hashchange', this.scheduleLayoutRefresh);
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    window.removeEventListener('keydown', this.handleGlobalKeyDown, true);
+    window.removeEventListener('pointerdown', this.handleGlobalPointerDown, true);
   }
 
   private handleVisibilityChange = (): void => {
@@ -270,6 +282,41 @@ class StickyScrollApp {
     this.lastActivityAt = Date.now();
     this.refreshLayout();
   };
+
+  /**
+   * 浏览器页面查找（Ctrl/⌘+F）：查找条就在页面顶部，而我们用的是最高层级，
+   * 不收起来就会压住它、也会挡住被滚到顶部的命中文字。
+   * 恢复时机：按 Esc、回到页面里点击、或 20 秒兜底。
+   */
+  private handleGlobalKeyDown = (event: KeyboardEvent): void => {
+    const key = event.key.toLowerCase();
+    if ((event.ctrlKey || event.metaKey) && key === 'f' && !event.altKey) {
+      this.setFindMode(true);
+      return;
+    }
+    if (key === 'escape' && this.findMode) this.setFindMode(false);
+  };
+
+  private handleGlobalPointerDown = (): void => {
+    if (this.findMode) this.setFindMode(false);
+  };
+
+  private setFindMode(active: boolean): void {
+    if (this.findMode === active) return;
+    this.findMode = active;
+    if (this.findTimer !== 0) {
+      window.clearTimeout(this.findTimer);
+      this.findTimer = 0;
+    }
+    if (active) {
+      this.findTimer = window.setTimeout(() => {
+        this.findTimer = 0;
+        this.findMode = false;
+        this.applyPresentation();
+      }, 20000);
+    }
+    this.applyPresentation();
+  }
 
   private scheduleReindex = (): void => {
     if (this.reindexTimer !== 0) window.clearTimeout(this.reindexTimer);
@@ -427,6 +474,10 @@ class StickyScrollApp {
           positioned: isPositionedWithin(element),
           insideContent: scope !== null && scope !== element && scope.contains(element),
           opaque: hasSurface(style),
+          // 站点搜索面板 / 对话框：native <dialog>、aria-modal、role=dialog
+          dialog:
+            element.matches('dialog[open], [aria-modal="true"], [role="dialog"]') ||
+            element.closest('dialog[open], [aria-modal="true"], [role="dialog"]') !== null,
           visible:
             style.display !== 'none' &&
             style.visibility !== 'hidden' &&
@@ -516,7 +567,7 @@ class StickyScrollApp {
   private applyPresentation(): void {
     this.ui?.setPresentation({
       // 顶部被遮罩层盖住时不显示，免得浮在对话框上面
-      visible: this.shown && !this.overlayBlocked,
+      visible: this.shown && !this.overlayBlocked && !this.findMode,
       dim: this.dimmed,
       compact: this.settings.pageTocMode === 'adapt' && this.tocVisible,
     });
