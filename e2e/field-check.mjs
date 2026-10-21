@@ -77,7 +77,7 @@ const inspect = (page) =>
     const shadow = host?.shadowRoot;
     const root = shadow?.querySelector('.wss-root');
     const clone = shadow?.querySelector('[data-wss-clone="true"]');
-    const scope = document.querySelector('[data-wss-scope]');
+    const scope = document.querySelector('[data-wss-scope], [data-wss-stats]');
     const dockTop = Number.parseFloat(root?.style.getPropertyValue('--wss-top') ?? 'NaN');
 
     // 站点自己的固定顶栏高度（用来对比我们的吸附位置）
@@ -165,7 +165,7 @@ const inspect = (page) =>
       injected: !!host,
       hasIndex: root?.dataset.wssActive === 'true',
       scope: root?.dataset.wssScope ?? null,
-      stats: root?.dataset.wssStats ?? null,
+      stats: root?.dataset.wssStats ?? scope?.dataset.wssStats ?? null,
       headings: shadow?.querySelectorAll('.wss-row').length ?? 0,
       visible: root?.dataset.visible ?? null,
       compact: root?.dataset.compact ?? null,

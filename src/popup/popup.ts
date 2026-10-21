@@ -24,6 +24,8 @@ interface PageStatus {
   statusReason: string;
   isArticle: boolean;
   geometryReliable: boolean;
+  visualSafe: boolean;
+  visualReason: string;
   pageTocVisible: boolean;
   dockTop: number;
   layerZIndex: number;
@@ -114,6 +116,8 @@ function renderStatus(): void {
     const reason =
       status.statusReason === 'conversation-surface'
         ? '检测到持续对话与输入区，保持静默。'
+        : status.statusReason === 'visual-unreliable'
+          ? '页面背景或标题视觉无法安全融合，保持静默。'
         : status.statusReason === 'heading-geometry-unreliable'
           ? '标题布局无法可靠确认，保持静默。'
           : '未判定为可安全阅读的文章页（保持静默）。';
@@ -179,6 +183,8 @@ function diagnosticText(): string {
           `scope=${status.scope ?? '-'}`,
           `isArticle=${status.isArticle}`,
           `geometryReliable=${status.geometryReliable}`,
+          `visualSafe=${status.visualSafe}`,
+          `visualReason=${status.visualReason}`,
           `pageTocVisible=${status.pageTocVisible}`,
           `dockTop=${status.dockTop}`,
           `layerZIndex=${status.layerZIndex}`,

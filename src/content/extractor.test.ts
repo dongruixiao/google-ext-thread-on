@@ -202,6 +202,23 @@ describe('buildHeadingIndex', () => {
     expect(index?.diagnostics).toContain('conv=1');
   });
 
+  it('渐变背景页面即使正文结构完整也保持静默', () => {
+    document.body.innerHTML = `
+      <article style="background-image: linear-gradient(red, blue)">
+        <h1 style="color: white; font-size: 40px">文章标题</h1>
+        <p>${paragraph(120)}</p>
+        <h2 style="color: white; font-size: 32px">第一节</h2>
+        <p>${paragraph(720)}</p>
+        <h2 style="color: white; font-size: 32px">第二节</h2>
+        <p>${paragraph(680)}</p>
+      </article>
+    `;
+    const index = buildHeadingIndex();
+    expect(index?.isVisualSafe).toBe(false);
+    expect(index?.visualReason).toBe('background-complex');
+    expect(index?.isArticle).toBe(false);
+  });
+
   it('侧栏导航标题没有正文，不进入大纲', () => {
     pageWithSidebarHeadings();
     const index = buildHeadingIndex();

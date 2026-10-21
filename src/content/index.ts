@@ -40,6 +40,10 @@ import { samplePageStyle } from './palette';
 import { findTocCandidates, isAnyTocVisible } from './page-toc';
 import { ScrollTracker, type TrackerSnapshot } from './tracker';
 import { StickyUI } from './ui';
+import {
+  assessVisualSafety,
+  type VisualSafetyReason,
+} from './visual-safety';
 
 /** 探测点：网页顶部附近，用于识别原站自带的固定导航栏 */
 const OVERLAY_PROBES = [0.5, 0.08, 0.92];
@@ -59,6 +63,9 @@ class StickyScrollApp {
   private forced = false;
   private overlayHeight = 0;
   private foreignZIndex = 0;
+  private visualSafe = true;
+  private visualReason: VisualSafetyReason = 'safe';
+  private visualBackground = '';
   /** 顶部被遮罩层挡住（对话框 / cookie 墙），此时收起 UI */
   private overlayBlocked = false;
   /** 用户正在用浏览器的页面查找（Ctrl/⌘+F）：收起 UI，别挡住查找条与命中的文字 */
@@ -260,8 +267,17 @@ class StickyScrollApp {
     this.removePageMarkers();
     this.index = index;
     this.signature = signature;
+    this.visualSafe = index?.isVisualSafe ?? false;
+    this.visualReason = index?.visualReason ?? 'background-complex';
+    this.visualBackground = index?.visualBackground ?? '';
 
-    if (!index || !(index.isArticle || (this.forced && !index.isConversation))) {
+    if (
+      !index ||
+      !(
+        index.isArticle ||
+        (this.forced && !index.isConversation && index.isVisualSafe)
+      )
+    ) {
       // 非文章页（列表页 / 搜索页 / 应用页）：保持静默，不注入任何 UI
       this.snapshot = null;
       return;
@@ -474,6 +490,7 @@ class StickyScrollApp {
   private refreshLayout(): void {
     if (!this.index) return;
     this.updateLayoutMetrics();
+    this.refreshVisualSafety();
     this.ui?.setAppearance(this.settings.appearance);
     this.ui?.setBarWidth(this.settings.barWidth);
     this.ui?.setTop(this.pillTop());
@@ -681,7 +698,10 @@ class StickyScrollApp {
     if (!this.running) return;
     // 站点导航栏可能随滚动出现/隐藏（隐藏式顶栏很常见），定期重新校准吸附位置
     this.ticks += 1;
-    if (this.ticks % 2 === 0) this.recalibrateOverlay();
+    if (this.ticks % 2 === 0) {
+      this.refreshVisualSafety();
+      this.recalibrateOverlay();
+    }
 
     const policy = this.settings.displayPolicy;
     if (policy === 'always') return;
@@ -719,10 +739,31 @@ class StickyScrollApp {
     this.applyPresentation();
   }
 
+  private refreshVisualSafety(): void {
+    const index = this.index;
+    if (!index) return;
+    const safety = assessVisualSafety(
+      index.scope,
+      index.headings.map((heading) => heading.element),
+    );
+    const backgroundChanged =
+      safety.safe &&
+      this.visualBackground !== '' &&
+      safety.background !== this.visualBackground;
+    const nextSafe = safety.safe && !backgroundChanged;
+    const nextReason: VisualSafetyReason = backgroundChanged
+      ? 'background-unstable'
+      : safety.reason;
+    if (nextSafe === this.visualSafe && nextReason === this.visualReason) return;
+    this.visualSafe = nextSafe;
+    this.visualReason = nextReason;
+    this.applyPresentation();
+  }
+
   private applyPresentation(): void {
     this.ui?.setPresentation({
       // 顶部被遮罩层盖住时不显示，免得浮在对话框上面
-      visible: this.shown && !this.overlayBlocked && !this.findMode,
+      visible: this.visualSafe && this.shown && !this.overlayBlocked && !this.findMode,
       dim: this.dimmed,
       compact: this.settings.pageTocMode === 'adapt' && this.tocVisible,
     });
@@ -853,6 +894,8 @@ class StickyScrollApp {
     statusReason: string;
     isArticle: boolean;
     geometryReliable: boolean;
+    visualSafe: boolean;
+    visualReason: VisualSafetyReason;
     pageTocVisible: boolean;
     dockTop: number;
     layerZIndex: number;
@@ -861,7 +904,7 @@ class StickyScrollApp {
   } {
     const index = this.index;
     return {
-      active: !!this.ui && !!this.tracker,
+      active: this.visualSafe && !!this.ui && !!this.tracker,
       enabled: this.settings.enabled,
       siteEnabled: this.siteAllowed,
       host: location.hostname,
@@ -876,6 +919,8 @@ class StickyScrollApp {
       statusReason: this.statusReason(index),
       isArticle: index?.isArticle ?? false,
       geometryReliable: index?.stats.geometryReliable ?? false,
+      visualSafe: this.visualSafe,
+      visualReason: this.visualReason,
       pageTocVisible: this.tocVisible,
       dockTop: this.pillTop(),
       layerZIndex: this.layerZIndex(),
@@ -892,6 +937,7 @@ class StickyScrollApp {
     if (!this.siteAllowed) return 'site-disabled';
     if (!index) return 'no-heading-index';
     if (index.isConversation) return 'conversation-surface';
+    if (!index.isVisualSafe || !this.visualSafe) return 'visual-unreliable';
     if (!index.isArticle && !this.forced) {
       return index.stats.geometryReliable ? 'content-not-article' : 'heading-geometry-unreliable';
     }

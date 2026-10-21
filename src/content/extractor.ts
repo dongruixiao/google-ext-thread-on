@@ -1,5 +1,9 @@
 import { HOST_ID } from '../shared/constants';
 import { detectConversationSurface, type ConversationReason } from './conversation';
+import {
+  assessVisualSafety,
+  type VisualSafetyReason,
+} from './visual-safety';
 
 export interface HeadingNode {
   /** 原生 id 或自动生成的占位 id */
@@ -46,6 +50,10 @@ export interface HeadingIndex {
   /** 持续对话 / 代理工作区：即使有过长标题也不展示 */
   isConversation: boolean;
   conversationReason: ConversationReason;
+  /** 页面背景、对比度和标题效果是否支持自然融合 */
+  isVisualSafe: boolean;
+  visualReason: VisualSafetyReason;
+  visualBackground: string;
   stats: HeadingStats;
   /** 稳定的本地诊断快照，不依赖页面后续是否保留 data 属性 */
   diagnostics: string;
@@ -558,6 +566,10 @@ export function buildHeadingIndex(): HeadingIndex | null {
         : Math.min(1, headings.length / bodyHeadingCount);
     const geometry = assessHeadingGeometry(headings);
     const columnAligned = geometry.reliable && geometry.alignedRatio >= 0.7;
+    const visualSafety = assessVisualSafety(
+      attempt.scope,
+      headings.map((heading) => heading.element),
+    );
     const stats: HeadingStats = {
       headingCount: headings.length,
       scopeText,
@@ -573,7 +585,10 @@ export function buildHeadingIndex(): HeadingIndex | null {
       paragraphRatio: ratios.paragraphRatio,
     };
     const isArticle =
-      !conversation.detected && geometry.reliable && decideArticle(stats, attempt.semantic);
+      !conversation.detected &&
+      visualSafety.safe &&
+      geometry.reliable &&
+      decideArticle(stats, attempt.semantic);
     if (isArticle) ensureIds(headings, attempt.scope);
     // 判定依据挂在 DOM 上，便于排查“为什么这个页面激活/没激活”
     const diagnostics = [
@@ -596,6 +611,9 @@ export function buildHeadingIndex(): HeadingIndex | null {
       `conv=${conversation.detected ? 1 : 0}`,
       `convReason=${conversation.reason}`,
       `convTurns=${conversation.turns}`,
+      `visual=${visualSafety.safe ? 1 : 0}`,
+      `visualReason=${visualSafety.reason}`,
+      `contrast=${visualSafety.contrast}`,
       `art=${isArticle ? 1 : 0}`,
     ].join(' ');
     attempt.scope.dataset.wssStats = diagnostics;
@@ -605,6 +623,9 @@ export function buildHeadingIndex(): HeadingIndex | null {
       isArticle,
       isConversation: conversation.detected,
       conversationReason: conversation.reason,
+      isVisualSafe: visualSafety.safe,
+      visualReason: visualSafety.reason,
+      visualBackground: visualSafety.background,
       stats,
       diagnostics,
     };

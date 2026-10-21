@@ -88,6 +88,7 @@
 | **有效标题占全页比例 < 25%** | 列表页里的一张卡片 → 不激活 |
 | 最长小节 / 层级嵌套 | 都要足够深，否则当成目录页/聚合页 → 不激活 |
 | **持续对话输入区 + 多轮消息结构** | AI 聊天、代理工作区、对话式搜索 → 整体静默，不把单条回答当文章 |
+| **稳定实色背景 + 对比度达标 + 标题效果可复现** | 视觉安全门禁；渐变、图片、半透明叠层、混合模式、渐变字或低对比度 → 整体静默 |
 | 兜底到 body 的页面额外要求标题排在同一列 | 排除多栏营销页 |
 | 侧栏/导航里“标题后面没有正文”的项 | 直接不进大纲（例如 GitHub 仓库页侧栏） |
 
@@ -192,7 +193,8 @@
 | 标题散落在多栏、隐藏副本重叠、尺寸为零 | 几何可靠性门禁拒绝激活，宁可整页不显示 |
 | 连续布局或渲染异常 | 10 秒内连续 3 次失败即熔断，销毁 UI、监听器、计时器和页面标记；本页会话不再重试 |
 | Web 字体晚到 | 字体加载完成后重新克隆当前标题，避免吸顶条继续使用旧字体快照 |
-| 页面没有显式底色 | 不猜颜色，直接使用插件主题色，避免深底深字 |
+| 页面没有可靠底色或对比度无法确认 | 不猜颜色，不强行盖图板；视觉安全门禁直接保持静默 |
+| 背景运行中变成渐变 / 图片 | 每 800ms 巡检；检测到视觉安全失效立即收起，恢复稳定后重新显示 |
 | 正文列很窄或页面全宽 | 列宽不足 260px 时退回默认内边距，文字仍对齐可见区域 |
 | 正文容器把侧栏也框进去（整宽 `main`） | 正文列不从容器矩形取，而是**从内容本身推导**：标题左缘与段落左缘一起取中位数（单边异常由多数票纠正），右缘取同列段落的中位数；都不可信时回退到容器内容盒 |
 
@@ -213,6 +215,7 @@ web-sticky-scroll/
 │   │   ├── index.ts              # 入口：生命周期、显示策略状态机、站点门控、消息
 │   │   ├── extractor.ts          # 正文容器识别 + 标题层级树
 │   │   ├── conversation.ts       # 通用对话 / 代理工作区识别（无域名规则）
+│   │   ├── visual-safety.ts      # 背景稳定性、对比度与标题效果门禁
 │   │   ├── page-toc.ts           # 原站目录探测
 │   │   ├── path.ts               # 面包屑裁剪（纯函数，可单测）
 │   │   ├── tracker.ts            # 滚动监听、活跃标题、滚动方向
@@ -241,7 +244,7 @@ npm install
 npm run dev          # CRXJS 开发模式（HMR），在 chrome://extensions 加载 dist/
 npm run build        # 类型检查 + 打包到 dist/
 npm test             # 单元测试（启发式判定、路径裁剪、设置迁移）
-npm run e2e          # 端到端：真实浏览器加载 dist/ 跑 43 项断言
+npm run e2e          # 端到端：真实浏览器加载 dist/ 跑 45 项断言
 npm run field-check  # 实地检查：27 个真实站点的激活范围、对齐与插件布局位移
 npm run demo:dev     # 本地演示页
 npm run icons        # 重新生成图标
@@ -258,8 +261,8 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 
 ## 发布前检查清单
 
-- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.8.5）
-- [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 43 项端到端 /
+- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.9.0）
+- [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 45 项端到端 /
       真实站点的激活范围、标题对齐与插件布局位移）
 - [ ] 确认权限仅 `storage`，`content_scripts.matches` 只覆盖 `http/https`
 - [ ] 更新截图：`npm run screenshots`（输出 1280×800 到 store/screenshots）
@@ -276,7 +279,7 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 | `store/screenshots/*.png` | 1280×800 商店截图（`npm run screenshots` 生成） |
 | `store/demo-page.html` | 截图用的中性示例文章页 |
 
-打包：`npm run package` → `release/web-sticky-scroll-0.8.5.zip`（zip 根目录就是 manifest.json，可直接上传）
+打包：`npm run package` → `release/web-sticky-scroll-0.9.0.zip`（zip 根目录就是 manifest.json，可直接上传）
 
 ## 已知取舍
 

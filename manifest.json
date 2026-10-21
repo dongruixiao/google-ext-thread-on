@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TopClip — 读长文，不掉线",
   "description": "读长文不掉线：把当前章节标题原样吸在页面顶部，提醒你这一节在讲什么。悬停展开完整目录，附整篇阅读进度。",
-  "version": "0.8.5",
+  "version": "0.9.0",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon16.png",

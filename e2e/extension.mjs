@@ -34,9 +34,15 @@ function check(name, condition, detail) {
 function startFixtureServer() {
   const html = readFileSync(join(HERE, 'fixture.html'), 'utf8');
   const chatHtml = readFileSync(join(HERE, 'chat-fixture.html'), 'utf8');
+  const unsafeColorHtml = readFileSync(join(HERE, 'unsafe-color-fixture.html'), 'utf8');
   const server = createServer((request, response) => {
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    response.end(request.url?.startsWith('/chat') ? chatHtml : html);
+    const target = request.url?.startsWith('/chat')
+      ? chatHtml
+      : request.url?.startsWith('/unsafe-color')
+        ? unsafeColorHtml
+        : html;
+    response.end(target);
   });
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => {
@@ -139,6 +145,20 @@ try {
       chatSurface.composer &&
       !chatSurface.host,
     chatSurface,
+  );
+
+  const unsafeColorPage = await context.newPage();
+  await unsafeColorPage.goto(`${url}unsafe-color`, { waitUntil: 'load' });
+  await unsafeColorPage.waitForTimeout(1200);
+  const unsafeColor = await unsafeColorPage.evaluate(() => ({
+    headings: document.querySelectorAll('h1, h2').length,
+    host: !!document.getElementById('__web_sticky_scroll_host__'),
+  }));
+  await unsafeColorPage.close();
+  check(
+    '渐变和图片背景页面保持静默',
+    unsafeColor.headings >= 3 && !unsafeColor.host,
+    unsafeColor,
   );
 
   const atTop = await probe(page);
@@ -604,6 +624,24 @@ try {
       foreignLayer.topmost === 'e2e-foreign-layer' &&
       foreignLayerGone === '2147483600',
     { ...foreignLayer, restored: foreignLayerGone },
+  );
+
+  // 运行中背景突然变得复杂：视觉安全巡检应主动收起，恢复实色后再回来
+  await page.evaluate(() => {
+    document.querySelector('article').style.backgroundImage =
+      'linear-gradient(135deg, #ff006e, #3a86ff)';
+  });
+  await page.waitForTimeout(1400);
+  const dynamicUnsafe = await probe(page);
+  await page.evaluate(() => {
+    document.querySelector('article').style.removeProperty('background-image');
+  });
+  await page.waitForTimeout(1400);
+  const dynamicSafe = await probe(page);
+  check(
+    '背景动态变化时自动收起并恢复',
+    dynamicUnsafe.visible === 'false' && dynamicSafe.visible === 'true',
+    { unsafe: dynamicUnsafe.visible, restored: dynamicSafe.visible },
   );
 
   // 失败即静默：连续 3 次测量异常后彻底移除自身，异常不能泄漏到宿主页面

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Unsafe Visual Surface · E2E Fixture</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 48px 24px 160px;
+        background: linear-gradient(135deg, #ffb703, #fb5607 45%, #8338ec);
+        color: white;
+        font: 17px/1.8 system-ui, sans-serif;
+      }
+      article {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 32px;
+        background-image: linear-gradient(160deg, rgb(255 0 128 / 88%), rgb(0 190 255 / 88%));
+        border-radius: 24px;
+      }
+      h1 { font-size: 40px; }
+      h2 { margin-top: 56px; font-size: 30px; }
+      p { min-height: 180px; }
+    </style>
+  </head>
+  <body>
+    <article>
+      <h1 style="color: white">渐变背景中的长文章</h1>
+      <p>
+        这个页面拥有完整标题、长段落和清晰层级，但它没有稳定的正文背景色。
+        插件不应该猜测一个颜色覆盖在渐变上，否则会把页面原本鲜艳的视觉关系破坏掉。
+      </p>
+      <h2 style="color: white">第一节：背景并不稳定</h2>
+      <p>
+        正文区域同时叠加了多种颜色。即使文字当前看起来可读，吸顶状态也会让标题跨过
+        不同颜色和内容的交界处，固定的页面底色无法可靠复现原网页的视觉效果。
+      </p>
+      <h2 style="color: white">第二节：宁可不展示</h2>
+      <p>
+        页面结构像文章并不能抵消视觉风险。TopClip 应当直接退出，让网页保持原样，
+        而不是为了覆盖率制造新的色块、模糊或半透明面板。
+      </p>
+    </article>
+  </body>
+</html>
