@@ -25,6 +25,8 @@ export interface HeadingStats {
   headingShare: number;
   /** 标题是否基本排在同一列（营销首页往往多栏/居中混排） */
   columnAligned: boolean;
+  /** 标题几何是否足以让我们安全地执行吸顶（无法确认时宁可不显示） */
+  geometryReliable: boolean;
   /** 最长小节的正文长度（用于排除列表页/搜索页） */
   longestSection: number;
   /** 是否存在层级嵌套（h1 > h2 > h3） */
@@ -132,11 +134,15 @@ function createMeasure(): Measure {
 }
 
 function isVisible(el: HTMLElement): boolean {
-  if (el.getClientRects().length === 0) return false;
-  const style = getComputedStyle(el);
-  if (style.visibility === 'hidden' || style.display === 'none') return false;
-  if (style.opacity === '0') return false;
-  return true;
+  try {
+    if (el.getClientRects().length === 0) return false;
+    const style = getComputedStyle(el);
+    if (style.visibility === 'hidden' || style.display === 'none') return false;
+    if (style.opacity === '0') return false;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** 清理标题文本：去掉零宽字符、折叠空白、去掉 Markdown 锚点残留的 # */
@@ -376,16 +382,91 @@ function computeRatios(scope: HTMLElement, measure: Measure): {
  * 标题是否基本排在同一列。
  * 长文/文档的标题都在正文那一栏；营销首页的多栏网格、居中大标题会让它们散开。
  */
-function headingsShareColumn(headings: HeadingNode[], tolerance = 48): boolean {
-  if (headings.length < 3) return true;
-  const lefts = headings
-    .map((node) => node.element.getBoundingClientRect().left)
-    .filter((left) => Number.isFinite(left))
-    .sort((a, b) => a - b);
-  if (lefts.length < 3) return true;
-  const median = lefts[Math.floor(lefts.length / 2)];
-  const aligned = lefts.filter((left) => Math.abs(left - median) <= tolerance).length;
-  return aligned / lefts.length >= 0.6;
+export interface HeadingGeometry {
+  reliable: boolean;
+  measurable: number;
+  alignedRatio: number;
+  overlapRatio: number;
+}
+
+interface MeasuredHeading {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/**
+ * 标题几何可信度门禁。
+ *
+ * 只要无法确认“这些是正文里彼此独立、排在同一列的可读标题”，就不激活。
+ * 个别标题落在屏幕横向之外、尺寸为零、或大量互相叠置时，通常意味着
+ * 页面用了虚拟列表、隐藏副本、绝对定位装饰或多栏布局；这种页面宁可漏掉。
+ */
+export function assessHeadingGeometry(
+  headings: HeadingNode[],
+  viewportWidth = window.innerWidth,
+): HeadingGeometry {
+  const boxes: MeasuredHeading[] = [];
+  for (const node of headings) {
+    try {
+      const rect = node.element.getBoundingClientRect();
+      const visibleLeft = Math.max(0, rect.left);
+      const visibleRight = Math.min(viewportWidth, rect.right);
+      if (
+        !Number.isFinite(rect.left) ||
+        !Number.isFinite(rect.right) ||
+        !Number.isFinite(rect.top) ||
+        !Number.isFinite(rect.bottom) ||
+        rect.width < 24 ||
+        rect.height < 8 ||
+        visibleRight - visibleLeft < 24
+      ) {
+        continue;
+      }
+      boxes.push({
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+      });
+    } catch {
+      /* 单个标题量不到就不把它算作可信证据 */
+    }
+  }
+
+  if (boxes.length < 2 || boxes.length / Math.max(1, headings.length) < 0.8) {
+    return {
+      reliable: false,
+      measurable: boxes.length,
+      alignedRatio: 0,
+      overlapRatio: 0,
+    };
+  }
+
+  const lefts = boxes.map((box) => box.left).sort((a, b) => a - b);
+  const medianLeft = lefts[Math.floor(lefts.length / 2)];
+  const tolerance = Math.max(48, Math.min(72, viewportWidth * 0.06));
+  const alignedRatio =
+    boxes.filter((box) => Math.abs(box.left - medianLeft) <= tolerance).length / boxes.length;
+
+  const ordered = [...boxes].sort((a, b) => a.top - b.top || a.left - b.left);
+  let overlaps = 0;
+  for (let index = 1; index < ordered.length; index += 1) {
+    const previous = ordered[index - 1];
+    const current = ordered[index];
+    const overlap = Math.min(previous.bottom, current.bottom) - Math.max(previous.top, current.top);
+    const shortest = Math.min(previous.bottom - previous.top, current.bottom - current.top);
+    if (overlap > shortest * 0.7) overlaps += 1;
+  }
+  const overlapRatio = overlaps / Math.max(1, ordered.length - 1);
+
+  return {
+    reliable: alignedRatio >= 0.7 && overlapRatio <= 0.15,
+    measurable: boxes.length,
+    alignedRatio,
+    overlapRatio,
+  };
 }
 
 /** 扫描文档并构建标题层级索引；没有可用标题时返回 null */
@@ -424,7 +505,6 @@ export function buildHeadingIndex(): HeadingIndex | null {
     if (headings.length < 2) continue;
 
     linkParents(headings);
-    ensureIds(headings, attempt.scope);
     measureHeadings(headings);
     const scopeText = measure(attempt.scope);
     const ratios = computeRatios(attempt.scope, measure);
@@ -438,7 +518,8 @@ export function buildHeadingIndex(): HeadingIndex | null {
       attempt.scopeIsBodyish || bodyHeadingCount === 0
         ? 1
         : Math.min(1, headings.length / bodyHeadingCount);
-    const columnAligned = headingsShareColumn(headings);
+    const geometry = assessHeadingGeometry(headings);
+    const columnAligned = geometry.reliable && geometry.alignedRatio >= 0.7;
     const stats: HeadingStats = {
       headingCount: headings.length,
       scopeText,
@@ -447,12 +528,14 @@ export function buildHeadingIndex(): HeadingIndex | null {
       paragraphShare,
       headingShare,
       columnAligned,
+      geometryReliable: geometry.reliable,
       longestSection,
       hasHierarchy: headings.some((node) => node.parentIndex !== -1),
       linkRatio: ratios.linkRatio,
       paragraphRatio: ratios.paragraphRatio,
     };
-    const isArticle = decideArticle(stats, attempt.semantic);
+    const isArticle = geometry.reliable && decideArticle(stats, attempt.semantic);
+    if (isArticle) ensureIds(headings, attempt.scope);
     // 判定依据挂在 DOM 上，便于排查“为什么这个页面激活/没激活”
     attempt.scope.dataset.wssStats = [
       `h=${stats.headingCount}`,
@@ -464,6 +547,10 @@ export function buildHeadingIndex(): HeadingIndex | null {
       `pShare=${stats.paragraphShare.toFixed(2)}`,
       `hShare=${stats.headingShare.toFixed(2)}`,
       `col=${stats.columnAligned ? 1 : 0}`,
+      `geo=${stats.geometryReliable ? 1 : 0}`,
+      `meas=${geometry.measurable}/${headings.length}`,
+      `align=${geometry.alignedRatio.toFixed(2)}`,
+      `overlap=${geometry.overlapRatio.toFixed(2)}`,
       `hier=${stats.hasHierarchy ? 1 : 0}`,
       `kept=${headings.length}/${rawHeadings.length}`,
       `sem=${attempt.semantic ? 1 : 0}`,
@@ -492,4 +579,15 @@ export function measureHeadings(headings: HeadingNode[]): void {
 export function headingSignature(index: HeadingIndex): string {
   const parts = index.headings.map((node) => `${node.level}:${node.id}:${node.text}`);
   return [location.pathname, location.search, parts.join('|')].join('#');
+}
+
+/**
+ * 结构指纹相同并不代表节点还有效：React/Vue 等站点可能用完全相同的标题
+ * 重建 DOM。此时旧索引里的 element 已脱离文档，必须重新建立索引。
+ */
+export function headingIndexStillAttached(index: HeadingIndex): boolean {
+  if (!index.scope.isConnected) return false;
+  return index.headings.every(
+    (node) => node.element.isConnected && node.element.dataset.wssId === node.id,
+  );
 }

@@ -3,7 +3,7 @@ import type { HeadingNode } from './extractor';
 import { buildVisiblePath, type PathOptions } from './path';
 import { BAR_PADDING_BLOCK, cloneHeading, estimateHeadingHeight } from './heading-clone';
 import type { Appearance, BarWidth, PillPosition, ThemeMode } from '../shared/settings';
-import { HOST_ID } from '../shared/constants';
+import { HOST_ID, Z_INDEX } from '../shared/constants';
 
 import type { PageStyle } from './palette';
 import type { TrackerSnapshot } from './tracker';
@@ -73,7 +73,10 @@ export class StickyUI {
   private currentIndex = -2;
   private progressLabel = '';
 
-  constructor(private readonly onJump: (index: number) => void) {}
+  constructor(
+    private readonly onJump: (index: number) => void,
+    private readonly onError?: (action: string, error: unknown) => void,
+  ) {}
 
   mount(headings: HeadingNode[]): void {
     this.headings = headings;
@@ -94,6 +97,7 @@ export class StickyUI {
     root.dataset.appearance = this.appearance;
     root.dataset.barWidth = this.barWidth;
     root.dataset.pinned = 'false';
+    root.style.setProperty('--wss-z-index', String(Z_INDEX));
     root.setAttribute('role', 'navigation');
     root.setAttribute('aria-label', '当前章节位置');
     root.innerHTML = `
@@ -196,6 +200,10 @@ export class StickyUI {
     this.root?.style.setProperty('--wss-top', `${Math.round(px)}px`);
   }
 
+  setZIndex(value: number): void {
+    this.root?.style.setProperty('--wss-z-index', String(Math.max(1, Math.round(value))));
+  }
+
   setPosition(position: PillPosition): void {
     this.position = position;
     if (this.root) this.root.dataset.position = position;
@@ -273,6 +281,12 @@ export class StickyUI {
 
   isDrawerOpen(): boolean {
     return this.drawerOpen;
+  }
+
+  /** Web 字体晚到后重新克隆当前标题，避免条里保留旧字体快照 */
+  refreshHeadingClone(): void {
+    this.cloneIndex = -2;
+    this.render();
   }
 
   // ── 渲染 ────────────────────────────────────────────
@@ -554,6 +568,14 @@ export class StickyUI {
     }
   }
 
+  private safely(action: string, fn: () => void): void {
+    try {
+      fn();
+    } catch (error) {
+      this.onError?.(action, error);
+    }
+  }
+
   /**
    * 只滚动抽屉自身，绝不调用 scrollIntoView：
    * 抽屉挂在 fixed 宿主里，scrollIntoView 会连整页一起滚。
@@ -575,62 +597,78 @@ export class StickyUI {
   }
 
   private handleClick = (event: MouseEvent): void => {
-    const target = event.target as HTMLElement | null;
-    const trigger = target?.closest<HTMLElement>('[data-wss-index], [data-wss-role="heading"]');
-    if (!trigger) return;
-    event.stopPropagation();
-    // 点击吸顶条里的标题 → 固定/取消固定目录
-    if (trigger.dataset.wssRole === 'heading') {
-      this.togglePin();
-      return;
-    }
-    const index = Number.parseInt(trigger.dataset.wssIndex ?? '', 10);
-    if (Number.isFinite(index)) this.onJump(index);
+    this.safely('ui:click', () => {
+      const target = event.target as HTMLElement | null;
+      const trigger = target?.closest<HTMLElement>('[data-wss-index], [data-wss-role="heading"]');
+      if (!trigger) return;
+      event.stopPropagation();
+      // 点击吸顶条里的标题 → 固定/取消固定目录
+      if (trigger.dataset.wssRole === 'heading') {
+        this.togglePin();
+        return;
+      }
+      const index = Number.parseInt(trigger.dataset.wssIndex ?? '', 10);
+      if (Number.isFinite(index)) this.onJump(index);
+    });
   };
 
   private handleEnter = (event: Event): void => {
-    const target = event.target as HTMLElement | null;
-    if (!target?.closest(HOVER_TARGET)) return;
-    this.clearCloseTimer();
-    this.openDrawer();
+    this.safely('ui:enter', () => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest(HOVER_TARGET)) return;
+      this.clearCloseTimer();
+      this.openDrawer();
+    });
   };
 
   private handleLeave = (event: Event): void => {
-    const target = event.target as HTMLElement | null;
-    if (!target?.closest(HOVER_TARGET)) return;
-    this.clearCloseTimer();
-    // 被钉住的大纲不随鼠标离开而收起
-    if (this.pinned) return;
-    this.closeTimer = window.setTimeout(() => {
-      this.closeTimer = 0;
-      if (!this.pinned) this.closeDrawer();
-    }, CLOSE_DELAY);
+    this.safely('ui:leave', () => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest(HOVER_TARGET)) return;
+      this.clearCloseTimer();
+      // 被钉住的大纲不随鼠标离开而收起
+      if (this.pinned) return;
+      this.closeTimer = window.setTimeout(() => {
+        this.closeTimer = 0;
+        this.safely('ui:close', () => {
+          if (!this.pinned) this.closeDrawer();
+        });
+      }, CLOSE_DELAY);
+    });
   };
 
   private handleKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    const target = event.target as HTMLElement | null;
-    if (target?.dataset.wssRole === 'heading') {
-      event.preventDefault();
-      this.togglePin();
-    }
+    this.safely('ui:key', () => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const target = event.target as HTMLElement | null;
+      if (target?.dataset.wssRole === 'heading') {
+        event.preventDefault();
+        this.togglePin();
+      }
+    });
   };
 
   private handleWindowKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') this.closeDrawer();
+    this.safely('ui:escape', () => {
+      if (event.key === 'Escape') this.closeDrawer();
+    });
   };
 
   /** 点到 UI 之外就取消钉住 */
   private handleOutsidePointerDown = (event: Event): void => {
-    if (!this.drawerOpen || !this.host) return;
-    if (event.composedPath().includes(this.host)) return;
-    this.closeDrawer();
+    this.safely('ui:outside', () => {
+      if (!this.drawerOpen || !this.host) return;
+      if (event.composedPath().includes(this.host)) return;
+      this.closeDrawer();
+    });
   };
 
   private applyTheme = (): void => {
-    if (!this.root) return;
-    const prefersDark = this.mediaQuery ? this.mediaQuery.matches : false;
-    const resolved = this.themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : this.themeMode;
-    this.root.dataset.theme = resolved;
+    this.safely('ui:theme', () => {
+      if (!this.root) return;
+      const prefersDark = this.mediaQuery ? this.mediaQuery.matches : false;
+      const resolved = this.themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : this.themeMode;
+      this.root.dataset.theme = resolved;
+    });
   };
 }

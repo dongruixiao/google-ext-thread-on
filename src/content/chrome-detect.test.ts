@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { classifyTopChrome, type ChromeCandidate } from './chrome-detect';
+import {
+  classifyTopChrome,
+  highestForeignZIndex,
+  type ChromeCandidate,
+} from './chrome-detect';
 
 const VIEWPORT = { width: 1200, height: 800 };
 
@@ -13,6 +17,7 @@ function candidate(overrides: Partial<ChromeCandidate> = {}): ChromeCandidate {
     insideContent: false,
     opaque: true,
     dialog: false,
+    zIndex: 0,
     visible: true,
     ...overrides,
   };
@@ -85,5 +90,16 @@ describe('classifyTopChrome', () => {
   it('又小又矮的弹层不值得让位', () => {
     const tiny = candidate({ dialog: true, positioned: false, width: 120, height: 40, bottom: 40 });
     expect(classifyTopChrome([tiny], VIEWPORT)).toEqual({ bottom: 0, blocked: false });
+  });
+
+  it('统计顶部外来 UI 的最高层级，正文里的粘性元素不算', () => {
+    expect(
+      highestForeignZIndex([
+        candidate({ zIndex: 30 }),
+        candidate({ zIndex: 90, dialog: true, positioned: false }),
+        candidate({ zIndex: 999, insideContent: true }),
+        candidate({ zIndex: 999, positioned: false }),
+      ]),
+    ).toBe(90);
   });
 });

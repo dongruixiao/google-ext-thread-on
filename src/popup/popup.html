@@ -194,7 +194,8 @@
 
       .actions button {
         flex: 1;
-        font-size: 12px;
+        padding-inline: 5px;
+        font-size: 11px;
         white-space: nowrap;
       }
 
@@ -278,11 +279,12 @@
     <div class="actions">
       <button id="site" type="button">在此站点禁用</button>
       <button id="rescan" type="button">重新扫描</button>
+      <button id="copy" type="button" title="在本地复制诊断信息，不会发送网络请求">复制诊断</button>
     </div>
 
     <footer>
       <button class="link" id="options" type="button">更多设置</button>
-      <span id="version">v0.7.0</span>
+      <span id="version">v0.8.0</span>
     </footer>
 
     <script type="module" src="./popup.ts"></script>

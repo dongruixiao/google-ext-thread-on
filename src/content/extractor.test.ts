@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { buildHeadingIndex, headingSignature } from './extractor';
+import {
+  assessHeadingGeometry,
+  buildHeadingIndex,
+  headingIndexStillAttached,
+  headingSignature,
+  type HeadingNode,
+} from './extractor';
 
 function paragraph(length: number): string {
   return '状'.repeat(length);
@@ -74,6 +80,36 @@ function pageWithSidebarHeadings(): void {
   `;
 }
 
+function geometryHeadings(
+  boxes: Array<{ left: number; top: number; width?: number; height?: number }>,
+): HeadingNode[] {
+  return boxes.map((box, index) => {
+    const element = document.createElement('h2');
+    const width = box.width ?? 180;
+    const height = box.height ?? 28;
+    element.getBoundingClientRect = () =>
+      ({
+        x: box.left,
+        y: box.top,
+        left: box.left,
+        right: box.left + width,
+        top: box.top,
+        bottom: box.top + height,
+        width,
+        height,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    return {
+      id: `g${index}`,
+      element,
+      level: 2,
+      text: `标题 ${index + 1}`,
+      top: box.top,
+      parentIndex: -1,
+    };
+  });
+}
+
 describe('buildHeadingIndex', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -143,5 +179,79 @@ describe('buildHeadingIndex', () => {
     const after = second ? headingSignature(second) : '';
     expect(before).not.toBe('');
     expect(before).not.toBe(after);
+  });
+
+  it('结构签名相同但 DOM 节点被整体替换时，旧索引不可复用', () => {
+    articlePage();
+    const first = buildHeadingIndex();
+    expect(first).not.toBeNull();
+    if (!first) return;
+    expect(headingIndexStillAttached(first)).toBe(true);
+
+    const beforeSignature = headingSignature(first);
+    const article = document.querySelector('article');
+    if (!article) return;
+    article.innerHTML = article.innerHTML;
+    const second = buildHeadingIndex();
+    expect(second).not.toBeNull();
+    if (!second) return;
+
+    expect(headingSignature(second)).toBe(beforeSignature);
+    expect(headingIndexStillAttached(first)).toBe(false);
+    expect(headingIndexStillAttached(second)).toBe(true);
+  });
+});
+
+describe('标题几何可靠性门禁', () => {
+  it('同一正文列、彼此独立的标题可以激活', () => {
+    const geometry = assessHeadingGeometry(
+      geometryHeadings([
+        { left: 320, top: 100 },
+        { left: 321, top: 180 },
+        { left: 319, top: 260 },
+      ]),
+      1280,
+    );
+    expect(geometry.reliable).toBe(true);
+    expect(geometry.alignedRatio).toBe(1);
+    expect(geometry.overlapRatio).toBe(0);
+  });
+
+  it('标题散落在不同栏位时保持静默', () => {
+    const geometry = assessHeadingGeometry(
+      geometryHeadings([
+        { left: 80, top: 100 },
+        { left: 520, top: 180 },
+        { left: 960, top: 260 },
+      ]),
+      1280,
+    );
+    expect(geometry.reliable).toBe(false);
+  });
+
+  it('隐藏副本大量叠在同一点时保持静默', () => {
+    const geometry = assessHeadingGeometry(
+      geometryHeadings([
+        { left: 320, top: 100 },
+        { left: 320, top: 100 },
+        { left: 320, top: 100 },
+      ]),
+      1280,
+    );
+    expect(geometry.reliable).toBe(false);
+    expect(geometry.overlapRatio).toBe(1);
+  });
+
+  it('标题尺寸不可测量或横向越界时保持静默', () => {
+    const geometry = assessHeadingGeometry(
+      geometryHeadings([
+        { left: 320, top: 100, width: 0 },
+        { left: 1400, top: 180 },
+        { left: 320, top: 260, height: 0 },
+      ]),
+      1280,
+    );
+    expect(geometry.reliable).toBe(false);
+    expect(geometry.measurable).toBe(0);
   });
 });

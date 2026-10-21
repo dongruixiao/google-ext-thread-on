@@ -3,26 +3,32 @@
  * 这样单元测试才能覆盖与 DOM 结构相关的启发式逻辑。
  * 需要隐藏某个元素时，测试里用 style="display:none"（jsdom 会正确计算样式）。
  */
-const RECT = {
-  x: 0,
-  y: 0,
-  width: 160,
-  height: 24,
-  top: 0,
-  right: 160,
-  bottom: 24,
-  left: 0,
-  toJSON() {
-    return { ...this };
-  },
-} as DOMRect;
+function layoutRect(element: Element): DOMRect {
+  // 让不同 DOM 节点拥有不同的纵向位置，避免几何可靠性门禁把所有测试标题
+  // 误认为“完全叠在一起”。真实浏览器里这些值来自页面布局。
+  const nodes = [...document.querySelectorAll('*')];
+  const top = Math.max(0, nodes.indexOf(element)) * 40;
+  return {
+    x: 0,
+    y: top,
+    width: 160,
+    height: 24,
+    top,
+    right: 160,
+    bottom: top + 24,
+    left: 0,
+    toJSON() {
+      return { ...this };
+    },
+  } as DOMRect;
+}
 
 if (typeof Element !== 'undefined') {
   Element.prototype.getBoundingClientRect = function getBoundingClientRect(): DOMRect {
-    return RECT;
+    return layoutRect(this);
   };
   Element.prototype.getClientRects = function getClientRects(): DOMRectList {
-    return [RECT] as unknown as DOMRectList;
+    return [layoutRect(this)] as unknown as DOMRectList;
   };
 }
 

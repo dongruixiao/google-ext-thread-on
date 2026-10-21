@@ -19,6 +19,8 @@ export interface TrackerOptions {
   dockTop?: () => number;
   /** 第 index 个标题吸顶后会占用的高度 */
   heightOf?: (index: number) => number;
+  /** 滚动回调内的异常交给上层熔断，避免冒泡成页面错误 */
+  onError?: (action: string, error: unknown) => void;
 }
 
 const EMPTY_SNAPSHOT: TrackerSnapshot = { index: -1, path: [], progress: 0 };
@@ -58,6 +60,7 @@ export class ScrollTracker {
   private readonly onActivity?: (direction: 1 | -1) => void;
   private readonly dockTop: () => number;
   private readonly heightOf: (index: number) => number;
+  private readonly onError?: (action: string, error: unknown) => void;
 
   constructor(
     private readonly headings: HeadingNode[],
@@ -68,6 +71,7 @@ export class ScrollTracker {
     this.scope = options.scope ?? null;
     this.dockTop = options.dockTop ?? (() => 0);
     this.heightOf = options.heightOf ?? (() => DEFAULT_HEIGHT);
+    this.onError = options.onError;
   }
 
   setScope(scope: HTMLElement | null): void {
@@ -131,8 +135,12 @@ export class ScrollTracker {
     if (this.rafId !== 0) return;
     this.rafId = requestAnimationFrame(() => {
       this.rafId = 0;
-      this.emitActivity();
-      this.flush();
+      try {
+        this.emitActivity();
+        this.flush();
+      } catch (error) {
+        this.onError?.('scroll', error);
+      }
     });
   };
 

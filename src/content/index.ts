@@ -8,6 +8,7 @@ import {
   REINDEX_DEBOUNCE,
   TOC_PROBE_INTERVAL,
   URL_POLL_INTERVAL,
+  Z_INDEX,
 } from '../shared/constants';
 import {
   DEFAULT_SETTINGS,
@@ -21,12 +22,16 @@ import {
   SITE_CHROME_SELECTOR,
   buildHeadingIndex,
   headingSignature,
+  headingIndexStillAttached,
   type HeadingIndex,
 } from './extractor';
 import { deriveColumnBox, type Box } from './column';
+import { FailureGuard } from './failure-guard';
 import {
   classifyTopChrome,
+  effectiveZIndex,
   hasSurface,
+  highestForeignZIndex,
   isPositionedWithin,
   type ChromeCandidate,
 } from './chrome-detect';
@@ -38,8 +43,12 @@ import { StickyUI } from './ui';
 
 /** 探测点：网页顶部附近，用于识别原站自带的固定导航栏 */
 const OVERLAY_PROBES = [0.5, 0.08, 0.92];
+const FAIL_SAFE_PREFIX = 'wss:failsafe:';
 
 class StickyScrollApp {
+  private readonly guard = new FailureGuard({
+    onFailSafe: (reason) => this.failSafe(reason),
+  });
   private settings: WssSettings = { ...DEFAULT_SETTINGS };
   private index: HeadingIndex | null = null;
   private tracker: ScrollTracker | null = null;
@@ -49,6 +58,7 @@ class StickyScrollApp {
   private siteAllowed = true;
   private forced = false;
   private overlayHeight = 0;
+  private foreignZIndex = 0;
   /** 顶部被遮罩层挡住（对话框 / cookie 墙），此时收起 UI */
   private overlayBlocked = false;
   /** 用户正在用浏览器的页面查找（Ctrl/⌘+F）：收起 UI，别挡住查找条与命中的文字 */
@@ -59,6 +69,7 @@ class StickyScrollApp {
   private snapshot: TrackerSnapshot | null = null;
   private shown = true;
   private dimmed = false;
+  private failSafeTripped = false;
   private lastActivityAt = 0;
   /** 主动跳转期间不要因为“向上滚动”就把胶囊收起来 */
   private keepVisibleUntil = 0;
@@ -77,12 +88,32 @@ class StickyScrollApp {
   private idleTimer = 0;
   private tocTimer = 0;
   private lastUrl = location.href;
+  private unsubscribeSettings: (() => void) | null = null;
+  private messageListener:
+    | ((
+        message: unknown,
+        sender: chrome.runtime.MessageSender,
+        sendResponse: (response?: unknown) => void,
+      ) => void)
+    | null = null;
 
-  async boot(): Promise<void> {
+  async start(): Promise<void> {
+    try {
+      await this.boot();
+    } catch {
+      // 启动没有后续重试机会，任何失败都立刻完整退出。
+      this.failSafe('boot failed');
+    }
+  }
+
+  private async boot(): Promise<void> {
     // 只在顶层窗口运行（manifest 也已限制 all_frames: false）
     if (window.self !== window.top) return;
+    if (this.hadFailSafe()) return;
     this.settings = await loadSettings();
-    subscribeSettings((next) => this.applySettings(next));
+    this.unsubscribeSettings = subscribeSettings((next) => {
+      this.guard.run('settings-change', () => this.applySettings(next));
+    });
     this.listenForMessages();
     this.applySettings(this.settings);
   }
@@ -130,14 +161,22 @@ class StickyScrollApp {
     this.lastActivityAt = Date.now();
     this.rebuild();
     this.observe();
-    this.idleTimer = window.setInterval(this.idleTick, IDLE_TICK_INTERVAL);
-    this.tocTimer = window.setInterval(this.probeToc, TOC_PROBE_INTERVAL);
+    this.idleTimer = window.setInterval(
+      () => this.guard.run('idle-tick', this.idleTick),
+      IDLE_TICK_INTERVAL,
+    );
+    this.tocTimer = window.setInterval(
+      () => this.guard.run('toc-probe', this.probeToc),
+      TOC_PROBE_INTERVAL,
+    );
     this.urlTimer = window.setInterval(() => {
-      if (location.href === this.lastUrl) return;
-      // SPA 路由变化：pushState 不会触发任何事件，只能轮询兜底
-      this.lastUrl = location.href;
-      this.forced = false;
-      this.scheduleReindex();
+      this.guard.run('url-poll', () => {
+        if (location.href === this.lastUrl) return;
+        // SPA 路由变化：pushState 不会触发任何事件，只能轮询兜底
+        this.lastUrl = location.href;
+        this.forced = false;
+        this.scheduleReindex();
+      });
     }, URL_POLL_INTERVAL);
   }
 
@@ -147,14 +186,30 @@ class StickyScrollApp {
   }
 
   private teardown(): void {
-    this.tracker?.stop();
+    try {
+      this.tracker?.stop();
+    } catch {
+      /* 清理阶段继续销毁其它资源 */
+    }
     this.tracker = null;
-    this.ui?.destroy();
+    try {
+      this.ui?.destroy();
+    } catch {
+      /* Shadow DOM 已不可用时也不能让清理中断 */
+    }
     this.ui = null;
-    this.unobserve();
-    this.observer?.disconnect();
+    try {
+      this.unobserve();
+      this.observer?.disconnect();
+    } catch {
+      /* 监听器可能已随页面卸载 */
+    }
     this.observer = null;
-    this.resizeObserver?.disconnect();
+    try {
+      this.resizeObserver?.disconnect();
+    } catch {
+      /* ResizeObserver 可能已失效 */
+    }
     this.resizeObserver = null;
     for (const timer of [this.reindexTimer, this.layoutTimer, this.urlTimer, this.idleTimer, this.tocTimer]) {
       if (timer === 0) continue;
@@ -171,6 +226,7 @@ class StickyScrollApp {
     this.urlTimer = 0;
     this.idleTimer = 0;
     this.tocTimer = 0;
+    this.removePageMarkers();
     this.index = null;
     this.snapshot = null;
     this.signature = '';
@@ -186,7 +242,13 @@ class StickyScrollApp {
     const index = buildHeadingIndex();
     const signature = index ? headingSignature(index) : '';
 
-    if (!force && index && this.index && signature === this.signature) {
+    if (
+      !force &&
+      index &&
+      this.index &&
+      signature === this.signature &&
+      headingIndexStillAttached(this.index)
+    ) {
       this.refreshLayout();
       return;
     }
@@ -195,6 +257,7 @@ class StickyScrollApp {
     this.tracker = null;
     this.ui?.destroy();
     this.ui = null;
+    this.removePageMarkers();
     this.index = index;
     this.signature = signature;
 
@@ -204,7 +267,10 @@ class StickyScrollApp {
       return;
     }
 
-    const ui = new StickyUI((headingIndex) => this.jumpTo(headingIndex));
+    const ui = new StickyUI(
+      (headingIndex) => this.jumpTo(headingIndex),
+      (action, error) => this.guard.report(action, error),
+    );
     ui.setPathOptions({
       hideArticleTitle: this.settings.hideArticleTitle,
       maxCrumbs: this.settings.maxCrumbs,
@@ -221,14 +287,19 @@ class StickyScrollApp {
     const tracker = new ScrollTracker(
       index.headings,
       (snapshot) => {
-        this.snapshot = snapshot;
-        this.ui?.update(snapshot);
+        this.guard.run('tracker-update', () => {
+          this.snapshot = snapshot;
+          this.ui?.update(snapshot);
+        });
       },
       {
-        onActivity: this.handleScrollActivity,
+        onActivity: (direction) => {
+          this.guard.run('tracker-activity', () => this.handleScrollActivity(direction));
+        },
         scope: index.scope,
         dockTop: () => this.pillTop(),
         heightOf: (headingIndex) => this.heightForHeading(headingIndex),
+        onError: (action, error) => this.guard.report(`tracker-${action}`, error),
       },
     );
     this.tracker = tracker;
@@ -243,18 +314,28 @@ class StickyScrollApp {
     observer.observe(index.scope);
     if (document.body) observer.observe(document.body);
     this.resizeObserver = observer;
-    void document.fonts?.ready.then(() => this.refreshLayout()).catch(() => undefined);
+    const fonts = document.fonts;
+    if (!fonts) return;
+    fonts.addEventListener('loadingdone', this.handleFontsLoaded);
+    void this.guard.runAsync('fonts-ready', async () => {
+      await fonts.ready;
+      // Web 字体晚于 document_idle 加载时，标题克隆里的字体快照会过期。
+      this.ui?.refreshHeadingClone();
+      this.refreshLayout();
+    });
   }
 
   private observe(): void {
     if (this.observer || !document.body) return;
     const observer = new MutationObserver((records) => {
-      const onlyOwnUi = records.every((record) => {
-        const target = record.target;
-        return target instanceof Element && target.closest(`#${HOST_ID}`) !== null;
+      this.guard.run('mutation-observer', () => {
+        const onlyOwnUi = records.every((record) => {
+          const target = record.target;
+          return target instanceof Element && target.closest(`#${HOST_ID}`) !== null;
+        });
+        if (onlyOwnUi) return;
+        this.scheduleReindex();
       });
-      if (onlyOwnUi) return;
-      this.scheduleReindex();
     });
     observer.observe(document.body, { childList: true, subtree: true });
     this.observer = observer;
@@ -275,12 +356,15 @@ class StickyScrollApp {
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     window.removeEventListener('keydown', this.handleGlobalKeyDown, true);
     window.removeEventListener('pointerdown', this.handleGlobalPointerDown, true);
+    document.fonts?.removeEventListener('loadingdone', this.handleFontsLoaded);
   }
 
   private handleVisibilityChange = (): void => {
-    if (document.visibilityState !== 'visible') return;
-    this.lastActivityAt = Date.now();
-    this.refreshLayout();
+    this.guard.run('visibility', () => {
+      if (document.visibilityState !== 'visible') return;
+      this.lastActivityAt = Date.now();
+      this.refreshLayout();
+    });
   };
 
   /**
@@ -289,16 +373,60 @@ class StickyScrollApp {
    * 恢复时机：按 Esc、回到页面里点击、或 20 秒兜底。
    */
   private handleGlobalKeyDown = (event: KeyboardEvent): void => {
-    const key = event.key.toLowerCase();
-    if ((event.ctrlKey || event.metaKey) && key === 'f' && !event.altKey) {
-      this.setFindMode(true);
-      return;
-    }
-    if (key === 'escape' && this.findMode) this.setFindMode(false);
+    this.guard.run('global-key', () => {
+      const key = event.key.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && key === 'f' && !event.altKey) {
+        this.setFindMode(true);
+        return;
+      }
+      if (
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        (key === '[' || key === ']') &&
+        !this.isEditableTarget(event.target)
+      ) {
+        event.preventDefault();
+        this.jumpAdjacent(key === ']' ? 1 : -1);
+        return;
+      }
+      if (key === 'escape' && this.findMode) this.setFindMode(false);
+    });
   };
 
+  private isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    return (
+      target.isContentEditable ||
+      target.matches('input, textarea, select, [contenteditable="true"]')
+    );
+  }
+
+  private jumpAdjacent(direction: 1 | -1): void {
+    const headings = this.index?.headings;
+    if (!headings || headings.length === 0 || !this.ui || !this.tracker) return;
+    const current = this.snapshot?.index ?? -1;
+    let next = current + direction;
+    if (current < 0 && direction === 1) {
+      next = this.settings.hideArticleTitle && headings.some((node) => node.level > 1)
+        ? headings.findIndex((node) => node.level > 1)
+        : 0;
+    }
+    if (next < 0 || next >= headings.length) return;
+    this.jumpTo(next);
+  }
+
   private handleGlobalPointerDown = (): void => {
-    if (this.findMode) this.setFindMode(false);
+    this.guard.run('global-pointer', () => {
+      if (this.findMode) this.setFindMode(false);
+    });
+  };
+
+  private handleFontsLoaded = (): void => {
+    this.guard.run('fonts-loaded', () => {
+      this.ui?.refreshHeadingClone();
+      this.refreshLayout();
+    });
   };
 
   private setFindMode(active: boolean): void {
@@ -319,19 +447,23 @@ class StickyScrollApp {
   }
 
   private scheduleReindex = (): void => {
-    if (this.reindexTimer !== 0) window.clearTimeout(this.reindexTimer);
-    this.reindexTimer = window.setTimeout(() => {
-      this.reindexTimer = 0;
-      this.rebuild();
-    }, REINDEX_DEBOUNCE);
+    this.guard.run('schedule-reindex', () => {
+      if (this.reindexTimer !== 0) window.clearTimeout(this.reindexTimer);
+      this.reindexTimer = window.setTimeout(() => {
+        this.reindexTimer = 0;
+        this.guard.run('reindex', () => this.rebuild());
+      }, REINDEX_DEBOUNCE);
+    });
   };
 
   private scheduleLayoutRefresh = (): void => {
-    if (this.layoutTimer !== 0) window.clearTimeout(this.layoutTimer);
-    this.layoutTimer = window.setTimeout(() => {
-      this.layoutTimer = 0;
-      this.refreshLayout();
-    }, 120);
+    this.guard.run('schedule-layout', () => {
+      if (this.layoutTimer !== 0) window.clearTimeout(this.layoutTimer);
+      this.layoutTimer = window.setTimeout(() => {
+        this.layoutTimer = 0;
+        this.guard.run('layout-refresh', () => this.refreshLayout());
+      }, 120);
+    });
   };
 
   /** 刷新与布局相关的度量：固定导航栏高度、阅读基准线、胶囊位置 */
@@ -341,6 +473,7 @@ class StickyScrollApp {
     this.ui?.setAppearance(this.settings.appearance);
     this.ui?.setBarWidth(this.settings.barWidth);
     this.ui?.setTop(this.pillTop());
+    this.ui?.setZIndex(this.layerZIndex());
     this.ui?.setPosition(this.settings.position);
     this.ui?.setTheme(this.settings.theme);
     this.ui?.setColumn(this.columnBox());
@@ -351,9 +484,10 @@ class StickyScrollApp {
   }
 
   private updateLayoutMetrics(): void {
-    const { bottom, blocked } = this.detectTopChrome();
+    const { bottom, blocked, foreignZIndex } = this.detectTopChrome();
     this.overlayHeight = bottom;
     this.overlayBlocked = blocked;
+    this.foreignZIndex = foreignZIndex;
   }
 
   /** 正文列的位置：吸顶条按它对齐，看起来像文章自己的标题栏 */
@@ -442,7 +576,7 @@ class StickyScrollApp {
    * - 正文里的粘性元素 → 无视（不然会带着吸顶条掉到页面中间）；
    * - 全屏遮罩 → 收起 UI，不要浮在它上面。
    */
-  private detectTopChrome(): { bottom: number; blocked: boolean } {
+  private detectTopChrome(): { bottom: number; blocked: boolean; foreignZIndex: number } {
     const probeY = 4;
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     const scope = this.index?.scope ?? null;
@@ -474,6 +608,7 @@ class StickyScrollApp {
           positioned: isPositionedWithin(element),
           insideContent: scope !== null && scope !== element && scope.contains(element),
           opaque: hasSurface(style),
+          zIndex: effectiveZIndex(element),
           // 站点搜索面板 / 对话框：native <dialog>、aria-modal、role=dialog
           dialog:
             element.matches('dialog[open], [aria-modal="true"], [role="dialog"]') ||
@@ -486,7 +621,15 @@ class StickyScrollApp {
       }
     }
 
-    return classifyTopChrome(candidates, viewport);
+    return {
+      ...classifyTopChrome(candidates, viewport),
+      foreignZIndex: highestForeignZIndex(candidates),
+    };
+  }
+
+  /** 足够高，但主动退到已在顶部的更高层 UI 下方 */
+  private layerZIndex(): number {
+    return this.foreignZIndex >= Z_INDEX ? Math.max(1, this.foreignZIndex - 1) : Z_INDEX;
   }
 
   private jumpTo(headingIndex: number): void {
@@ -555,11 +698,19 @@ class StickyScrollApp {
 
   private recalibrateOverlay(): void {
     if (!this.index) return;
-    const { bottom, blocked } = this.detectTopChrome();
-    if (bottom === this.overlayHeight && blocked === this.overlayBlocked) return;
+    const { bottom, blocked, foreignZIndex } = this.detectTopChrome();
+    if (
+      bottom === this.overlayHeight &&
+      blocked === this.overlayBlocked &&
+      foreignZIndex === this.foreignZIndex
+    ) {
+      return;
+    }
     this.overlayHeight = bottom;
     this.overlayBlocked = blocked;
+    this.foreignZIndex = foreignZIndex;
     this.ui?.setTop(this.pillTop());
+    this.ui?.setZIndex(this.layerZIndex());
     this.tracker?.refresh();
     this.applyPresentation();
   }
@@ -597,13 +748,13 @@ class StickyScrollApp {
 
   private listenForMessages(): void {
     if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
-    chrome.runtime.onMessage.addListener(
-      (
-        message: unknown,
-        _sender: chrome.runtime.MessageSender,
-        sendResponse: (response?: unknown) => void,
-      ) => {
-        const type = (message as { type?: string } | null)?.type;
+    const listener = (
+      message: unknown,
+      _sender: chrome.runtime.MessageSender,
+      sendResponse: (response?: unknown) => void,
+    ): void => {
+      const type = (message as { type?: string } | null)?.type;
+      this.guard.run(`message:${type ?? 'unknown'}`, () => {
         if (type === 'wss:status') {
           sendResponse(this.status());
           return;
@@ -626,8 +777,62 @@ class StickyScrollApp {
           this.applySettings(normalizeSettings((message as { settings?: unknown }).settings));
           sendResponse(this.status());
         }
-      },
-    );
+      });
+    };
+    this.messageListener = listener;
+    chrome.runtime.onMessage.addListener(listener);
+  }
+
+  // ── 失败即静默 ──────────────────────────────────────
+
+  private pageFailureKey(): string {
+    return `${FAIL_SAFE_PREFIX}${location.pathname}${location.search}`.slice(0, 500);
+  }
+
+  private hadFailSafe(): boolean {
+    try {
+      return window.sessionStorage.getItem(this.pageFailureKey()) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private failSafe(_reason: string): void {
+    if (this.failSafeTripped) return;
+    this.failSafeTripped = true;
+    this.running = false;
+    try {
+      window.sessionStorage.setItem(this.pageFailureKey(), '1');
+    } catch {
+      /* 隐私模式禁用 storage 时仍然继续清理界面 */
+    }
+    try {
+      this.unsubscribeSettings?.();
+    } catch {
+      /* ignore */
+    }
+    this.unsubscribeSettings = null;
+    if (this.messageListener && typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+      try {
+        chrome.runtime.onMessage.removeListener(this.messageListener);
+      } catch {
+        /* ignore */
+      }
+    }
+    this.messageListener = null;
+    this.teardown();
+  }
+
+  private removePageMarkers(): void {
+    const index = this.index;
+    if (!index) return;
+    try {
+      for (const heading of index.headings) delete heading.element.dataset.wssId;
+      delete index.scope.dataset.wssScope;
+      delete index.scope.dataset.wssStats;
+    } catch {
+      /* 页面已卸载或节点被冻结时无需继续 */
+    }
   }
 
   private status(): {
@@ -635,10 +840,18 @@ class StickyScrollApp {
     enabled: boolean;
     siteEnabled: boolean;
     host: string;
+    url: string;
+    title: string;
+    viewport: string;
     headings: number;
     scope: string | null;
+    stats: string | null;
+    statusReason: string;
     isArticle: boolean;
+    geometryReliable: boolean;
     pageTocVisible: boolean;
+    dockTop: number;
+    layerZIndex: number;
     displayPolicy: string;
     currentSection: string | null;
   } {
@@ -648,10 +861,20 @@ class StickyScrollApp {
       enabled: this.settings.enabled,
       siteEnabled: this.siteAllowed,
       host: location.hostname,
+      url: location.href,
+      title: document.title.slice(0, 240),
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
       headings: index?.headings.length ?? 0,
-      scope: index ? index.scope.tagName.toLowerCase() : null,
+      scope: index
+        ? `${index.scope.tagName.toLowerCase()}${index.scope.classList[0] ? `.${index.scope.classList[0]}` : ''}`
+        : null,
+      stats: index?.scope.dataset.wssStats ?? null,
+      statusReason: this.statusReason(index),
       isArticle: index?.isArticle ?? false,
+      geometryReliable: index?.stats.geometryReliable ?? false,
       pageTocVisible: this.tocVisible,
+      dockTop: this.pillTop(),
+      layerZIndex: this.layerZIndex(),
       displayPolicy: this.settings.displayPolicy,
       currentSection:
         this.snapshot && this.snapshot.index >= 0
@@ -659,7 +882,17 @@ class StickyScrollApp {
           : null,
     };
   }
+
+  private statusReason(index: HeadingIndex | null): string {
+    if (!this.settings.enabled) return 'global-disabled';
+    if (!this.siteAllowed) return 'site-disabled';
+    if (!index) return 'no-heading-index';
+    if (!index.isArticle && !this.forced) {
+      return index.stats.geometryReliable ? 'content-not-article' : 'heading-geometry-unreliable';
+    }
+    return this.ui && this.tracker ? 'active' : 'inactive';
+  }
 }
 
 const app = new StickyScrollApp();
-void app.boot();
+void app.start();

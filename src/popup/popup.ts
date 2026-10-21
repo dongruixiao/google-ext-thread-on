@@ -15,10 +15,18 @@ interface PageStatus {
   enabled: boolean;
   siteEnabled: boolean;
   host: string;
+  url: string;
+  title: string;
+  viewport: string;
   headings: number;
   scope: string | null;
+  stats: string | null;
+  statusReason: string;
   isArticle: boolean;
+  geometryReliable: boolean;
   pageTocVisible: boolean;
+  dockTop: number;
+  layerZIndex: number;
   displayPolicy: DisplayPolicy;
   currentSection: string | null;
 }
@@ -48,6 +56,7 @@ const policyHint = getElement<HTMLElement>('#policyHint');
 const statusBox = getElement<HTMLDivElement>('#status');
 const siteButton = getElement<HTMLButtonElement>('#site');
 const rescanButton = getElement<HTMLButtonElement>('#rescan');
+const copyButton = getElement<HTMLButtonElement>('#copy');
 const optionsButton = getElement<HTMLButtonElement>('#options');
 
 let settings: WssSettings = { ...DEFAULT_SETTINGS };
@@ -85,6 +94,10 @@ function renderStatus(): void {
     statusBox.textContent = '当前页面无法注入内容脚本（如 Chrome 内置页、应用商店）。';
     return;
   }
+  if (!status.enabled) {
+    statusBox.textContent = 'TopClip 已全局关闭。';
+    return;
+  }
   if (!status.siteEnabled) {
     statusBox.innerHTML = `已在 <strong>${escapeHtml(status.host)}</strong> 上禁用。`;
     return;
@@ -98,7 +111,11 @@ function renderStatus(): void {
     return;
   }
   if (status.headings > 0) {
-    statusBox.innerHTML = `识别到 <strong>${status.headings}</strong> 个标题，但未判定为文章页（保持静默）。`;
+    const reason =
+      status.statusReason === 'heading-geometry-unreliable'
+        ? '标题布局无法可靠确认，保持静默。'
+        : '未判定为可安全阅读的文章页（保持静默）。';
+    statusBox.innerHTML = `识别到 <strong>${status.headings}</strong> 个标题，但${reason}`;
     return;
   }
   statusBox.textContent = '当前页面未发现可用标题，插件保持静默。';
@@ -142,6 +159,58 @@ function persist(): void {
   void saveSettings(settings);
 }
 
+function diagnosticText(): string {
+  const status = pageStatus;
+  const manifest = chrome.runtime.getManifest();
+  const lines = [
+    `TopClip ${manifest.version}`,
+    `generated=${new Date().toISOString()}`,
+    status
+      ? [
+          `url=${status.url}`,
+          `title=${status.title}`,
+          `host=${status.host}`,
+          `viewport=${status.viewport}`,
+          `active=${status.active}`,
+          `status=${status.statusReason}`,
+          `headings=${status.headings}`,
+          `scope=${status.scope ?? '-'}`,
+          `isArticle=${status.isArticle}`,
+          `geometryReliable=${status.geometryReliable}`,
+          `pageTocVisible=${status.pageTocVisible}`,
+          `dockTop=${status.dockTop}`,
+          `layerZIndex=${status.layerZIndex}`,
+          `currentSection=${status.currentSection ?? '-'}`,
+          `stats=${status.stats ?? '-'}`,
+        ].join('\n')
+      : 'contentScript=unavailable',
+    `userAgent=${navigator.userAgent}`,
+  ];
+  return lines.join('\n');
+}
+
+async function copyDiagnostics(): Promise<void> {
+  const text = diagnosticText();
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    copied = true;
+  } catch {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    copied = document.execCommand('copy');
+    area.remove();
+  }
+  copyButton.textContent = copied ? '已复制' : '复制失败';
+  window.setTimeout(() => {
+    copyButton.textContent = '复制诊断';
+  }, 1400);
+}
+
 async function main(): Promise<void> {
   settings = await loadSettings();
   render();
@@ -180,6 +249,10 @@ async function main(): Promise<void> {
 
   rescanButton.addEventListener('click', () => {
     void refreshStatus().then(() => sendToActiveTab({ type: 'wss:rescan' }));
+  });
+
+  copyButton.addEventListener('click', () => {
+    void copyDiagnostics();
   });
 
   optionsButton.addEventListener('click', () => {

@@ -25,12 +25,26 @@ const DEFAULT_TARGETS = [
   { name: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Web_browser', expect: 'active' },
   { name: 'GitHub README', url: 'https://github.com/vitejs/vite', expect: 'active' },
   { name: 'Vite 官网文档', url: 'https://vite.dev/guide/', expect: 'active' },
+  { name: 'web.dev 长文', url: 'https://web.dev/articles/rendering-performance', expect: 'active' },
+  { name: 'TypeScript 手册', url: 'https://www.typescriptlang.org/docs/handbook/2/everyday-types.html', expect: 'active' },
+  { name: 'Rust Book', url: 'https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html', expect: 'active' },
+  { name: 'WHATWG HTML', url: 'https://html.spec.whatwg.org/multipage/dom.html', expect: 'active' },
+  { name: 'W3C WCAG', url: 'https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html', expect: 'active' },
+  { name: 'Martin Fowler', url: 'https://martinfowler.com/articles/microservices.html', expect: 'active' },
+  // 长文但没有章节标题：没有可吸顶的对象，按产品边界保持静默
+  { name: 'Paul Graham 长文', url: 'https://paulgraham.com/lisp.html', expect: 'silent', note: '无小节标题' },
+  { name: 'ar5iv 论文', url: 'https://ar5iv.labs.arxiv.org/html/1706.03762', expect: 'active' },
+  { name: 'Cornell 法律条目', url: 'https://www.law.cornell.edu/wex/contract', expect: 'active' },
   // 整宽 main 里塞了左侧目录的文档站：吸顶标题必须对齐正文列，而不是贴视口左边
   { name: 'pi.dev 文档', url: 'https://pi.dev/docs/latest', expect: 'active' },
   // 不该激活：列表页、搜索结果、营销首页
   { name: 'HN 列表', url: 'https://news.ycombinator.com/', expect: 'silent' },
   { name: 'MDN 目录页', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide', expect: 'silent' },
   { name: '搜索结果页', url: 'https://html.duckduckgo.com/html/?q=web+browser', expect: 'silent' },
+  { name: 'GitHub 趋势页', url: 'https://github.com/trending', expect: 'silent' },
+  { name: 'npm 搜索', url: 'https://www.npmjs.com/search?q=web', expect: 'silent' },
+  { name: 'Wikipedia 分类', url: 'https://en.wikipedia.org/wiki/Category:Web_browsers', expect: 'silent' },
+  { name: 'YouTube 首页', url: 'https://www.youtube.com/', expect: 'silent' },
   // 这一页是一篇很长的营销长文（6.7k 字、单栏、段落为主、章节 1.5k 字），
   // 结构上和长文一致，因此判定为激活——属于可接受的边界情况。
   { name: 'Tailwind 首页', url: 'https://tailwindcss.com/', expect: 'active', note: '长营销页，边界情况' },
@@ -188,6 +202,41 @@ const scrollPage = (page, delta) =>
     if (best) best.scrollTop += amount;
   }, delta);
 
+const startInstrumentation = (page) =>
+  page.evaluate(() => {
+    const state = {
+      longTasks: 0,
+      pluginLayoutShifts: 0,
+      layoutShiftSources: [],
+    };
+    window.__wssFieldPerformance = state;
+    try {
+      new PerformanceObserver((list) => {
+        state.longTasks += list.getEntries().filter((entry) => entry.duration > 50).length;
+      }).observe({ type: 'longtask', buffered: false });
+    } catch {
+      /* 浏览器不支持 longtask 时保留为 0 */
+    }
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          for (const source of entry.sources ?? []) {
+            const node = source.node;
+            if (!(node instanceof Element)) continue;
+            const touchesPlugin =
+              node.id === '__web_sticky_scroll_host__' ||
+              node.closest?.('#__web_sticky_scroll_host__') !== null;
+            if (!touchesPlugin) continue;
+            state.pluginLayoutShifts += 1;
+            state.layoutShiftSources.push(node.id || node.className || node.tagName);
+          }
+        }
+      }).observe({ type: 'layout-shift', buffered: false });
+    } catch {
+      /* ignore */
+    }
+  });
+
 const results = [];
 let mismatches = 0;
 for (const target of targets) {
@@ -200,12 +249,14 @@ for (const target of targets) {
     await page.mouse.move(640, 400);
     await page.waitForTimeout(2500);
     entry.atTop = await inspect(page);
+    await startInstrumentation(page);
     await scrollPage(page, 900);
     await page.waitForTimeout(700);
     entry.scrolled = await inspect(page);
     await scrollPage(page, 900);
     await page.waitForTimeout(700);
     entry.deeper = await inspect(page);
+    entry.performance = await page.evaluate(() => window.__wssFieldPerformance);
     entry.errors = errors;
     // 以插件自己的判定为准（页面正文可能在首屏之外，用“条是否可见”会误判）
     const statsText = entry.deeper.stats ?? entry.scrolled.stats ?? '';
@@ -213,9 +264,13 @@ for (const target of targets) {
     const alignment = entry.deeper.alignmentDelta ?? entry.scrolled.alignmentDelta ?? null;
     const barVisible = entry.deeper.visible === 'true' || entry.scrolled.visible === 'true';
     entry.alignmentDelta = alignment;
-    // 只在“真的显示了”的页面上校验对齐：与正文文字列偏差 ≤ 8px
-    entry.aligned = !barVisible || alignment === null ? null : Math.abs(alignment) <= 8;
+    // 只在“真的显示了”的页面上校验对齐：与正文文字列偏差 ≤ 2px
+    entry.aligned = !barVisible || alignment === null ? null : Math.abs(alignment) <= 2;
     if (entry.aligned === false) mismatches += 1;
+    entry.performancePass =
+      !entry.performance ||
+      (entry.performance.pluginLayoutShifts === 0 && entry.performance.longTasks === 0);
+    if (entry.performancePass === false) mismatches += 1;
     entry.barVisible = entry.deeper.visible === 'true' || entry.scrolled.visible === 'true';
     entry.activated = activated;
     entry.pass = target.expect === 'active' ? activated : !activated;
@@ -236,6 +291,9 @@ for (const target of targets) {
       `activated=${entry.activated ?? '-'}`,
       `alignΔ=${entry.alignmentDelta ?? '-'}`,
       entry.aligned === false ? '✗错位' : entry.aligned ? '✓对齐' : '',
+      entry.performancePass === false
+        ? `✗perf(long=${entry.performance?.longTasks}, cls=${entry.performance?.pluginLayoutShifts})`
+        : '',
       entry.failed ? `FAILED ${entry.failed}` : '',
     ].join(' '),
   );

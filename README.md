@@ -30,7 +30,10 @@
 4. **配色取自页面**：从正文容器向上找实色背景、从正文标题取文字颜色；
    采样不到时退回插件主题色，不会出现深底配深字。
 5. **不与原站争**：原站目录在屏幕上时，插件退化成「当前小节」指示器，不再弹自己的大纲。
-6. **不修改页面**：只读取 DOM 与几何信息，全部 UI 挂在独立 Shadow DOM 里，不往页面写样式类。
+6. **不改页面视觉与布局**：不写页面样式类、不插入占位元素，全部 UI 挂在独立 Shadow DOM 里；
+   少量用于诊断和清理的 `data-wss-*` 标记会在退出时全部移除。
+7. **宁可错杀，不要错误展示**：标题尺寸、列位置或叠置关系无法可靠确认时不激活；
+   连续运行异常会熔断并彻底退出，不留下半截界面，也不持续打扰页面。
 
 ## 功能
 
@@ -52,9 +55,11 @@
 - **原站目录自适应**：页面自带目录可见时自动退让，不重复打扰
 - **两种形态**：吸顶条（默认，满宽 / 与正文列同宽）与悬浮胶囊，随时可切
 - **跟随页面配色**：底色与字色采样自页面，深色站点自动深色
-- **站点规则**：黑名单 / 白名单，可在当前站点一键禁用或强制启用
 - **站点规则**：支持黑名单 / 白名单，可在当前站点一键禁用
-- **快捷键**：`Alt+Shift+S` 切换当前站点，`Alt+Shift+W` 切换全局开关
+- **快捷键**：`Alt+[` / `Alt+]` 跳到上一节 / 下一节；`Alt+Shift+S` 切换当前站点，
+  `Alt+Shift+W` 切换全局开关
+- **本地诊断**：popup 可复制页面 URL、激活原因、标题结构指标、停靠位置与层级；
+  只复制到剪贴板，不发送网络请求
 
 ## 显示策略
 
@@ -87,14 +92,17 @@
 正文长度统计会**跳过内联 `<script>`/`<style>`**：Next.js、Nuxt 这类站点会把整页数据塞在
 脚本里，否则会被误判成“十万字正文”。
 
-实测（`npm run field-check`，11 个真实站点，可复跑）：
+实测（`npm run field-check`，25 个真实站点，可复跑；其中 16 个应激活、9 个应静默）：
 
 | 站点 | 期望 | 结果 |
 | --- | --- | --- |
-| MDN 文档 / Python 文档 / React 文档 / Wikipedia / Vite 文档 | 激活 | ✓ 全部激活 |
-| GitHub 仓库 README | 激活 | ✓（正文容器细化到 `.markdown-body`，侧栏标题已剔除） |
-| Hacker News 列表 / MDN 目录页 / DuckDuckGo 搜索结果 / Apple 首页 | 静默 | ✓ 全部静默 |
+| MDN / Python / React / Wikipedia / Vite / web.dev / TypeScript / Rust Book | 激活 | ✓ 全部激活，对齐偏差 0px |
+| GitHub README / WHATWG HTML / W3C WCAG / Martin Fowler / ar5iv / Cornell LII / pi.dev | 激活 | ✓ 结构正确；pi.dev 这类整宽容器也能对齐正文列 |
+| Hacker News / MDN 目录 / DuckDuckGo / GitHub Trending / npm Search / Wikipedia Category / YouTube 首页 / Apple 首页 | 静默 | ✓ 全部静默 |
+| Paul Graham 无小节标题长文 | 静默 | ✓ 没有可吸顶的对象，明确不展示 |
 | Tailwind 首页 | 边界情况 | 它是 6.7k 字、单栏、段落为主的长营销页，结构上与长文一致 → 判定激活 |
+
+实地检查同时要求：插件造成的布局位移为 0、滚动期间长任务为 0、显示页面的标题与正文列偏差 ≤2px。
 
 想要更严格的控制，有两级手动开关：
 
@@ -175,6 +183,10 @@
 | 顶部出现遮罩层 / 对话框 | 覆盖大半个屏幕的实心遮罩会触发收起，不浮在对话框上面 |
 | 浏览器页面查找（Ctrl/⌘+F） | 检测到查找快捷键立即收起——不压住查找条，也不挡住被滚到顶部的命中文字；按 `Esc`、回到页面里点击、或 20 秒兜底后恢复 |
 | 站点搜索面板（Cmd+K）/ 对话框 | 检测到盖住顶部的 `dialog / aria-modal / role=dialog` 时自动让位，关闭后恢复 |
+| 其它扩展 / 站点注入的高层浮层 | 读取顶部实际层级；若对方比我们更高，就自动降到它下面，不使用“绝对最高”硬盖 |
+| 标题散落在多栏、隐藏副本重叠、尺寸为零 | 几何可靠性门禁拒绝激活，宁可整页不显示 |
+| 连续布局或渲染异常 | 10 秒内连续 3 次失败即熔断，销毁 UI、监听器、计时器和页面标记；本页会话不再重试 |
+| Web 字体晚到 | 字体加载完成后重新克隆当前标题，避免吸顶条继续使用旧字体快照 |
 | 页面没有显式底色 | 不猜颜色，直接使用插件主题色，避免深底深字 |
 | 正文列很窄或页面全宽 | 列宽不足 260px 时退回默认内边距，文字仍对齐可见区域 |
 | 正文容器把侧栏也框进去（整宽 `main`） | 正文列不从容器矩形取，而是**从内容本身推导**：标题左缘与段落左缘一起取中位数（单边异常由多数票纠正），右缘取同列段落的中位数；都不可信时回退到容器内容盒 |
@@ -223,8 +235,8 @@ npm install
 npm run dev          # CRXJS 开发模式（HMR），在 chrome://extensions 加载 dist/
 npm run build        # 类型检查 + 打包到 dist/
 npm test             # 单元测试（启发式判定、路径裁剪、设置迁移）
-npm run e2e          # 端到端：真实浏览器加载 dist/ 跑 18 项断言
-npm run field-check  # 实地检查：拿真实网站跑一遍激活范围判断（可传 URL 只跑指定页面）
+npm run e2e          # 端到端：真实浏览器加载 dist/ 跑 40 项断言
+npm run field-check  # 实地检查：25 个真实站点的激活范围、对齐、布局位移与长任务
 npm run demo:dev     # 本地演示页
 npm run icons        # 重新生成图标
 ```
@@ -235,13 +247,14 @@ npm run icons        # 重新生成图标
 （`npx playwright install chromium`），也可以用 `WSS_CHROME_PATH=/path/to/chrome npm run e2e` 指定
 Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载未打包扩展的能力，因此不要指向它。
 
-端到端覆盖：注入与挂载、顶部静默、固定顶栏避让、默认隐藏大标题、层级上限、原站目录退让与恢复、
-点击回溯落点与跟随、跳转后保持可见、popup / options 渲染、设置实时同步。
+端到端覆盖：注入与挂载、顶部静默、固定顶栏避让、默认隐藏大标题、吸顶时机、原站目录退让与恢复、
+点击回溯落点与跟随、键盘跳转、外来浮层礼让、异常熔断、popup / options 渲染、设置实时同步。
 
 ## 发布前检查清单
 
-- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.4.0）
-- [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 扩展端到端 / 真实站点的激活范围**与标题对齐**）
+- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.8.0）
+- [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 40 项端到端 /
+      真实站点的激活范围、标题对齐、布局位移与长任务）
 - [ ] 确认权限仅 `storage`，`content_scripts.matches` 只覆盖 `http/https`
 - [ ] 更新截图：`npm run screenshots`（输出 1280×800 到 store/screenshots）
 - [ ] 打包并自检：`npm run package`（产物在 release/，内含版本一致性与远程代码检查）
@@ -257,7 +270,7 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 | `store/screenshots/*.png` | 1280×800 商店截图（`npm run screenshots` 生成） |
 | `store/demo-page.html` | 截图用的中性示例文章页 |
 
-打包：`npm run package` → `release/web-sticky-scroll-0.3.0.zip`（zip 根目录就是 manifest.json，可直接上传）
+打包：`npm run package` → `release/web-sticky-scroll-0.8.0.zip`（zip 根目录就是 manifest.json，可直接上传）
 
 ## 已知取舍
 

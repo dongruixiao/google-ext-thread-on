@@ -23,6 +23,8 @@ export interface ChromeCandidate {
   opaque: boolean;
   /** 是否是页面弹层（dialog / aria-modal / role=dialog） */
   dialog: boolean;
+  /** 自身或近亲祖先声明的最高 z-index */
+  zIndex: number;
   visible: boolean;
 }
 
@@ -99,6 +101,33 @@ export function isPositionedWithin(element: HTMLElement, depth = 4): boolean {
     node = node.parentElement;
   }
   return false;
+}
+
+/** 取元素及近亲祖先里声明的最高 z-index；auto / 非法值按 0 处理 */
+export function effectiveZIndex(element: HTMLElement, depth = 5): number {
+  let highest = 0;
+  let node: HTMLElement | null = element;
+  for (let level = 0; node && level <= depth; level += 1) {
+    try {
+      const value = Number.parseInt(getComputedStyle(node).zIndex, 10);
+      if (Number.isFinite(value)) highest = Math.max(highest, value);
+    } catch {
+      /* 单个节点读不到样式不影响其它祖先 */
+    }
+    node = node.parentElement;
+  }
+  return highest;
+}
+
+/** 顶部探针处可能与我们同处一层的外来 UI，最高声明的层级是多少 */
+export function highestForeignZIndex(candidates: ChromeCandidate[]): number {
+  let highest = 0;
+  for (const candidate of candidates) {
+    if (!candidate.visible || candidate.insideContent) continue;
+    if (!candidate.positioned && !candidate.dialog) continue;
+    highest = Math.max(highest, candidate.zIndex);
+  }
+  return highest;
 }
 
 /** 是否有实色背景或背景图（遮罩层一般两者占其一） */

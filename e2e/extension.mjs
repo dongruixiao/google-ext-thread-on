@@ -397,6 +397,20 @@ try {
   const afterJump = await probe(page);
   check('跳转后吸顶条保持可见', afterJump.visible === 'true', afterJump);
 
+  // 键盘阅读流：Alt+] / Alt+[ 在相邻标题之间移动
+  await page.keyboard.press('Alt+]');
+  await page.waitForTimeout(1600);
+  const keyboardNext = await probe(page);
+  await page.keyboard.press('Alt+[');
+  await page.waitForTimeout(1600);
+  const keyboardPrevious = await probe(page);
+  check(
+    '键盘可跳到下一节 / 上一节',
+    keyboardNext.cloneText === '小节二：边界处理' &&
+      keyboardPrevious.cloneText === '第二节：实现方式',
+    { next: keyboardNext.cloneText, previous: keyboardPrevious.cloneText },
+  );
+
   // 浏览器页面查找（Ctrl/⌘+F）：不能压住查找条，也不能挡住被滚到顶部的命中文字
   await page.evaluate(() => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true }));
@@ -432,6 +446,137 @@ try {
     '站点弹层盖住顶部时让位，关闭后恢复',
     dialogOpen.visible === 'false' && dialogClosed.visible === 'true',
     { dialogOpen: dialogOpen.visible, dialogClosed: dialogClosed.visible },
+  );
+
+  // 其它扩展 / 站点注入的更高层浮层：主动降到它下面，不能靠最高 z-index 硬盖
+  await page.evaluate(() => {
+    const layer = document.createElement('div');
+    layer.id = 'e2e-foreign-layer';
+    layer.textContent = '外部浮层';
+    layer.style.cssText =
+      'position:fixed;top:4px;right:16px;width:220px;height:44px;background:#fff;border:1px solid #999;z-index:2147483647';
+    document.body.appendChild(layer);
+  });
+  await page.waitForTimeout(1400);
+  const foreignLayer = await page.evaluate(() => {
+    const root = document
+      .getElementById('__web_sticky_scroll_host__')
+      ?.shadowRoot?.querySelector('.wss-root');
+    return {
+      ours: root?.style.getPropertyValue('--wss-z-index') ?? null,
+      topmost: document.elementFromPoint(window.innerWidth - 100, 20)?.id ?? null,
+    };
+  });
+  await page.evaluate(() => document.getElementById('e2e-foreign-layer')?.remove());
+  await page.waitForTimeout(1400);
+  const foreignLayerGone = await page.evaluate(
+    () =>
+      document
+        .getElementById('__web_sticky_scroll_host__')
+        ?.shadowRoot?.querySelector('.wss-root')
+        ?.style.getPropertyValue('--wss-z-index') ?? null,
+  );
+  check(
+    '不覆盖更高层的外来 UI，且它消失后恢复层级',
+    foreignLayer.ours === '2147483646' &&
+      foreignLayer.topmost === 'e2e-foreign-layer' &&
+      foreignLayerGone === '2147483600',
+    { ...foreignLayer, restored: foreignLayerGone },
+  );
+
+  // 失败即静默：连续 3 次测量异常后彻底移除自身，异常不能泄漏到宿主页面
+  const faultPage = await context.newPage();
+  const faultPageErrors = [];
+  faultPage.on('pageerror', (error) => faultPageErrors.push(String(error)));
+  await faultPage.goto(url, { waitUntil: 'load' });
+  await faultPage.waitForTimeout(1000);
+
+  // 内容脚本运行在独立的 JS world，主页面改原型不会影响它。
+  // 通过 CDP 找到扩展所在的 isolated world，在那里制造真实的布局 API 异常。
+  const cdp = await context.newCDPSession(faultPage);
+  const executionContexts = new Map();
+  cdp.on('Runtime.executionContextCreated', (event) => {
+    executionContexts.set(event.context.id, event.context);
+  });
+  await cdp.send('Runtime.enable');
+  let extensionContextId = null;
+  for (const contextInfo of executionContexts.values()) {
+    const probe = await cdp.send('Runtime.evaluate', {
+      expression: `typeof chrome !== 'undefined' && chrome.runtime?.id === ${JSON.stringify(extensionId)}`,
+      contextId: contextInfo.id,
+      returnByValue: true,
+    });
+    if (probe.result.value === true) {
+      extensionContextId = contextInfo.id;
+      break;
+    }
+  }
+  check('能定位内容脚本隔离环境', extensionContextId !== null, extensionContextId);
+
+  const faultHadHost = await faultPage.evaluate(
+    () => !!document.getElementById('__web_sticky_scroll_host__'),
+  );
+  let faultResult = {
+    hadHost: faultHadHost,
+    hostExists: true,
+    markers: -1,
+    failSafeRecorded: false,
+  };
+  if (extensionContextId !== null) {
+    await cdp.send('Runtime.evaluate', {
+      contextId: extensionContextId,
+      expression: `(() => {
+        const original = Element.prototype.getBoundingClientRect;
+        window.__wssE2eOriginalRect = original;
+        Element.prototype.getBoundingClientRect = function () {
+          if (this instanceof HTMLElement && this.matches('h2, h3')) {
+            throw new Error('forced layout failure');
+          }
+          return original.call(this);
+        };
+        return true;
+      })()`,
+      returnByValue: true,
+    });
+    await faultPage.evaluate(async () => {
+      const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      for (const y of [500, 900, 1300, 1700]) {
+        window.scrollTo(0, y);
+        await nextFrame();
+        await nextFrame();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+    await cdp.send('Runtime.evaluate', {
+      contextId: extensionContextId,
+      expression: `(() => {
+        if (window.__wssE2eOriginalRect) {
+          Element.prototype.getBoundingClientRect = window.__wssE2eOriginalRect;
+        }
+        return true;
+      })()`,
+      returnByValue: true,
+    });
+    faultResult = await faultPage.evaluate(() => ({
+      hostExists: !!document.getElementById('__web_sticky_scroll_host__'),
+      markers: document.querySelectorAll('[data-wss-id], [data-wss-scope], [data-wss-stats]').length,
+      failSafeRecorded: Array.from(
+        { length: sessionStorage.length },
+        (_, index) => sessionStorage.key(index) ?? '',
+      ).some((key) => key.startsWith('wss:failsafe:')),
+    }));
+    faultResult.hadHost = faultHadHost;
+  }
+  await cdp.detach();
+  await faultPage.close();
+  check(
+    '连续异常后静默退出且不破坏页面',
+    faultResult.hadHost &&
+      !faultResult.hostExists &&
+      faultResult.markers === 0 &&
+      faultResult.failSafeRecorded &&
+      faultPageErrors.length === 0,
+    { ...faultResult, pageErrors: faultPageErrors },
   );
 
   // options：切显示策略为智能、形态切回胶囊 → 页面实时响应
@@ -502,9 +647,11 @@ try {
     policy: document.querySelector('#displayPolicy')?.value ?? '',
     appearance: document.querySelector('#appearance')?.value ?? '',
     siteButtonDisabled: document.querySelector('#site')?.disabled ?? true,
+    hasDiagnostics: !!document.querySelector('#copy'),
   }));
   check('popup 正常渲染', popupState.title.includes('TopClip'), popupState);
   check('popup 能读到当前站点', popupState.siteButtonDisabled === false, popupState);
+  check('popup 提供本地诊断复制入口', popupState.hasDiagnostics, popupState);
 
   await popup.evaluate(() => document.querySelector('#site').click());
   await popup.waitForTimeout(900);
