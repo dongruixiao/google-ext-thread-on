@@ -27,13 +27,12 @@
 
   --wss-fg: #0f172a;
   --wss-surface: #ffffff;
-  --wss-bg: rgba(255, 255, 255, 0.76);
-  --wss-border: rgba(15, 23, 42, 0.1);
-  --wss-shadow: 0 12px 32px -16px rgba(15, 23, 42, 0.5), 0 2px 6px -2px rgba(15, 23, 42, 0.14);
-  --wss-muted: rgba(15, 23, 42, 0.58);
-  --wss-accent: #4f46e5;
-  --wss-accent-soft: rgba(79, 70, 229, 0.14);
-  --wss-hover: rgba(15, 23, 42, 0.07);
+  --wss-border: color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
+  --wss-shadow: none;
+  --wss-muted: color-mix(in srgb, var(--wss-page-fg) 58%, transparent);
+  --wss-accent: color-mix(in srgb, var(--wss-page-fg) 72%, transparent);
+  --wss-accent-soft: color-mix(in srgb, var(--wss-page-fg) 8%, transparent);
+  --wss-hover: color-mix(in srgb, var(--wss-page-fg) 7%, transparent);
 
   opacity: 1;
   translate: 0 0;
@@ -43,13 +42,6 @@
 .wss-root[data-theme='dark'] {
   --wss-fg: #e9eaf3;
   --wss-surface: #14161d;
-  --wss-bg: rgba(18, 20, 28, 0.76);
-  --wss-border: rgba(255, 255, 255, 0.14);
-  --wss-shadow: 0 14px 34px -16px rgba(0, 0, 0, 0.75), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
-  --wss-muted: rgba(233, 234, 243, 0.62);
-  --wss-accent: #8b8cf9;
-  --wss-accent-soft: rgba(139, 140, 249, 0.2);
-  --wss-hover: rgba(255, 255, 255, 0.08);
 }
 
 .wss-root[data-visible='false'] {
@@ -148,15 +140,29 @@
 
 /* 克隆进来的标题：样式全部来自页面，这里只负责占位与裁切 */
 .wss-bar-heading {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   min-width: 0;
   flex: 0 1 auto;
-  overflow: hidden;
   pointer-events: auto;
 }
 
+.wss-bar-heading::before {
+  content: '';
+  position: absolute;
+  inset: -3px -12px;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--wss-page-bg);
+  opacity: 0.94;
+  filter: blur(6px);
+}
+
 .wss-bar-heading > * {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   max-width: 100%;
 }
@@ -225,11 +231,11 @@
   height: 36px;
   padding: 0 12px 0 10px;
   border-radius: 999px;
-  background: var(--wss-bg);
+  background: var(--wss-page-bg);
   border: 1px solid var(--wss-border);
-  box-shadow: var(--wss-shadow);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   max-width: min(76vw, 720px);
   pointer-events: auto;
   cursor: default;
@@ -348,7 +354,7 @@
   width: 0%;
   height: 100%;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--wss-accent), #a855f7);
+  background: color-mix(in srgb, var(--wss-page-fg) 48%, transparent);
   transition: width 0.12s linear;
 }
 
@@ -389,13 +395,12 @@
   padding: 8px;
   margin-top: 6px;
   overflow: auto;
-  border-radius: 14px;
-  /* 97% 而不是全透明：没有 GPU 合成（backdrop-filter 失效）时也不会透出底下文字 */
-  background: color-mix(in srgb, var(--wss-page-bg) 97%, transparent);
-  border: 1px solid color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
-  box-shadow: var(--wss-shadow);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-radius: 12px;
+  background: var(--wss-page-bg);
+  border: 1px solid var(--wss-border);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   pointer-events: auto;
   opacity: 0;
   translate: 0 -6px;

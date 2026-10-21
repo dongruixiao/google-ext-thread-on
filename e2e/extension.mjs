@@ -70,6 +70,10 @@ const probe = (page) =>
     const clone = shadow?.querySelector('[data-wss-clone="true"]');
     const bar = shadow?.querySelector('.wss-bar');
     const barStyle = bar ? getComputedStyle(bar) : null;
+    const heading = shadow?.querySelector('.wss-bar-heading');
+    const headingMaskStyle = heading ? getComputedStyle(heading, '::before') : null;
+    const drawer = shadow?.querySelector('.wss-drawer');
+    const drawerStyle = drawer ? getComputedStyle(drawer) : null;
     const article = document.querySelector('article');
     const anchor = root?.dataset.appearance === 'bar' ? clone : active?.querySelector('.wss-crumb');
     return {
@@ -83,6 +87,11 @@ const probe = (page) =>
       barBackground: barStyle?.backgroundColor ?? null,
       barShadow: barStyle?.boxShadow ?? null,
       barBorderWidth: barStyle?.borderBottomWidth ?? null,
+      titleMaskBackground: headingMaskStyle?.backgroundColor ?? null,
+      titleMaskFilter: headingMaskStyle?.filter ?? null,
+      drawerBackground: drawerStyle?.backgroundColor ?? null,
+      drawerShadow: drawerStyle?.boxShadow ?? null,
+      drawerBackdrop: drawerStyle?.backdropFilter ?? null,
       surfaceTop: active ? Math.round(active.getBoundingClientRect().top) : null,
       barHeight: Math.round(shadow?.querySelector('.wss-bar')?.getBoundingClientRect().height ?? 0),
       cloneText: clone?.textContent?.trim() ?? null,
@@ -153,7 +162,8 @@ try {
     !scrolled.hasBarSheet &&
       scrolled.barBackground === 'rgba(0, 0, 0, 0)' &&
       scrolled.barShadow === 'none' &&
-      scrolled.barBorderWidth === '0px',
+      scrolled.barBorderWidth === '0px' &&
+      scrolled.titleMaskFilter === 'blur(6px)',
     scrolled,
   );
   const transparentArea = await page.evaluate(() => {
@@ -410,7 +420,10 @@ try {
     outlinePanel.title === '文章目录' &&
       outlinePanel.nestedLevels >= 1 &&
       outlinePanel.rows === EXPECTED_HEADINGS &&
-      /%$/.test(outlinePanel.progress),
+      /%$/.test(outlinePanel.progress) &&
+      withToc.drawerShadow === 'none' &&
+      withToc.drawerBackdrop === 'none' &&
+      !!withToc.drawerBackground?.startsWith('rgb('),
     outlinePanel,
   );
 
