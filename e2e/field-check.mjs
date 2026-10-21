@@ -45,6 +45,9 @@ const DEFAULT_TARGETS = [
   { name: 'npm 搜索', url: 'https://www.npmjs.com/search?q=web', expect: 'silent' },
   { name: 'Wikipedia 分类', url: 'https://en.wikipedia.org/wiki/Category:Web_browsers', expect: 'silent' },
   { name: 'YouTube 首页', url: 'https://www.youtube.com/', expect: 'silent' },
+  // 持续对话 / 代理工作区：即使回答里有长标题，也不能当成独立文章
+  { name: 'ChatGPT 对话', url: 'https://chatgpt.com/', expect: 'silent' },
+  { name: 'Gemini 对话', url: 'https://gemini.google.com/app', expect: 'silent' },
   // 这一页是一篇很长的营销长文（6.7k 字、单栏、段落为主、章节 1.5k 字），
   // 结构上和长文一致，因此判定为激活——属于可接受的边界情况。
   { name: 'Tailwind 首页', url: 'https://tailwindcss.com/', expect: 'active', note: '长营销页，边界情况' },

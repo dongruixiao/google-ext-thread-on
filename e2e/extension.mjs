@@ -33,9 +33,10 @@ function check(name, condition, detail) {
 
 function startFixtureServer() {
   const html = readFileSync(join(HERE, 'fixture.html'), 'utf8');
+  const chatHtml = readFileSync(join(HERE, 'chat-fixture.html'), 'utf8');
   const server = createServer((request, response) => {
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    response.end(html);
+    response.end(request.url?.startsWith('/chat') ? chatHtml : html);
   });
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => {
@@ -106,6 +107,27 @@ try {
   await page.goto(url, { waitUntil: 'load' });
   await page.mouse.move(10, 600);
   await page.waitForTimeout(1000);
+
+  // 持续对话页：有文章式标题、长段落和语义 article，但底部有对话输入区，
+  // 必须整体保持静默，不能把某一条回复当成独立文章。
+  const chatPage = await context.newPage();
+  await chatPage.goto(`${url}chat`, { waitUntil: 'load' });
+  await chatPage.waitForTimeout(1200);
+  const chatSurface = await chatPage.evaluate(() => ({
+    headings: document.querySelectorAll('h2, h3').length,
+    turns: document.querySelectorAll('[data-message-author-role]').length,
+    composer: !!document.querySelector('form textarea'),
+    host: !!document.getElementById('__web_sticky_scroll_host__'),
+  }));
+  await chatPage.close();
+  check(
+    '持续对话页面不会把回复标题当成文章',
+    chatSurface.headings >= 4 &&
+      chatSurface.turns >= 4 &&
+      chatSurface.composer &&
+      !chatSurface.host,
+    chatSurface,
+  );
 
   const atTop = await probe(page);
   check('注入到页面', atTop.host && atTop.attachedToHtml, atTop);

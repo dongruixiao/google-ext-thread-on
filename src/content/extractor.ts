@@ -1,4 +1,5 @@
 import { HOST_ID } from '../shared/constants';
+import { detectConversationSurface, type ConversationReason } from './conversation';
 
 export interface HeadingNode {
   /** 原生 id 或自动生成的占位 id */
@@ -42,6 +43,9 @@ export interface HeadingIndex {
   headings: HeadingNode[];
   /** 智能阅读模式判定：只有“像文章/文档”的页面才自动激活 */
   isArticle: boolean;
+  /** 持续对话 / 代理工作区：即使有过长标题也不展示 */
+  isConversation: boolean;
+  conversationReason: ConversationReason;
   stats: HeadingStats;
   /** 稳定的本地诊断快照，不依赖页面后续是否保留 data 属性 */
   diagnostics: string;
@@ -505,6 +509,7 @@ export function buildHeadingIndex(): HeadingIndex | null {
   const body = document.body;
   if (!body) return null;
 
+  const conversation = detectConversationSurface(document);
   const measure = createMeasure();
   const bodyText = measure(body);
   const bodyParagraphText = computeRatios(body, measure).paragraphText;
@@ -567,7 +572,8 @@ export function buildHeadingIndex(): HeadingIndex | null {
       linkRatio: ratios.linkRatio,
       paragraphRatio: ratios.paragraphRatio,
     };
-    const isArticle = geometry.reliable && decideArticle(stats, attempt.semantic);
+    const isArticle =
+      !conversation.detected && geometry.reliable && decideArticle(stats, attempt.semantic);
     if (isArticle) ensureIds(headings, attempt.scope);
     // 判定依据挂在 DOM 上，便于排查“为什么这个页面激活/没激活”
     const diagnostics = [
@@ -587,6 +593,9 @@ export function buildHeadingIndex(): HeadingIndex | null {
       `hier=${stats.hasHierarchy ? 1 : 0}`,
       `kept=${headings.length}/${rawHeadings.length}`,
       `sem=${attempt.semantic ? 1 : 0}`,
+      `conv=${conversation.detected ? 1 : 0}`,
+      `convReason=${conversation.reason}`,
+      `convTurns=${conversation.turns}`,
       `art=${isArticle ? 1 : 0}`,
     ].join(' ');
     attempt.scope.dataset.wssStats = diagnostics;
@@ -594,6 +603,8 @@ export function buildHeadingIndex(): HeadingIndex | null {
       scope: attempt.scope,
       headings,
       isArticle,
+      isConversation: conversation.detected,
+      conversationReason: conversation.reason,
       stats,
       diagnostics,
     };

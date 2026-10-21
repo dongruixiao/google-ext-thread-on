@@ -80,6 +80,41 @@ function pageWithSidebarHeadings(): void {
   `;
 }
 
+function conversationPage(): void {
+  document.body.innerHTML = `
+    <main role="main">
+      <div role="log">
+        <article data-message-author-role="user"><p>${paragraph(120)}</p></article>
+        <article data-message-author-role="assistant">
+          <h2>先分析问题</h2><p>${paragraph(620)}</p>
+          <h3>一个子问题</h3><p>${paragraph(420)}</p>
+        </article>
+        <article data-message-author-role="user"><p>${paragraph(100)}</p></article>
+        <article data-message-author-role="assistant">
+          <h2>再给出方案</h2><p>${paragraph(700)}</p>
+        </article>
+      </div>
+    </main>
+    <form style="position:fixed;left:240px;right:80px;bottom:16px">
+      <textarea aria-label="Message"></textarea>
+    </form>
+  `;
+  const control = document.querySelector('textarea') as HTMLElement;
+  const rect = {
+    x: 240,
+    y: 700,
+    top: 700,
+    left: 240,
+    right: 960,
+    bottom: 752,
+    width: 720,
+    height: 52,
+    toJSON: () => ({}),
+  } as DOMRect;
+  control.getBoundingClientRect = () => rect;
+  control.getClientRects = () => [rect] as unknown as DOMRectList;
+}
+
 function geometryHeadings(
   boxes: Array<{ left: number; top: number; width?: number; height?: number }>,
 ): HeadingNode[] {
@@ -155,6 +190,16 @@ describe('buildHeadingIndex', () => {
     marketingPage();
     const index = buildHeadingIndex();
     expect(index?.isArticle).toBe(false);
+  });
+
+  it('持续对话页面即使有长标题和多级结构也保持静默', () => {
+    conversationPage();
+    const index = buildHeadingIndex();
+    expect(index).not.toBeNull();
+    expect(index?.isConversation).toBe(true);
+    expect(index?.conversationReason).toBe('explicit-message-roles');
+    expect(index?.isArticle).toBe(false);
+    expect(index?.diagnostics).toContain('conv=1');
   });
 
   it('侧栏导航标题没有正文，不进入大纲', () => {

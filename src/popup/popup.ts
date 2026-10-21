@@ -112,9 +112,11 @@ function renderStatus(): void {
   }
   if (status.headings > 0) {
     const reason =
-      status.statusReason === 'heading-geometry-unreliable'
-        ? '标题布局无法可靠确认，保持静默。'
-        : '未判定为可安全阅读的文章页（保持静默）。';
+      status.statusReason === 'conversation-surface'
+        ? '检测到持续对话与输入区，保持静默。'
+        : status.statusReason === 'heading-geometry-unreliable'
+          ? '标题布局无法可靠确认，保持静默。'
+          : '未判定为可安全阅读的文章页（保持静默）。';
     statusBox.innerHTML = `识别到 <strong>${status.headings}</strong> 个标题，但${reason}`;
     return;
   }

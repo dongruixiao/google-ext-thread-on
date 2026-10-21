@@ -261,7 +261,7 @@ class StickyScrollApp {
     this.index = index;
     this.signature = signature;
 
-    if (!index || !(index.isArticle || this.forced)) {
+    if (!index || !(index.isArticle || (this.forced && !index.isConversation))) {
       // 非文章页（列表页 / 搜索页 / 应用页）：保持静默，不注入任何 UI
       this.snapshot = null;
       return;
@@ -891,6 +891,7 @@ class StickyScrollApp {
     if (!this.settings.enabled) return 'global-disabled';
     if (!this.siteAllowed) return 'site-disabled';
     if (!index) return 'no-heading-index';
+    if (index.isConversation) return 'conversation-surface';
     if (!index.isArticle && !this.forced) {
       return index.stats.geometryReliable ? 'content-not-article' : 'heading-geometry-unreliable';
     }

@@ -86,19 +86,21 @@
 | **段落文字占比 < 40%** | 正文块太少（卡片、表格、图墙）→ 不激活 |
 | **有效标题占全页比例 < 25%** | 列表页里的一张卡片 → 不激活 |
 | 最长小节 / 层级嵌套 | 都要足够深，否则当成目录页/聚合页 → 不激活 |
+| **持续对话输入区 + 多轮消息结构** | AI 聊天、代理工作区、对话式搜索 → 整体静默，不把单条回答当文章 |
 | 兜底到 body 的页面额外要求标题排在同一列 | 排除多栏营销页 |
 | 侧栏/导航里“标题后面没有正文”的项 | 直接不进大纲（例如 GitHub 仓库页侧栏） |
 
 正文长度统计会**跳过内联 `<script>`/`<style>`**：Next.js、Nuxt 这类站点会把整页数据塞在
 脚本里，否则会被误判成“十万字正文”。
 
-实测（`npm run field-check`，25 个真实站点，可复跑；其中 16 个应激活、9 个应静默）：
+实测（`npm run field-check`，27 个真实站点，可复跑；其中 16 个应激活、11 个应静默）：
 
 | 站点 | 期望 | 结果 |
 | --- | --- | --- |
 | MDN / Python / React / Wikipedia / Vite / web.dev / TypeScript / Rust Book | 激活 | ✓ 全部激活，对齐偏差 0px |
 | GitHub README / WHATWG HTML / W3C WCAG / Martin Fowler / ar5iv / Cornell LII / pi.dev | 激活 | ✓ 结构正确；pi.dev 这类整宽容器也能对齐正文列 |
 | Hacker News / MDN 目录 / DuckDuckGo / GitHub Trending / npm Search / Wikipedia Category / YouTube 首页 / Apple 首页 | 静默 | ✓ 全部静默 |
+| ChatGPT / Gemini 对话页面 | 静默 | ✓ 不按域名排除，由持续对话与输入区结构共同判定 |
 | Paul Graham 无小节标题长文 | 静默 | ✓ 没有可吸顶的对象，明确不展示 |
 | Tailwind 首页 | 边界情况 | 它是 6.7k 字、单栏、段落为主的长营销页，结构上与长文一致 → 判定激活 |
 
@@ -174,6 +176,7 @@
 | 侧栏 / 页脚 / 评论区标题干扰 | 正文容器启发式识别 + 过滤 `nav / aside / footer / role=* / 评论区` |
 | 目标站样式污染 | UI 挂在独立 Shadow DOM，宿主页面 CSS 命中不到 |
 | 列表页 / 搜索结果误触发 | 智能阅读模式判定：需要足够长的正文小节，或「有层级 + 小节水位足够深」 |
+| AI 聊天 / 代理页面误触发 | 同时检测持续对话轮次与底部或固定输入区；任一侧证据不足都不排除，评论区、搜索框和单条 AI 摘要不会单独触发 |
 | 文章卡片列表页 | 通过「选中容器占全页比例」与「小节水位」双重排除 |
 | 页面触底 | 只在文档真正无法继续滚动时让最后一个标题接替；此前仍严格按越过吸顶线判定，不提前展示中途可见标题 |
 | 滚动容器而非 window 的站点 | 用标题的视口位置推断滚动方向，不依赖 `window.scrollY` |
@@ -208,6 +211,7 @@ web-sticky-scroll/
 │   ├── content/
 │   │   ├── index.ts              # 入口：生命周期、显示策略状态机、站点门控、消息
 │   │   ├── extractor.ts          # 正文容器识别 + 标题层级树
+│   │   ├── conversation.ts       # 通用对话 / 代理工作区识别（无域名规则）
 │   │   ├── page-toc.ts           # 原站目录探测
 │   │   ├── path.ts               # 面包屑裁剪（纯函数，可单测）
 │   │   ├── tracker.ts            # 滚动监听、活跃标题、滚动方向
@@ -236,8 +240,8 @@ npm install
 npm run dev          # CRXJS 开发模式（HMR），在 chrome://extensions 加载 dist/
 npm run build        # 类型检查 + 打包到 dist/
 npm test             # 单元测试（启发式判定、路径裁剪、设置迁移）
-npm run e2e          # 端到端：真实浏览器加载 dist/ 跑 41 项断言
-npm run field-check  # 实地检查：25 个真实站点的激活范围、对齐与插件布局位移
+npm run e2e          # 端到端：真实浏览器加载 dist/ 跑 42 项断言
+npm run field-check  # 实地检查：27 个真实站点的激活范围、对齐与插件布局位移
 npm run demo:dev     # 本地演示页
 npm run icons        # 重新生成图标
 ```
@@ -253,8 +257,8 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 
 ## 发布前检查清单
 
-- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.8.1）
-- [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 41 项端到端 /
+- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.8.2）
+- [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 42 项端到端 /
       真实站点的激活范围、标题对齐与插件布局位移）
 - [ ] 确认权限仅 `storage`，`content_scripts.matches` 只覆盖 `http/https`
 - [ ] 更新截图：`npm run screenshots`（输出 1280×800 到 store/screenshots）
@@ -271,7 +275,7 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 | `store/screenshots/*.png` | 1280×800 商店截图（`npm run screenshots` 生成） |
 | `store/demo-page.html` | 截图用的中性示例文章页 |
 
-打包：`npm run package` → `release/web-sticky-scroll-0.8.1.zip`（zip 根目录就是 manifest.json，可直接上传）
+打包：`npm run package` → `release/web-sticky-scroll-0.8.2.zip`（zip 根目录就是 manifest.json，可直接上传）
 
 ## 已知取舍
 

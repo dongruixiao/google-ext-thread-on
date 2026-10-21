@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Conversation Surface · E2E Fixture</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        height: 100vh;
+        overflow: hidden;
+        background: #f7f7f8;
+        color: #15171c;
+        font: 16px/1.75 system-ui, sans-serif;
+      }
+      main {
+        height: calc(100vh - 112px);
+        overflow-y: auto;
+        padding: 32px max(24px, calc((100vw - 820px) / 2));
+      }
+      [role='log'] { display: grid; gap: 18px; }
+      article {
+        padding: 20px 24px;
+        border-radius: 16px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+      }
+      article[data-message-author-role='user'] {
+        background: #eef2ff;
+      }
+      h2 { margin: 18px 0 10px; font-size: 22px; }
+      h3 { margin: 14px 0 8px; font-size: 18px; }
+      form {
+        position: fixed;
+        left: 50%;
+        bottom: 18px;
+        width: min(760px, calc(100vw - 48px));
+        translate: -50% 0;
+        padding: 10px;
+        border: 1px solid #d6d8df;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 12px 32px -18px rgb(0 0 0 / 35%);
+      }
+      textarea {
+        width: 100%;
+        min-height: 54px;
+        resize: none;
+        border: 0;
+        outline: 0;
+        font: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <main role="main">
+      <div role="log" aria-live="polite">
+        <article data-message-author-role="user">
+          <p>请帮我设计一个可以处理大量动态内容的前端状态方案，并分步骤解释取舍。</p>
+        </article>
+        <article data-message-author-role="assistant">
+          <h2>先确定数据的生命周期</h2>
+          <p>
+            聊天回答可以很长、可以带多级标题，也可以包含代码、引用和列表。但这些视觉特征
+            并不能把它变成一篇独立文章，因为它仍然属于一个持续变化的对话轮次。
+          </p>
+          <h3>服务端状态与本地状态</h3>
+          <p>
+            服务端状态围绕缓存、失效和重试设计；本地交互状态则跟随组件生命周期。
+            这两类状态需要明确边界，避免把所有数据塞进同一个全局容器。
+          </p>
+        </article>
+        <article data-message-author-role="user">
+          <p>如果页面需要离线、权限和实时协作呢？</p>
+        </article>
+        <article data-message-author-role="assistant">
+          <h2>按能力边界拆分写入路径</h2>
+          <p>
+            离线能力需要持久队列和冲突合并；权限检查需要靠近读取和写入边界；
+            实时协作则需要版本向量或操作日志。回答依然在一个聊天轮次内持续生成。
+          </p>
+          <h3>最后再统一派生</h3>
+          <p>
+            派生数据应尽量保持纯函数，并让缓存成为优化而不是架构中心。
+            无论内容多长，这里都不是一个可以离开会话上下文单独阅读的正文页面。
+          </p>
+        </article>
+      </div>
+    </main>
+    <form>
+      <textarea aria-label="Message" placeholder="Message the assistant"></textarea>
+    </form>
+  </body>
+</html>
