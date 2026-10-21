@@ -102,7 +102,8 @@
 | Paul Graham 无小节标题长文 | 静默 | ✓ 没有可吸顶的对象，明确不展示 |
 | Tailwind 首页 | 边界情况 | 它是 6.7k 字、单栏、段落为主的长营销页，结构上与长文一致 → 判定激活 |
 
-实地检查同时要求：插件造成的布局位移为 0、滚动期间长任务为 0、显示页面的标题与正文列偏差 ≤2px。
+实地检查同时要求：插件造成的布局位移为 0、显示页面的标题与正文列偏差 ≤2px；
+滚动期间的长任务会记录在报告中，但真实站点自身造成的长任务无法可靠归因给扩展。
 
 想要更严格的控制，有两级手动开关：
 
@@ -174,7 +175,7 @@
 | 目标站样式污染 | UI 挂在独立 Shadow DOM，宿主页面 CSS 命中不到 |
 | 列表页 / 搜索结果误触发 | 智能阅读模式判定：需要足够长的正文小节，或「有层级 + 小节水位足够深」 |
 | 文章卡片列表页 | 通过「选中容器占全页比例」与「小节水位」双重排除 |
-| 页面触底 | 最后一个标题即使无法越过基准线也会被认定为当前章节 |
+| 页面触底 | 只在文档真正无法继续滚动时让最后一个标题接替；此前仍严格按越过吸顶线判定，不提前展示中途可见标题 |
 | 滚动容器而非 window 的站点 | 用标题的视口位置推断滚动方向，不依赖 `window.scrollY` |
 | 用户想临时看全部结构 | 悬停展开折叠层级 + 大纲抽屉；`Esc` 关闭 |
 | 站点顶栏随滚动隐藏 / 出现 | 每 800ms 重新校准吸附位置，顶栏收起时吸顶条自动上移到视口顶部 |
@@ -235,8 +236,8 @@ npm install
 npm run dev          # CRXJS 开发模式（HMR），在 chrome://extensions 加载 dist/
 npm run build        # 类型检查 + 打包到 dist/
 npm test             # 单元测试（启发式判定、路径裁剪、设置迁移）
-npm run e2e          # 端到端：真实浏览器加载 dist/ 跑 40 项断言
-npm run field-check  # 实地检查：25 个真实站点的激活范围、对齐、布局位移与长任务
+npm run e2e          # 端到端：真实浏览器加载 dist/ 跑 41 项断言
+npm run field-check  # 实地检查：25 个真实站点的激活范围、对齐与插件布局位移
 npm run demo:dev     # 本地演示页
 npm run icons        # 重新生成图标
 ```
@@ -252,9 +253,9 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 
 ## 发布前检查清单
 
-- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.8.0）
-- [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 40 项端到端 /
-      真实站点的激活范围、标题对齐、布局位移与长任务）
+- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.8.1）
+- [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 41 项端到端 /
+      真实站点的激活范围、标题对齐与插件布局位移）
 - [ ] 确认权限仅 `storage`，`content_scripts.matches` 只覆盖 `http/https`
 - [ ] 更新截图：`npm run screenshots`（输出 1280×800 到 store/screenshots）
 - [ ] 打包并自检：`npm run package`（产物在 release/，内含版本一致性与远程代码检查）
@@ -270,7 +271,7 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 | `store/screenshots/*.png` | 1280×800 商店截图（`npm run screenshots` 生成） |
 | `store/demo-page.html` | 截图用的中性示例文章页 |
 
-打包：`npm run package` → `release/web-sticky-scroll-0.8.0.zip`（zip 根目录就是 manifest.json，可直接上传）
+打包：`npm run package` → `release/web-sticky-scroll-0.8.1.zip`（zip 根目录就是 manifest.json，可直接上传）
 
 ## 已知取舍
 

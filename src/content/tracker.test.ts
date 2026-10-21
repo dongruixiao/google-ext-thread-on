@@ -162,6 +162,31 @@ describe('吸顶时机', () => {
     rig.flush();
     expect(rig.last()?.index).toBe(1);
   });
+
+  it('页面触底也不会把尚未越过吸顶线的标题提前提升', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'scrollY');
+    let scrollY = 99_000;
+    Object.defineProperty(window, 'scrollY', {
+      configurable: true,
+      get: () => scrollY,
+    });
+    try {
+      const rig = createRig([50, 40, 40]);
+      rig.setTop(0, 66);
+      rig.setTop(1, 180);
+      rig.setTop(2, 360);
+      rig.flush();
+      expect(rig.last()?.index).toBe(0);
+
+      // 真正到达文档终点后，只允许最后一个标题接替。
+      scrollY = 99_900;
+      rig.flush();
+      expect(rig.last()?.index).toBe(2);
+    } finally {
+      if (descriptor) Object.defineProperty(window, 'scrollY', descriptor);
+      else Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+    }
+  });
 });
 
 describe('整篇文章的阅读进度', () => {

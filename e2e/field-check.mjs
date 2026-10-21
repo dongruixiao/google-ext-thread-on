@@ -160,10 +160,10 @@ const inspect = (page) =>
     return {
       url: location.href,
       injected: !!host,
-      hasIndex: !!scope,
-      scope: scope ? `${scope.tagName.toLowerCase()}${scope.className ? '.' + String(scope.className).split(' ')[0] : ''}` : null,
-      stats: scope?.dataset.wssStats ?? null,
-      headings: document.querySelectorAll('[data-wss-id]').length,
+      hasIndex: root?.dataset.wssActive === 'true',
+      scope: root?.dataset.wssScope ?? null,
+      stats: root?.dataset.wssStats ?? null,
+      headings: shadow?.querySelectorAll('.wss-row').length ?? 0,
       visible: root?.dataset.visible ?? null,
       compact: root?.dataset.compact ?? null,
       appearance: root?.dataset.appearance ?? null,
@@ -267,9 +267,10 @@ for (const target of targets) {
     // 只在“真的显示了”的页面上校验对齐：与正文文字列偏差 ≤ 2px
     entry.aligned = !barVisible || alignment === null ? null : Math.abs(alignment) <= 2;
     if (entry.aligned === false) mismatches += 1;
+    // 真实站点自身的长任务无法可靠归因给扩展，因此作为观测值记录；
+    // 只有明确由插件宿主造成的布局位移才判失败。
     entry.performancePass =
-      !entry.performance ||
-      (entry.performance.pluginLayoutShifts === 0 && entry.performance.longTasks === 0);
+      !entry.performance || entry.performance.pluginLayoutShifts === 0;
     if (entry.performancePass === false) mismatches += 1;
     entry.barVisible = entry.deeper.visible === 'true' || entry.scrolled.visible === 'true';
     entry.activated = activated;
@@ -292,8 +293,10 @@ for (const target of targets) {
       `alignΔ=${entry.alignmentDelta ?? '-'}`,
       entry.aligned === false ? '✗错位' : entry.aligned ? '✓对齐' : '',
       entry.performancePass === false
-        ? `✗perf(long=${entry.performance?.longTasks}, cls=${entry.performance?.pluginLayoutShifts})`
-        : '',
+        ? `✗插件布局位移=${entry.performance?.pluginLayoutShifts}`
+        : entry.performance?.longTasks
+          ? `ℹlong=${entry.performance.longTasks}`
+          : '',
       entry.failed ? `FAILED ${entry.failed}` : '',
     ].join(' '),
   );

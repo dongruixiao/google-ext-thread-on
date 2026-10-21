@@ -239,6 +239,67 @@ try {
     timingScan,
   );
 
+  // 文章结尾：不能因为“已经到页面底部”就把仍在下方可见的标题提前放进条里
+  const bottomTiming = await page.evaluate(async () => {
+    const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
+    const root = shadow.querySelector('.wss-root');
+    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+    const dockTop = Number.parseFloat(
+      root.style.getPropertyValue('--wss-top').replace('px', ''),
+    ) || 0;
+    const headings = [...document.querySelectorAll('article h1, article h2, article h3')];
+    const finalHeading = headings.at(-1)?.textContent?.trim() ?? null;
+
+    const inspect = () => {
+      const clone = shadow.querySelector('[data-wss-clone="true"]');
+      const text = clone?.textContent?.trim() ?? null;
+      const source = text ? headings.find((node) => node.textContent.trim() === text) : null;
+      return {
+        visible: root.dataset.visible === 'true',
+        text,
+        sourceTop: source ? Math.round(source.getBoundingClientRect().top) : null,
+        scrollY: Math.round(window.scrollY),
+        atBottom:
+          Math.abs(window.scrollY + window.innerHeight - document.documentElement.scrollHeight) <= 4,
+      };
+    };
+
+    window.scrollTo(
+      0,
+      document.documentElement.scrollHeight - window.innerHeight - 120,
+    );
+    await frame();
+    await frame();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const nearBottom = inspect();
+
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    await frame();
+    await frame();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const atBottom = inspect();
+
+    return {
+      nearBottom,
+      atBottom,
+      finalHeading,
+      dockTop,
+      activeLine: dockTop + 6,
+    };
+  });
+  check(
+    '文章结尾不提前跳级，但真正到底时能显示最后小节',
+    !bottomTiming.nearBottom.atBottom &&
+      bottomTiming.nearBottom.text !== bottomTiming.finalHeading &&
+      bottomTiming.nearBottom.visible &&
+      bottomTiming.nearBottom.sourceTop !== null &&
+      bottomTiming.nearBottom.sourceTop <= bottomTiming.activeLine &&
+      bottomTiming.atBottom.atBottom &&
+      bottomTiming.atBottom.visible &&
+      bottomTiming.atBottom.text === bottomTiming.finalHeading,
+    bottomTiming,
+  );
+
   // 整篇阅读进度：随滚动单调增长，读到文末接近 100%
   const readProgress = () =>
     page.evaluate(() => {

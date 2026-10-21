@@ -43,6 +43,8 @@ export interface HeadingIndex {
   /** 智能阅读模式判定：只有“像文章/文档”的页面才自动激活 */
   isArticle: boolean;
   stats: HeadingStats;
+  /** 稳定的本地诊断快照，不依赖页面后续是否保留 data 属性 */
+  diagnostics: string;
 }
 
 /** 优先级 1：语义化正文容器 */
@@ -87,8 +89,12 @@ export const SITE_CHROME_SELECTOR = [
 
 const HEADING_SELECTOR = 'h1, h2, h3, h4';
 const MAX_LEVEL = 4;
-/** 标题后面至少要跟这么多字，才算“真的带内容” */
-const MIN_SECTION_TEXT = 40;
+/**
+ * 标题后面至少要有这么多字符，才算“这个标题确实带着内容”。
+ * 不能用更长的篇幅门槛筛标题：README、法律条文和结尾总结常有
+ * 只有几个字但完全合法的独立小节。段落水位等页面级指标仍负责区分列表页。
+ */
+const MIN_SECTION_TEXT = 4;
 
 /**
  * 计算正文长度时必须跳过的标签：
@@ -339,6 +345,31 @@ function sectionTexts(
   return totals;
 }
 
+/**
+ * 选出真正属于正文的标题。
+ *
+ * 普通小节仍需达到最小正文量；结尾小节允许更短，因为总结往往只有一两句话。
+ * 一旦保留某个子标题，也要保留它在原始标题树里的祖先，否则层级会被压平，
+ * 甚至让子标题错误地挂到别的小节下面。
+ */
+function selectSectionHeadings(raw: HeadingNode[], lengths: number[]): HeadingNode[] {
+  linkParents(raw);
+  const meaningful = raw
+    .map((_, index) => index)
+    .filter((index) => (lengths[index] ?? 0) >= MIN_SECTION_TEXT);
+
+  const selected = new Set<number>(meaningful);
+
+  for (const index of [...selected]) {
+    for (let parent = raw[index]?.parentIndex ?? -1; parent >= 0; parent = raw[parent].parentIndex) {
+      selected.add(parent);
+    }
+  }
+
+  if (selected.size < 2) return raw;
+  return raw.filter((_, index) => selected.has(index));
+}
+
 /** 智能阅读模式：判断当前页面是否值得激活吸顶面包屑 */
 function decideArticle(stats: HeadingStats, semanticScope: boolean): boolean {
   if (stats.headingCount < 2) return false;
@@ -483,8 +514,7 @@ export function buildHeadingIndex(): HeadingIndex | null {
     const raw = collectHeadings(scope, scopeIsBodyish);
     if (raw.length < 2) return raw.length;
     const lengths = sectionTexts(scope, raw, measure);
-    const keptCount = raw.filter((_, index) => (lengths[index] ?? 0) >= MIN_SECTION_TEXT).length;
-    return keptCount >= 2 ? keptCount : raw.length;
+    return selectSectionHeadings(raw, lengths).length;
   };
   const bodyHeadingCount = countEffectiveHeadings(body, true);
   const attempts: Array<{ scope: HTMLElement; scopeIsBodyish: boolean; semantic: boolean }> = [];
@@ -496,14 +526,17 @@ export function buildHeadingIndex(): HeadingIndex | null {
     const rawHeadings = collectHeadings(attempt.scope, attempt.scopeIsBodyish);
     if (rawHeadings.length < 2) continue;
 
-    // 丢掉“标题后面几乎没有正文”的项：侧栏导航、搜索结果标题、卡片列表标题都会长这样
+    // 丢掉“标题后面几乎没有正文”的项：侧栏导航、搜索结果标题、卡片列表标题都会长这样。
+    // 文末短总结与必要父级是例外，见 selectSectionHeadings。
     const sectionLengths = sectionTexts(attempt.scope, rawHeadings, measure);
+    const headings = selectSectionHeadings(rawHeadings, sectionLengths);
+    const selectedSet = new Set(headings);
     const kept = rawHeadings
       .map((node, index) => ({ node, text: sectionLengths[index] ?? 0 }))
-      .filter((item) => item.text >= MIN_SECTION_TEXT);
-    const headings = kept.length >= 2 ? kept.map((item) => item.node) : rawHeadings;
+      .filter((item) => selectedSet.has(item.node));
     if (headings.length < 2) continue;
 
+    // selectSectionHeadings 已经为原始树连过父级；过滤后的树需要重新计算相对索引。
     linkParents(headings);
     measureHeadings(headings);
     const scopeText = measure(attempt.scope);
@@ -537,7 +570,7 @@ export function buildHeadingIndex(): HeadingIndex | null {
     const isArticle = geometry.reliable && decideArticle(stats, attempt.semantic);
     if (isArticle) ensureIds(headings, attempt.scope);
     // 判定依据挂在 DOM 上，便于排查“为什么这个页面激活/没激活”
-    attempt.scope.dataset.wssStats = [
+    const diagnostics = [
       `h=${stats.headingCount}`,
       `text=${stats.scopeText}`,
       `share=${stats.scopeShare.toFixed(2)}`,
@@ -556,11 +589,13 @@ export function buildHeadingIndex(): HeadingIndex | null {
       `sem=${attempt.semantic ? 1 : 0}`,
       `art=${isArticle ? 1 : 0}`,
     ].join(' ');
+    attempt.scope.dataset.wssStats = diagnostics;
     return {
       scope: attempt.scope,
       headings,
       isArticle,
       stats,
+      diagnostics,
     };
   }
 
@@ -587,7 +622,5 @@ export function headingSignature(index: HeadingIndex): string {
  */
 export function headingIndexStillAttached(index: HeadingIndex): boolean {
   if (!index.scope.isConnected) return false;
-  return index.headings.every(
-    (node) => node.element.isConnected && node.element.dataset.wssId === node.id,
-  );
+  return index.headings.every((node) => node.element.isConnected);
 }

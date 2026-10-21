@@ -186,15 +186,11 @@ export class ScrollTracker {
     }
     index = this.applyOverride(tops, index, line);
 
-    // 页面滚动到底后，最后一个标题可能永远无法越过基准线：此时让它直接生效
-    if (this.atPageBottom()) {
-      const bottomLine = window.innerHeight - 8;
-      let last = index;
-      for (let i = index + 1; i < count; i += 1) {
-        if (tops[i] <= bottomLine) last = i;
-        else break;
-      }
-      index = last;
+    // 页面已经不能再滚动时，最后一个小节没有机会越过吸顶线。
+    // 只允许“最后这个标题”在真正的终点接替，绝不把中途可见的标题提前提升，
+    // 也不覆盖用户正在进行的主动跳转。
+    if (this.override === null && this.atPageBottom() && index < count - 1) {
+      index = count - 1;
     }
 
     if (index < 0) {

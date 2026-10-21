@@ -165,6 +165,31 @@ describe('buildHeadingIndex', () => {
     expect(index?.isArticle).toBe(true);
   });
 
+  it('保留文末短总结，并保留它所属的必要父级结构', () => {
+    document.body.innerHTML = `
+      <article>
+        <h1>文章标题</h1>
+        <p>${paragraph(120)}</p>
+        <h2>第一节</h2>
+        <p>${paragraph(360)}</p>
+        <h2>带子标题的章节</h2>
+        <h3>子标题</h3>
+        <p>${paragraph(180)}</p>
+        <h2>总结</h2>
+        <p>${paragraph(20)}</p>
+      </article>
+    `;
+    const index = buildHeadingIndex();
+    expect(index?.headings.map((node) => node.text)).toEqual([
+      '文章标题',
+      '第一节',
+      '带子标题的章节',
+      '子标题',
+      '总结',
+    ]);
+    expect(index?.headings.at(-1)?.parentIndex).toBe(0);
+  });
+
   it('没有标题时返回 null', () => {
     document.body.innerHTML = '<main><p>只有正文，没有标题</p></main>';
     expect(buildHeadingIndex()).toBeNull();

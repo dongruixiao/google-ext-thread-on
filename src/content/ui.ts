@@ -97,6 +97,7 @@ export class StickyUI {
     root.dataset.appearance = this.appearance;
     root.dataset.barWidth = this.barWidth;
     root.dataset.pinned = 'false';
+    root.dataset.wssActive = 'true';
     root.style.setProperty('--wss-z-index', String(Z_INDEX));
     root.setAttribute('role', 'navigation');
     root.setAttribute('aria-label', '当前章节位置');
@@ -198,6 +199,12 @@ export class StickyUI {
 
   setTop(px: number): void {
     this.root?.style.setProperty('--wss-top', `${Math.round(px)}px`);
+  }
+
+  setDiagnostics(scope: string, stats: string): void {
+    if (!this.root) return;
+    this.root.dataset.wssScope = scope;
+    this.root.dataset.wssStats = stats;
   }
 
   setZIndex(value: number): void {

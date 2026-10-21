@@ -276,6 +276,10 @@ class StickyScrollApp {
       maxCrumbs: this.settings.maxCrumbs,
     });
     ui.mount(index.headings);
+    ui.setDiagnostics(
+      `${index.scope.tagName.toLowerCase()}${index.scope.classList[0] ? `.${index.scope.classList[0]}` : ''}`,
+      index.diagnostics,
+    );
     this.ui = ui;
 
     this.tocCandidates = this.collectTocCandidates();
@@ -868,7 +872,7 @@ class StickyScrollApp {
       scope: index
         ? `${index.scope.tagName.toLowerCase()}${index.scope.classList[0] ? `.${index.scope.classList[0]}` : ''}`
         : null,
-      stats: index?.scope.dataset.wssStats ?? null,
+      stats: index?.diagnostics ?? null,
       statusReason: this.statusReason(index),
       isArticle: index?.isArticle ?? false,
       geometryReliable: index?.stats.geometryReliable ?? false,
