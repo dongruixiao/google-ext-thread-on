@@ -103,7 +103,6 @@ export class StickyUI {
     root.setAttribute('aria-label', '当前章节位置');
     root.innerHTML = `
       <div class="wss-bar" part="bar">
-        <div class="wss-bar-sheet" aria-hidden="true"></div>
         <div class="wss-bar-inner">
           <div class="wss-bar-heading" data-wss-role="heading" role="button" tabindex="0"
                aria-label="展开或固定文章目录"></div>

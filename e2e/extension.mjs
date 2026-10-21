@@ -68,6 +68,8 @@ const probe = (page) =>
     const active = shadow?.querySelector(surface);
     const crumbs = [...(active?.querySelectorAll('.wss-crumb') ?? [])].map((node) => node.textContent);
     const clone = shadow?.querySelector('[data-wss-clone="true"]');
+    const bar = shadow?.querySelector('.wss-bar');
+    const barStyle = bar ? getComputedStyle(bar) : null;
     const article = document.querySelector('article');
     const anchor = root?.dataset.appearance === 'bar' ? clone : active?.querySelector('.wss-crumb');
     return {
@@ -77,9 +79,10 @@ const probe = (page) =>
       visible: root?.dataset.visible ?? null,
       compact: root?.dataset.compact ?? null,
       top: Number.parseFloat(root?.style.getPropertyValue('--wss-top') ?? 'NaN'),
-      sheetBackground: shadow
-        ? getComputedStyle(shadow.querySelector('.wss-bar-sheet')).backgroundColor
-        : null,
+      hasBarSheet: !!shadow?.querySelector('.wss-bar-sheet'),
+      barBackground: barStyle?.backgroundColor ?? null,
+      barShadow: barStyle?.boxShadow ?? null,
+      barBorderWidth: barStyle?.borderBottomWidth ?? null,
       surfaceTop: active ? Math.round(active.getBoundingClientRect().top) : null,
       barHeight: Math.round(shadow?.querySelector('.wss-bar')?.getBoundingClientRect().height ?? 0),
       cloneText: clone?.textContent?.trim() ?? null,
@@ -146,10 +149,23 @@ try {
   check('向下滚动后浮现', scrolled.visible === 'true', scrolled);
   check('吸顶条贴在固定顶栏下方', Math.abs(scrolled.top - TOPBAR_HEIGHT) <= 1, scrolled.top);
   check(
-    '吸顶条实心、取自页面底色',
-    !!scrolled.sheetBackground && scrolled.sheetBackground.startsWith('rgb('),
-    scrolled.sheetBackground,
+    '标题背后没有图板、边框或阴影',
+    !scrolled.hasBarSheet &&
+      scrolled.barBackground === 'rgba(0, 0, 0, 0)' &&
+      scrolled.barShadow === 'none' &&
+      scrolled.barBorderWidth === '0px',
+    scrolled,
   );
+  const transparentArea = await page.evaluate(() => {
+    const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
+    const bar = shadow.querySelector('.wss-bar').getBoundingClientRect();
+    const hit = document.elementFromPoint(bar.right - 8, bar.top + bar.height / 2);
+    return {
+      hit: hit?.id || hit?.tagName || null,
+      hitsPlugin: hit?.id === '__web_sticky_scroll_host__',
+    };
+  });
+  check('无图板的空白区域不拦截页面点击', !transparentArea.hitsPlugin, transparentArea);
   check(
     '条里只显示当前小节标题',
     !!scrolled.cloneText &&
@@ -353,13 +369,15 @@ try {
       barTop: Math.round(bar.top),
       trackTop: Math.round(track.top),
       barBottom: Math.round(bar.bottom),
+      trackHeight: Math.round(track.height),
     };
   });
   check(
     '进度条通栏贴在吸顶区域顶部，不像标题下划线',
     progressTrack.barX[0] === progressTrack.trackX[0] &&
       progressTrack.barX[1] === progressTrack.trackX[1] &&
-      Math.abs(progressTrack.barTop - progressTrack.trackTop) <= 1,
+      Math.abs(progressTrack.barTop - progressTrack.trackTop) <= 1 &&
+      progressTrack.trackHeight === 1,
     progressTrack,
   );
 

@@ -26,9 +26,10 @@
    向上回滚时，下级标题的原文一露头就退回上一级，不会出现"上级标题已在屏幕上、条还赖着下级"。
    判定只看当前几何位置，快速回滚和锚点跳转都不会残留旧状态。
 2. **层级不堆在条上**：条里只放当前标题；上级层级放进悬停展开的抽屉顶部，做成一条可点击的细路径。
-3. **像 VS Code 那样贴边停靠**：吸顶条紧贴站点导航栏下方、与正文列左右对齐，背景取自页面底色。
-4. **配色取自页面**：从正文容器向上找实色背景、从正文标题取文字颜色；
-   采样不到时退回插件主题色，不会出现深底配深字。
+3. **没有 Toolbar 图板**：标题紧贴站点导航栏下方、与正文列左右对齐，但背后没有满宽背景、
+   边框、阴影或毛玻璃；滚过去的正文保持原样可见。
+4. **标题身份取自页面**：字体、字号、字重、行高和颜色都来自原网页标题；
+   进度线与大纲使用低干扰的中性色，不重绘整页配色。
 5. **不与原站争**：原站目录在屏幕上时，插件退化成「当前小节」指示器，不再弹自己的大纲。
 6. **不改页面视觉与布局**：不写页面样式类、不插入占位元素，全部 UI 挂在独立 Shadow DOM 里；
    少量用于诊断和清理的 `data-wss-*` 标记会在退出时全部移除。
@@ -240,7 +241,7 @@ npm install
 npm run dev          # CRXJS 开发模式（HMR），在 chrome://extensions 加载 dist/
 npm run build        # 类型检查 + 打包到 dist/
 npm test             # 单元测试（启发式判定、路径裁剪、设置迁移）
-npm run e2e          # 端到端：真实浏览器加载 dist/ 跑 42 项断言
+npm run e2e          # 端到端：真实浏览器加载 dist/ 跑 43 项断言
 npm run field-check  # 实地检查：27 个真实站点的激活范围、对齐与插件布局位移
 npm run demo:dev     # 本地演示页
 npm run icons        # 重新生成图标
@@ -257,8 +258,8 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 
 ## 发布前检查清单
 
-- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.8.3）
-- [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 42 项端到端 /
+- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.8.4）
+- [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 43 项端到端 /
       真实站点的激活范围、标题对齐与插件布局位移）
 - [ ] 确认权限仅 `storage`，`content_scripts.matches` 只覆盖 `http/https`
 - [ ] 更新截图：`npm run screenshots`（输出 1280×800 到 store/screenshots）
@@ -275,7 +276,7 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 | `store/screenshots/*.png` | 1280×800 商店截图（`npm run screenshots` 生成） |
 | `store/demo-page.html` | 截图用的中性示例文章页 |
 
-打包：`npm run package` → `release/web-sticky-scroll-0.8.3.zip`（zip 根目录就是 manifest.json，可直接上传）
+打包：`npm run package` → `release/web-sticky-scroll-0.8.4.zip`（zip 根目录就是 manifest.json，可直接上传）
 
 ## 已知取舍
 
@@ -283,9 +284,8 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 - 没有实现「插入占位元素把正文推下去」的方案：那会改变宿主页面布局，风险大于收益
 - 目前文案为中文；多语言（`_locales`）留到接入英文用户时再做
 
-关于遮挡：吸顶条是贴边实心条，和 VS Code 的 sticky 行一样，滚过去的文字会被盖住顶部 40～70px（跟着标题行高）。
-这正是它看起来像页面自带 header 的原因。如果不要这个取舍，
-可以在设置里换成「悬浮胶囊 + 智能 / 轻提示策略」，或把吸顶条宽度改成「与正文列同宽」。
+关于遮挡：默认形态没有实色图板，正文会从原样标题文字下方继续滚过；顶部仅有 1px 阅读进度线。
+标题高度仍跟随网页原始标题，因此不会为了变薄而改写原网页字号。
 
 标题克隆是「只读」的：我们克隆 DOM 并把计算样式写成内联样式，页面里的原始标题不移动、不改样式；
 因此站点自己的悬停效果、锚点行为在原文里仍然照旧，吸顶条只负责长相一致与被点击回溯。
