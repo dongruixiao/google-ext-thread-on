@@ -339,13 +339,13 @@
   display: none;
 }
 
-/* ── 进度条：整篇文章的阅读进度，通栏贴在条底 ───────── */
+/* ── 进度条：整篇文章的阅读进度，贴在吸顶区域顶部 ───── */
 
 .wss-progress {
   position: absolute;
   left: 14px;
   right: 14px;
-  bottom: 1px;
+  top: 1px;
   height: 2px;
   border-radius: 2px;
   overflow: hidden;
@@ -364,7 +364,7 @@
 .wss-root[data-appearance='bar'] .wss-progress {
   left: 0;
   right: 0;
-  bottom: 0;
+  top: 0;
   height: 3px;
   border-radius: 0;
   background: color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
@@ -372,7 +372,7 @@
 
 .wss-root[data-bar-width='column'] .wss-progress {
   height: 2px;
-  border-radius: 0 0 12px 12px;
+  border-radius: 0;
 }
 
 /* ── 悬停大纲：顶部是上级路径，下面是全文目录 ───────── */

@@ -347,11 +347,19 @@ try {
     const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
     const bar = shadow.querySelector('.wss-bar').getBoundingClientRect();
     const track = shadow.querySelector('.wss-progress').getBoundingClientRect();
-    return { bar: [Math.round(bar.left), Math.round(bar.right)], track: [Math.round(track.left), Math.round(track.right)] };
+    return {
+      barX: [Math.round(bar.left), Math.round(bar.right)],
+      trackX: [Math.round(track.left), Math.round(track.right)],
+      barTop: Math.round(bar.top),
+      trackTop: Math.round(track.top),
+      barBottom: Math.round(bar.bottom),
+    };
   });
   check(
-    '进度条通栏贴在条底部，不像标题下划线',
-    progressTrack.bar[0] === progressTrack.track[0] && progressTrack.bar[1] === progressTrack.track[1],
+    '进度条通栏贴在吸顶区域顶部，不像标题下划线',
+    progressTrack.barX[0] === progressTrack.trackX[0] &&
+      progressTrack.barX[1] === progressTrack.trackX[1] &&
+      Math.abs(progressTrack.barTop - progressTrack.trackTop) <= 1,
     progressTrack,
   );
 

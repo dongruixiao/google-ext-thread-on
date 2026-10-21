@@ -1,7 +1,7 @@
 {
   "name": "web-sticky-scroll",
   "private": true,
-  "version": "0.8.2",
+  "version": "0.8.3",
   "type": "module",
   "description": "TopClip —— 读长文，不掉线（网页章节标题常驻顶部；类 VS Code Sticky Scroll 的阅读体验）",
   "scripts": {
