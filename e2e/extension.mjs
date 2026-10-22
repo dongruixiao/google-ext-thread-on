@@ -786,7 +786,7 @@ try {
     hadHost: faultHadHost,
     hostExists: true,
     markers: -1,
-    failSafeRecorded: false,
+    persistentMarker: false,
   };
   if (extensionContextId !== null) {
     await cdp.send('Runtime.evaluate', {
@@ -826,7 +826,7 @@ try {
     faultResult = await faultPage.evaluate(() => ({
       hostExists: !!document.getElementById('__web_sticky_scroll_host__'),
       markers: document.querySelectorAll('[data-wss-id], [data-wss-scope], [data-wss-stats]').length,
-      failSafeRecorded: Array.from(
+      persistentMarker: Array.from(
         { length: sessionStorage.length },
         (_, index) => sessionStorage.key(index) ?? '',
       ).some((key) => key.startsWith('wss:failsafe:')),
@@ -834,15 +834,21 @@ try {
     faultResult.hadHost = faultHadHost;
   }
   await cdp.detach();
+  await faultPage.reload({ waitUntil: 'load' });
+  await faultPage.waitForTimeout(1000);
+  const recoveredAfterReload = await faultPage.evaluate(
+    () => !!document.getElementById('__web_sticky_scroll_host__'),
+  );
   await faultPage.close();
   check(
-    '连续异常后静默退出且不破坏页面',
+    '连续异常后静默退出且刷新后可以恢复',
     faultResult.hadHost &&
       !faultResult.hostExists &&
       faultResult.markers === 0 &&
-      faultResult.failSafeRecorded &&
+      !faultResult.persistentMarker &&
+      recoveredAfterReload &&
       faultPageErrors.length === 0,
-    { ...faultResult, pageErrors: faultPageErrors },
+    { ...faultResult, recoveredAfterReload, pageErrors: faultPageErrors },
   );
 
   // options：只保留智能 / 常驻；切换到智能后页面实时响应

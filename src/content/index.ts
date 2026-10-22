@@ -42,8 +42,6 @@ declare const __WSS_VERSION__: string;
 
 /** 探测点：网页顶部附近，用于识别原站自带的固定导航栏 */
 const OVERLAY_PROBES = [0.5, 0.08, 0.92];
-const FAIL_SAFE_PREFIX = 'wss:failsafe:';
-
 class StickyScrollApp {
   private readonly guard = new FailureGuard({
     onFailSafe: (reason) => this.failSafe(reason),
@@ -108,7 +106,6 @@ class StickyScrollApp {
   private async boot(): Promise<void> {
     // 只在顶层窗口运行（manifest 也已限制 all_frames: false）
     if (window.self !== window.top) return;
-    if (this.hadFailSafe()) return;
     this.settings = await loadSettings();
     this.unsubscribeSettings = subscribeSettings((next) => {
       this.guard.run('settings-change', () => this.applySettings(next));
@@ -691,27 +688,10 @@ class StickyScrollApp {
 
   // ── 失败即静默 ──────────────────────────────────────
 
-  private pageFailureKey(): string {
-    return `${FAIL_SAFE_PREFIX}${location.pathname}${location.search}`.slice(0, 500);
-  }
-
-  private hadFailSafe(): boolean {
-    try {
-      return window.sessionStorage.getItem(this.pageFailureKey()) === '1';
-    } catch {
-      return false;
-    }
-  }
-
   private failSafe(_reason: string): void {
     if (this.failSafeTripped) return;
     this.failSafeTripped = true;
     this.running = false;
-    try {
-      window.sessionStorage.setItem(this.pageFailureKey(), '1');
-    } catch {
-      /* 隐私模式禁用 storage 时仍然继续清理界面 */
-    }
     try {
       this.unsubscribeSettings?.();
     } catch {
