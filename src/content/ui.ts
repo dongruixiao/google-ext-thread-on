@@ -500,7 +500,12 @@ export class StickyUI {
     const height = rect.height || 40;
     const anchorRange = Math.max(1, window.innerWidth - 16);
     const maxY = Math.max(0, window.innerHeight - height - 16);
-    const left = 8 + (this.floatingPosition.x / 100) * anchorRange;
+    const desiredLeft = 8 + (this.floatingPosition.x / 100) * anchorRange;
+    // 旧版本保存的 x/y 使用过不同的归一化基准。夹取一次可避免升级后
+    // 胶囊被定位到视口右缘之外，看起来像“完全不显示”。
+    pill.style.removeProperty('max-width');
+    const width = Math.min(480, Math.max(140, pill.getBoundingClientRect().width || 180));
+    const left = Math.max(8, Math.min(desiredLeft, window.innerWidth - width - 8));
     const availableWidth = Math.max(140, window.innerWidth - left - 16);
     pill.style.maxWidth = `${Math.min(480, availableWidth)}px`;
     const top = 8 + (this.floatingPosition.y / 100) * maxY;

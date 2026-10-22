@@ -146,6 +146,31 @@ try {
   if (!worker) worker = await context.waitForEvent('serviceworker', { timeout: 15000 });
   const extensionId = new URL(worker.url()).host;
 
+  // 用上一版的真实配置启动，验证用户升级后不会因为设置迁移而整页失效。
+  const setup = await context.newPage();
+  await setup.goto(`chrome-extension://${extensionId}/src/options/options.html`);
+  await setup.evaluate(async () => {
+    await chrome.storage.sync.set({
+      'wss:settings': {
+        version: 5,
+        enabled: true,
+        position: 'top-center',
+        theme: 'auto',
+        offsetY: 0,
+        hideArticleTitle: true,
+        maxCrumbs: 3,
+        displayPolicy: 'always',
+        pageTocMode: 'adapt',
+        appearance: 'pill',
+        barWidth: 'full',
+        siteAccess: 'blocklist',
+        sites: ['blocked.example'],
+        floatingPositions: {},
+      },
+    });
+  });
+  await setup.close();
+
   const page = await context.newPage();
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(String(error)));
@@ -943,6 +968,33 @@ try {
   );
 
   await page.setViewportSize({ width: 1280, height: 720 });
+  // 旧版把 x=100 解释为“胶囊左边缘贴近视口右边缘”。新版改为左边缘锚定后，
+  // 必须把这类历史位置夹回视口，否则升级后只会露出几像素，看起来像没有显示。
+  await options.evaluate(async () => {
+    await chrome.storage.sync.set({
+      'wss:settings': {
+        version: 5,
+        enabled: true,
+        displayPolicy: 'always',
+        siteAccess: 'blocklist',
+        sites: [],
+        floatingPositions: { '127.0.0.1': { x: 100, y: 20 } },
+      },
+    });
+  });
+  await page.waitForTimeout(700);
+  const legacyPosition = await probe(page);
+  check(
+    '升级后旧版右侧位置会被完整夹回视口',
+    legacyPosition.position === 'custom' &&
+      legacyPosition.surfaceLeft !== null &&
+      legacyPosition.surfaceWidth !== null &&
+      legacyPosition.surfaceLeft >= 8 &&
+      legacyPosition.surfaceLeft + legacyPosition.surfaceWidth <=
+        legacyPosition.viewport.width - 8,
+    legacyPosition,
+  );
+
   await page.evaluate(() => window.scrollTo(0, 1000));
   await page.waitForTimeout(500);
   await page.evaluate(() => window.scrollTo(0, 1400));
