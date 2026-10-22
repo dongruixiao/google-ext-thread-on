@@ -91,10 +91,11 @@ const dark = await context.newPage();
 await dark.goto(`${url}?dark=1`, { waitUntil: 'load' });
 await dark.mouse.move(640, 400);
 await dark.waitForTimeout(1200);
-  await shoot(dark, '03-dark-site.png', 1000);
+await shoot(dark, '03-dark-site.png', 1000);
 await dark.close();
 
 // 4) 自由拖动到文章右下角，目录自动向上展开
+await applySettings({ pageTocMode: 'full' });
 const pill = await context.newPage();
 await pill.goto(url, { waitUntil: 'load' });
 await pill.mouse.move(640, 400);
@@ -113,7 +114,16 @@ await pill.mouse.down();
 await pill.mouse.move(960, 680, { steps: 12 });
 await pill.mouse.up();
 await pill.waitForTimeout(500);
-await pill.mouse.move(960, 680);
+const end = await pill.evaluate(() => {
+  const rect = document
+    .getElementById('__web_sticky_scroll_host__')
+    .shadowRoot.querySelector('.wss-pill')
+    .getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+});
+await pill.mouse.move(20, 450);
+await pill.waitForTimeout(150);
+await pill.mouse.move(end.x, end.y);
 await pill.waitForTimeout(500);
 await pill.screenshot({ path: join(OUT_DIR, '04-draggable-pill.png') });
 console.log('✓', '04-draggable-pill.png');

@@ -538,7 +538,7 @@ export class StickyUI {
 
   /**
    * 自由拖动后，目录不能仍然假设自己在顶部。
-   * 下方空间不足就向上展开，左右空间不足就换边，保证控件始终留在视口内。
+   * 下方空间不足就向上展开；两者共享左边缘，宽度固定所以不需要横向换边。
    */
   private layoutDrawer(): void {
     const root = this.root;
@@ -559,15 +559,6 @@ export class StickyUI {
     const maxHeight = Math.max(96, Math.min(520, Math.floor(availableHeight)));
     below.dataset.placement = placement;
     root.style.setProperty('--wss-drawer-max-height', `${maxHeight}px`);
-
-    if (!this.floatingPosition) {
-      root.dataset.drawerAlign = this.position === 'top-right' ? 'right' : 'center';
-      return;
-    }
-
-    const leftSpace = rect.left - margin;
-    const rightSpace = window.innerWidth - rect.right - margin;
-    root.dataset.drawerAlign = rightSpace >= leftSpace ? 'left' : 'right';
   }
 
   private handleViewportResize = (): void => {

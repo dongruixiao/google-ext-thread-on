@@ -103,6 +103,8 @@ const probe = (page) =>
       progressHeight: progressRect ? Math.round(progressRect.height) : null,
       progressVisible: progressLayer?.dataset.visible ?? null,
       surfaceTop: active ? Math.round(active.getBoundingClientRect().top) : null,
+      surfaceLeft: active ? Math.round(active.getBoundingClientRect().left) : null,
+      surfaceWidth: active ? Math.round(active.getBoundingClientRect().width) : null,
       title: chapterTitle?.textContent?.trim() ?? null,
       pillHeight: active ? Math.round(active.getBoundingClientRect().height) : null,
       drawerPath: [...(shadow?.querySelectorAll('.wss-drawer-path .wss-crumb') ?? [])].map(
@@ -111,7 +113,6 @@ const probe = (page) =>
       rows: shadow?.querySelectorAll('.wss-row').length ?? 0,
       drawerOpen: shadow?.querySelector('.wss-drawer')?.classList.contains('is-open') ?? null,
       drawerPlacement: shadow?.querySelector('.wss-below')?.dataset.placement ?? null,
-      drawerAlign: root?.dataset.drawerAlign ?? null,
       drawerRect: drawer
         ? {
             left: Math.round(drawer.getBoundingClientRect().left),
@@ -262,6 +263,7 @@ try {
 
     const samples = [];
     const violations = [];
+    const pillWidths = [];
     const inspect = () => {
       if (!visible()) return;
       const text = cloneText();
@@ -269,6 +271,7 @@ try {
       if (!node) return;
       const delta = Math.round(node.getBoundingClientRect().top - dockTop());
       samples.push(delta);
+      pillWidths.push(Math.round(shadow.querySelector('.wss-pill').getBoundingClientRect().width));
       // delta > 0 表示这个标题还露在条下面 —— 不该已经显示在条里
       if (delta > 8) {
         violations.push({
@@ -297,12 +300,16 @@ try {
       samples: samples.length,
       minDelta: Math.min(...samples),
       maxDelta: Math.max(...samples),
+      minPillWidth: Math.min(...pillWidths),
+      maxPillWidth: Math.max(...pillWidths),
       violations,
     };
   });
   check(
     '胶囊只显示已经滑过停靠线的标题（向下不提前 / 回滚不赖着下级）',
-    timingScan.samples > 50 && timingScan.violations.length === 0,
+    timingScan.samples > 50 &&
+      timingScan.violations.length === 0 &&
+      timingScan.maxPillWidth - timingScan.minPillWidth <= 1,
     timingScan,
   );
 
@@ -799,8 +806,13 @@ try {
   check(
     '拟物胶囊可自由拖动并记住位置',
     dragged.position === 'custom' &&
-      dragged.floatingLeft > 100 &&
-      dragged.floatingTop > 400,
+      dragged.floatingLeft >= 8 &&
+      dragged.floatingTop > 400 &&
+      dragged.drawerRect !== null &&
+      Math.abs(dragged.drawerRect.left - dragged.surfaceLeft) <= 1 &&
+      Math.abs(
+        dragged.drawerRect.right - (dragged.surfaceLeft + dragged.surfaceWidth),
+      ) <= 1,
     dragged,
   );
   check(
