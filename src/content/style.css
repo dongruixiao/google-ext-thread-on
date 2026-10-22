@@ -138,26 +138,33 @@
   user-select: none;
 }
 
+.wss-bar-inner::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: var(--wss-col-right);
+  bottom: -18px;
+  left: var(--wss-col-left);
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    var(--wss-page-bg) 0%,
+    var(--wss-page-bg) 62%,
+    color-mix(in srgb, var(--wss-page-bg) 94%, transparent) 78%,
+    transparent 100%
+  );
+}
+
 /* 克隆进来的标题：样式全部来自页面，这里只负责占位与裁切 */
 .wss-bar-heading {
   position: relative;
-  isolation: isolate;
+  z-index: 1;
   display: flex;
   align-items: center;
   min-width: 0;
   flex: 0 1 auto;
   pointer-events: auto;
-}
-
-.wss-bar-heading::before {
-  content: '';
-  position: absolute;
-  inset: -3px -12px;
-  z-index: -1;
-  pointer-events: none;
-  background: var(--wss-page-bg);
-  opacity: 0.94;
-  filter: blur(6px);
 }
 
 .wss-bar-heading > * {
@@ -218,6 +225,11 @@
 .wss-root[data-bar-width='column'] .wss-bar-inner {
   padding-left: 14px;
   padding-right: 14px;
+}
+
+.wss-root[data-bar-width='column'] .wss-bar-inner::before {
+  right: 0;
+  left: 0;
 }
 
 /* ── 悬浮胶囊 ───────────────────────────────────────── */

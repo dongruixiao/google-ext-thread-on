@@ -76,8 +76,8 @@ const probe = (page) =>
     const clone = shadow?.querySelector('[data-wss-clone="true"]');
     const bar = shadow?.querySelector('.wss-bar');
     const barStyle = bar ? getComputedStyle(bar) : null;
-    const heading = shadow?.querySelector('.wss-bar-heading');
-    const headingMaskStyle = heading ? getComputedStyle(heading, '::before') : null;
+    const barInner = shadow?.querySelector('.wss-bar-inner');
+    const titleMaskStyle = barInner ? getComputedStyle(barInner, '::before') : null;
     const drawer = shadow?.querySelector('.wss-drawer');
     const drawerStyle = drawer ? getComputedStyle(drawer) : null;
     const article = document.querySelector('article');
@@ -93,8 +93,8 @@ const probe = (page) =>
       barBackground: barStyle?.backgroundColor ?? null,
       barShadow: barStyle?.boxShadow ?? null,
       barBorderWidth: barStyle?.borderBottomWidth ?? null,
-      titleMaskBackground: headingMaskStyle?.backgroundColor ?? null,
-      titleMaskFilter: headingMaskStyle?.filter ?? null,
+      titleMaskBackground: titleMaskStyle?.backgroundImage ?? null,
+      titleMaskFilter: titleMaskStyle?.filter ?? null,
       drawerBackground: drawerStyle?.backgroundColor ?? null,
       drawerShadow: drawerStyle?.boxShadow ?? null,
       drawerBackdrop: drawerStyle?.backdropFilter ?? null,
@@ -183,7 +183,8 @@ try {
       scrolled.barBackground === 'rgba(0, 0, 0, 0)' &&
       scrolled.barShadow === 'none' &&
       scrolled.barBorderWidth === '0px' &&
-      scrolled.titleMaskFilter === 'blur(6px)',
+      scrolled.titleMaskFilter === 'none' &&
+      !!scrolled.titleMaskBackground?.includes('linear-gradient'),
     scrolled,
   );
   const transparentArea = await page.evaluate(() => {
