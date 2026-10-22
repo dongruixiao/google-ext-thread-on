@@ -147,6 +147,14 @@ export class StickyUI {
     this.drawerProgress = root.querySelector<HTMLElement>('.wss-drawer-progress');
     this.rows = new Map();
 
+    // Keep the standard property as an inline declaration: the build minifier
+    // otherwise leaves only the WebKit alias, which is not honoured consistently.
+    const glassFilter = 'blur(26px) saturate(210%) contrast(1.04)';
+    this.pill?.style.setProperty('backdrop-filter', glassFilter);
+    this.pill?.style.setProperty('-webkit-backdrop-filter', glassFilter);
+    this.drawer?.style.setProperty('backdrop-filter', glassFilter);
+    this.drawer?.style.setProperty('-webkit-backdrop-filter', glassFilter);
+
     const outline = root.querySelector<HTMLDivElement>('.wss-outline');
     if (outline) outline.appendChild(this.buildOutline());
 

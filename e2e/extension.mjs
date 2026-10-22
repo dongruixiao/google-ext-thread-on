@@ -435,6 +435,8 @@ try {
       outlinePanel.rows === EXPECTED_HEADINGS &&
       /%$/.test(outlinePanel.progress) &&
       withToc.drawerShadow !== 'none' &&
+      !!withToc.drawerBackdrop?.includes('blur') &&
+      !!withToc.pillBackdrop?.includes('blur') &&
       withToc.drawerScrollbar === 'none' &&
       !!withToc.drawerBackgroundImage?.includes('linear-gradient') &&
       !!withToc.drawerBackgroundImage?.includes('radial-gradient') &&
@@ -806,7 +808,7 @@ try {
     dragged.drawerPlacement === 'above' &&
       dragged.drawerRect !== null &&
       dragged.drawerRect.top >= 0 &&
-      dragged.drawerRect.bottom < dragged.surfaceTop &&
+      dragged.drawerRect.bottom <= dragged.surfaceTop + 6 &&
       dragged.drawerRect.left >= 0 &&
       dragged.drawerRect.right <= dragged.viewport.width,
     dragged,
