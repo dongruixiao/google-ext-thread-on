@@ -16,6 +16,7 @@ const ICON_SVG = `<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="t
 const CLOSE_DELAY = 260;
 
 const EMPTY_SNAPSHOT: TrackerSnapshot = { index: -1, path: [], progress: 0 };
+const PROGRESS_RING_CIRCUMFERENCE = 88;
 
 export interface Presentation {
   /** 当前策略是否允许显示（路径存在 + 显示策略判定） */
@@ -39,8 +40,8 @@ export class StickyUI {
   private root: HTMLDivElement | null = null;
   private pill: HTMLDivElement | null = null;
   private chapterTitle: HTMLElement | null = null;
-  private progressLayer: HTMLDivElement | null = null;
-  private progressFill: HTMLElement | null = null;
+  private progressBadge: HTMLElement | null = null;
+  private progressRing: SVGCircleElement | null = null;
   private below: HTMLDivElement | null = null;
   private drawer: HTMLDivElement | null = null;
   private drawerPath: HTMLDivElement | null = null;
@@ -96,12 +97,6 @@ export class StickyUI {
     style.textContent = styleText;
     shadow.appendChild(style);
 
-    const progressLayer = document.createElement('div');
-    progressLayer.className = 'wss-global-progress';
-    progressLayer.dataset.visible = 'false';
-    progressLayer.style.setProperty('--wss-z-index', String(Z_INDEX));
-    progressLayer.innerHTML = '<i></i>';
-
     const root = document.createElement('div');
     root.className = 'wss-root';
     root.dataset.visible = 'false';
@@ -114,10 +109,16 @@ export class StickyUI {
     root.setAttribute('aria-label', '当前章节位置');
     root.innerHTML = `
       <div class="wss-pill" part="pill">
-        <span class="wss-icon">${ICON_SVG}</span>
+        <span class="wss-icon-badge" role="progressbar" aria-label="整篇阅读进度"
+              aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <svg class="wss-progress-svg" viewBox="0 0 34 34" aria-hidden="true">
+            <circle class="wss-progress-track" cx="17" cy="17" r="14"></circle>
+            <circle class="wss-progress-ring" cx="17" cy="17" r="14"></circle>
+          </svg>
+          <span class="wss-icon">${ICON_SVG}</span>
+        </span>
         <div class="wss-title" data-wss-role="heading" role="button" tabindex="0"
              aria-label="展开或固定文章目录"></div>
-        <span class="wss-led" aria-hidden="true"></span>
       </div>
       <div class="wss-below">
         <div class="wss-drawer" part="drawer">
@@ -127,14 +128,13 @@ export class StickyUI {
       </div>
     `;
     shadow.appendChild(root);
-    shadow.appendChild(progressLayer);
 
     this.host = host;
     this.root = root;
     this.pill = root.querySelector<HTMLDivElement>('.wss-pill');
     this.chapterTitle = root.querySelector<HTMLElement>('.wss-title');
-    this.progressLayer = progressLayer;
-    this.progressFill = progressLayer.querySelector<HTMLElement>('i');
+    this.progressBadge = root.querySelector<HTMLElement>('.wss-icon-badge');
+    this.progressRing = root.querySelector<SVGCircleElement>('.wss-progress-ring');
     this.below = root.querySelector<HTMLDivElement>('.wss-below');
     this.drawer = root.querySelector<HTMLDivElement>('.wss-drawer');
     this.drawerPath = root.querySelector<HTMLDivElement>('.wss-drawer-path');
@@ -193,8 +193,8 @@ export class StickyUI {
     this.root = null;
     this.pill = null;
     this.chapterTitle = null;
-    this.progressLayer = null;
-    this.progressFill = null;
+    this.progressBadge = null;
+    this.progressRing = null;
     this.below = null;
     this.drawer = null;
     this.drawerPath = null;
@@ -223,7 +223,6 @@ export class StickyUI {
   setZIndex(value: number): void {
     const zIndex = String(Math.max(1, Math.round(value)));
     this.root?.style.setProperty('--wss-z-index', zIndex);
-    this.progressLayer?.style.setProperty('--wss-z-index', zIndex);
   }
 
   setPosition(position: PillPosition): void {
@@ -280,11 +279,13 @@ export class StickyUI {
     root.dataset.visible = String(visible);
     root.dataset.dim = String(visible && presentation.dim);
     root.dataset.compact = String(presentation.compact);
-    // 整篇进度线是全局阅读反馈，不跟胶囊的智能显隐一起消失。
-    if (this.progressLayer) this.progressLayer.dataset.visible = 'true';
-    if (this.progressFill) {
-      this.progressFill.style.width = `${(snapshot.progress * 100).toFixed(1)}%`;
+    const progress = Math.min(1, Math.max(0, snapshot.progress));
+    if (this.progressRing) {
+      this.progressRing.style.strokeDashoffset = String(
+        PROGRESS_RING_CIRCUMFERENCE * (1 - progress),
+      );
     }
+    this.progressBadge?.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
     if (!visible) {
       this.unpin();
       this.currentIndex = -2;
@@ -737,7 +738,6 @@ export class StickyUI {
       const prefersDark = this.mediaQuery ? this.mediaQuery.matches : false;
       const resolved = this.themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : this.themeMode;
       this.root.dataset.theme = resolved;
-      if (this.progressLayer) this.progressLayer.dataset.theme = resolved;
     });
   };
 }

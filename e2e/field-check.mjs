@@ -78,8 +78,8 @@ const inspect = (page) =>
     const root = shadow?.querySelector('.wss-root');
     const pill = shadow?.querySelector('.wss-pill');
     const pillRect = pill?.getBoundingClientRect();
-    const progress = shadow?.querySelector('.wss-global-progress');
-    const progressRect = progress?.getBoundingClientRect();
+    const progressBadge = shadow?.querySelector('.wss-icon-badge');
+    const progressRing = shadow?.querySelector('.wss-progress-ring');
     const scope = document.querySelector('[data-wss-scope], [data-wss-stats]');
     const dockTop = Number.parseFloat(root?.style.getPropertyValue('--wss-top') ?? 'NaN');
 
@@ -160,8 +160,9 @@ const inspect = (page) =>
             height: Math.round(pillRect.height),
           }
         : null,
-      progressTop: progressRect ? Math.round(progressRect.top) : null,
-      progressHeight: progressRect ? Math.round(progressRect.height) : null,
+      progressValue: Number(progressBadge?.getAttribute('aria-valuenow') ?? -1),
+      progressOffset: Number.parseFloat(progressRing?.style.strokeDashoffset ?? '88'),
+      hasTopProgress: !!shadow?.querySelector('.wss-global-progress'),
       shownHeadingOffset: source ? Math.round(source.getBoundingClientRect().top - (Number.isFinite(dockTop) ? dockTop : 0)) : null,
       scrollY: Math.round(window.scrollY),
       docHeight: Math.round(document.documentElement.scrollHeight),
@@ -261,9 +262,11 @@ for (const target of targets) {
         surface.right <= 1280 &&
         surface.bottom <= 800);
     if (entry.pillInViewport === false) mismatches += 1;
-    const progress = entry.deeper.progressTop ?? entry.scrolled.progressTop;
-    const progressHeight = entry.deeper.progressHeight ?? entry.scrolled.progressHeight;
-    entry.progressPass = !pillVisible || (progress === 0 && progressHeight === 1);
+    const progressValue = entry.deeper.progressValue ?? entry.scrolled.progressValue;
+    const progressOffset = entry.deeper.progressOffset ?? entry.scrolled.progressOffset;
+    entry.progressPass =
+      !pillVisible ||
+      (progressValue >= 0 && progressValue <= 100 && progressOffset >= 0 && progressOffset <= 88);
     if (entry.progressPass === false) mismatches += 1;
     // 真实站点自身的长任务无法可靠归因给扩展，因此作为观测值记录；
     // 只有明确由插件宿主造成的布局位移才判失败。

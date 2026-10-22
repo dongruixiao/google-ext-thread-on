@@ -76,8 +76,8 @@ const probe = (page) =>
     const drawerStyle = drawer ? getComputedStyle(drawer) : null;
     const pill = shadow?.querySelector('.wss-pill');
     const pillStyle = pill ? getComputedStyle(pill) : null;
-    const progressLayer = shadow?.querySelector('.wss-global-progress');
-    const progressRect = progressLayer?.getBoundingClientRect();
+    const progressBadge = shadow?.querySelector('.wss-icon-badge');
+    const progressRing = shadow?.querySelector('.wss-progress-ring');
     return {
       host: !!host,
       attachedToHtml: host?.parentElement?.tagName === 'HTML',
@@ -99,9 +99,9 @@ const probe = (page) =>
       pillBackdrop: pillStyle?.backdropFilter ?? null,
       pillBackground: pillStyle?.backgroundImage ?? null,
       pillShadow: pillStyle?.boxShadow ?? null,
-      progressTop: progressRect ? Math.round(progressRect.top) : null,
-      progressHeight: progressRect ? Math.round(progressRect.height) : null,
-      progressVisible: progressLayer?.dataset.visible ?? null,
+      progressValue: Number(progressBadge?.getAttribute('aria-valuenow') ?? 0),
+      progressOffset: Number.parseFloat(progressRing?.style.strokeDashoffset ?? '88'),
+      hasTopProgress: !!shadow?.querySelector('.wss-global-progress'),
       surfaceTop: active ? Math.round(active.getBoundingClientRect().top) : null,
       surfaceLeft: active ? Math.round(active.getBoundingClientRect().left) : null,
       surfaceWidth: active ? Math.round(active.getBoundingClientRect().width) : null,
@@ -191,8 +191,9 @@ try {
     return {
       pill: !!pill,
       title: shadow?.querySelector('.wss-title')?.textContent?.trim() ?? null,
-      pill: !!pill,
-      progressTop: Math.round(shadow?.querySelector('.wss-global-progress')?.getBoundingClientRect().top ?? -1),
+      progressValue: Number(
+        shadow?.querySelector('.wss-icon-badge')?.getAttribute('aria-valuenow') ?? 0,
+      ),
     };
   });
   await unsafeColorPage.close();
@@ -200,7 +201,7 @@ try {
     '复杂背景可使用拟物胶囊',
     unsafeGlass.pill &&
       !!unsafeGlass.title &&
-      unsafeGlass.progressTop === 0,
+      unsafeGlass.progressValue === 100,
     unsafeGlass,
   );
 
@@ -416,8 +417,9 @@ try {
   const readProgress = () =>
     page.evaluate(() => {
       const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
-      const fill = shadow.querySelector('.wss-global-progress > i');
-      return Number.parseFloat(fill?.style.width ?? '0');
+      return Number(
+        shadow.querySelector('.wss-icon-badge')?.getAttribute('aria-valuenow') ?? 0,
+      );
     });
   await page.evaluate(() => window.scrollTo(0, 400));
   await page.waitForTimeout(500);
@@ -433,26 +435,52 @@ try {
     progressEarly < progressMid && progressMid < progressEnd && progressEnd > 98,
     { progressEarly, progressMid, progressEnd },
   );
-  const progressTrack = await page.evaluate(() => {
+  const progressRing = await page.evaluate(() => {
     const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
-    const track = shadow.querySelector('.wss-global-progress').getBoundingClientRect();
-    const fill = shadow.querySelector('.wss-global-progress > i');
+    const badge = shadow.querySelector('.wss-icon-badge');
+    const ring = shadow.querySelector('.wss-progress-ring');
+    const badgeRect = badge?.getBoundingClientRect();
+    const pillRect = shadow.querySelector('.wss-pill')?.getBoundingClientRect();
     return {
-      trackX: [Math.round(track.left), Math.round(track.right)],
-      trackTop: Math.round(track.top),
-      trackHeight: Math.round(track.height),
-      viewportWidth: window.innerWidth,
-      fillBackground: fill ? getComputedStyle(fill).backgroundColor : null,
+      role: badge?.getAttribute('role') ?? null,
+      value: Number(badge?.getAttribute('aria-valuenow') ?? -1),
+      stroke: ring ? getComputedStyle(ring).stroke : null,
+      dashArray: ring ? getComputedStyle(ring).strokeDasharray : null,
+      dashOffset: Number.parseFloat(ring?.style.strokeDashoffset ?? '88'),
+      badge: badgeRect
+        ? {
+            left: Math.round(badgeRect.left),
+            top: Math.round(badgeRect.top),
+            right: Math.round(badgeRect.right),
+            bottom: Math.round(badgeRect.bottom),
+          }
+        : null,
+      pill: pillRect
+        ? {
+            left: Math.round(pillRect.left),
+            top: Math.round(pillRect.top),
+            right: Math.round(pillRect.right),
+            bottom: Math.round(pillRect.bottom),
+          }
+        : null,
+      hasTopProgress: !!shadow.querySelector('.wss-global-progress'),
     };
   });
   check(
-    '紫色进度条固定在页面最顶部并横跨视口',
-    progressTrack.trackX[0] === 0 &&
-      progressTrack.trackX[1] === progressTrack.viewportWidth &&
-      progressTrack.trackTop === 0 &&
-      progressTrack.trackHeight === 1 &&
-      progressTrack.fillBackground === 'rgb(108, 77, 246)',
-    progressTrack,
+    '阅读进度收进拟物徽标，以圆环而非顶部横线显示',
+    !progressRing.hasTopProgress &&
+      progressRing.role === 'progressbar' &&
+      progressRing.value === 100 &&
+      progressRing.dashOffset <= 0.1 &&
+      progressRing.dashArray === '88px' &&
+      progressRing.stroke === 'rgb(108, 77, 246)' &&
+      progressRing.badge !== null &&
+      progressRing.pill !== null &&
+      progressRing.badge.left >= progressRing.pill.left &&
+      progressRing.badge.right <= progressRing.pill.right &&
+      progressRing.badge.top >= progressRing.pill.top &&
+      progressRing.badge.bottom <= progressRing.pill.bottom,
+    progressRing,
   );
 
   // 原站目录可见时退让：只显示当前小节，且悬停不弹抽屉
@@ -825,10 +853,8 @@ try {
     scrolledUp,
   );
   check(
-    '胶囊收起时全局阅读进度仍留在视口顶部',
-    scrolledUp.progressVisible === 'true' &&
-      scrolledUp.progressTop === 0 &&
-      scrolledUp.progressHeight === 1,
+    '智能模式收起胶囊时不会留下顶部进度线',
+    scrolledUp.hasTopProgress === false,
     scrolledUp,
   );
   await page.mouse.wheel(0, 320);

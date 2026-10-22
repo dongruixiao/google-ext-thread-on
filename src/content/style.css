@@ -65,36 +65,6 @@
   --wss-brand: #b1a1ff;
 }
 
-.wss-global-progress {
-  position: fixed;
-  z-index: var(--wss-z-index, 2147483600);
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 1px;
-  background: color-mix(in srgb, var(--wss-brand, #6c4df6) 14%, transparent);
-  pointer-events: none;
-  opacity: 1;
-  transition: opacity 0.18s ease;
-}
-
-.wss-global-progress[data-theme='dark'] {
-  --wss-brand: #b1a1ff;
-}
-
-.wss-global-progress[data-visible='false'] {
-  opacity: 0;
-}
-
-.wss-global-progress > i {
-  display: block;
-  width: 0%;
-  height: 100%;
-  background: var(--wss-brand, #6c4df6);
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--wss-brand, #6c4df6) 38%, transparent);
-  transition: width 0.12s linear;
-}
-
 .wss-root[data-visible='false'] {
   visibility: hidden;
   opacity: 0;
@@ -213,14 +183,14 @@
     0 1px 0 rgb(255 255 255 / 34%);
 }
 
-.wss-icon {
+.wss-icon-badge {
   position: relative;
   z-index: 1;
   display: grid;
   place-items: center;
   flex: none;
-  width: 29px;
-  height: 29px;
+  width: 34px;
+  height: 34px;
   border: 1px solid #0c0c0f;
   border-radius: 50%;
   background: radial-gradient(circle at 36% 24%, #55545b, #232329 58%, #0e0e11);
@@ -228,6 +198,43 @@
     inset 0 1px 1px rgb(255 255 255 / 22%),
     inset 0 -1px 1px rgb(0 0 0 / 72%),
     0 1px 0 rgb(255 255 255 / 72%);
+}
+
+.wss-progress-svg {
+  position: absolute;
+  inset: 0;
+  width: 34px;
+  height: 34px;
+  rotate: -90deg;
+  pointer-events: none;
+}
+
+.wss-progress-track,
+.wss-progress-ring {
+  fill: none;
+  stroke-width: 2;
+}
+
+.wss-progress-track {
+  stroke: rgb(255 255 255 / 14%);
+}
+
+.wss-progress-ring {
+  stroke: var(--wss-brand);
+  stroke-dasharray: 88;
+  stroke-dashoffset: 88;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--wss-brand) 72%, transparent));
+  transition: stroke-dashoffset 0.16s linear;
+}
+
+.wss-icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
   color: #e4dcff;
 }
 
@@ -250,19 +257,6 @@
   outline: 2px solid #8769ff;
   outline-offset: 2px;
   border-radius: 5px;
-}
-
-.wss-led {
-  position: relative;
-  z-index: 1;
-  flex: none;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--wss-brand);
-  box-shadow:
-    0 0 6px color-mix(in srgb, var(--wss-brand) 78%, transparent),
-    inset 0 1px 0 rgb(255 255 255 / 45%);
 }
 
 /* ── 深色内嵌目录面板 ───────────────────────────────── */
@@ -436,9 +430,7 @@
 }
 
 .wss-outline-level[data-depth] {
-  margin-left: 11px;
-  padding-left: 9px;
-  border-left: 1px solid var(--wss-panel-line);
+  margin-left: 14px;
 }
 
 .wss-outline-level[data-depth] .wss-row {
@@ -470,19 +462,6 @@
   transition: background-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
 }
 
-.wss-row::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 5px;
-  width: 4px;
-  height: 4px;
-  margin-top: -2px;
-  border-radius: 50%;
-  background: var(--wss-panel-faint);
-  transition: background-color 0.14s ease, box-shadow 0.14s ease, scale 0.14s ease;
-}
-
 .wss-row:hover {
   background: var(--wss-panel-hover);
   color: var(--wss-panel-fg);
@@ -497,10 +476,6 @@
   color: var(--wss-panel-fg);
 }
 
-.wss-row[data-in-path='true']::before {
-  background: rgb(172 146 255 / 64%);
-}
-
 .wss-row[data-current='true'] {
   background: var(--wss-panel-current);
   box-shadow:
@@ -512,12 +487,6 @@
 
 .wss-outline-level[data-depth] .wss-row[data-current='true'] {
   color: #fffaf0;
-}
-
-.wss-row[data-current='true']::before {
-  background: var(--wss-brand);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--wss-brand) 70%, transparent);
-  scale: 1.35;
 }
 
 .wss-drawer::-webkit-scrollbar {
@@ -534,7 +503,7 @@
   .wss-root,
   .wss-pill,
   .wss-drawer,
-  .wss-global-progress > i,
+  .wss-progress-ring,
   .wss-crumb,
   .wss-row {
     transition: none;
