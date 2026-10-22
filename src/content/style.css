@@ -148,14 +148,14 @@
   z-index: 0;
   top: 0;
   right: 0;
-  bottom: -18px;
+  bottom: -4px;
   left: 0;
   pointer-events: none;
   background: linear-gradient(
     to bottom,
     var(--wss-page-bg) 0%,
-    var(--wss-page-bg) 62%,
-    color-mix(in srgb, var(--wss-page-bg) 94%, transparent) 78%,
+    var(--wss-page-bg) 72%,
+    color-mix(in srgb, var(--wss-page-bg) 94%, transparent) 86%,
     transparent 100%
   );
 }

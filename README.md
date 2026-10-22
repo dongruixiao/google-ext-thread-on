@@ -261,7 +261,7 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 
 ## 发布前检查清单
 
-- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.10.0）
+- [ ] `manifest.json` 与 `package.json` 版本号一致（当前 0.10.1）
 - [ ] `npm test && npm run e2e && npm run field-check` 通过（单测 / 46 项端到端 /
       真实站点的激活范围、标题对齐与插件布局位移）
 - [ ] 确认权限仅 `storage`，`content_scripts.matches` 只覆盖 `http/https`
@@ -279,7 +279,7 @@ Chrome for Testing / Chromium。Chrome 137+ 正式版已经移除命令行加载
 | `store/screenshots/*.png` | 1280×800 商店截图（`npm run screenshots` 生成） |
 | `store/demo-page.html` | 截图用的中性示例文章页 |
 
-打包：`npm run package` → `release/web-sticky-scroll-0.10.0.zip`（zip 根目录就是 manifest.json，可直接上传）
+打包：`npm run package` → `release/web-sticky-scroll-0.10.1.zip`（zip 根目录就是 manifest.json，可直接上传）
 
 ## 已知取舍
 

@@ -46,20 +46,20 @@ describe('estimateHeadingHeight', () => {
   it('按行高估算吸顶条高度', () => {
     document.body.innerHTML = '<h2 id="src" style="line-height: 34px">标题</h2>';
     const source = document.getElementById('src') as HTMLElement;
-    expect(estimateHeadingHeight(source)).toBe(50); // 34 + 8 * 2
+    expect(estimateHeadingHeight(source)).toBe(34);
   });
 
   it('异常行高会被夹到可读区间', () => {
     document.body.innerHTML = '<h2 id="big" style="line-height: 200px">标题</h2>';
     const big = document.getElementById('big') as HTMLElement;
     expect(estimateHeadingHeight(big)).toBe(96);
-    expect(estimateHeadingHeight(null)).toBeGreaterThanOrEqual(32);
+    expect(estimateHeadingHeight(null)).toBeGreaterThanOrEqual(24);
   });
 
   it('把标题自身的上下内边距算进去，和实测条高一致', () => {
     document.body.innerHTML =
       '<h2 id="padded" style="line-height: 34px; padding-top: 8px; padding-bottom: 2px">标题</h2>';
     const padded = document.getElementById('padded') as HTMLElement;
-    expect(estimateHeadingHeight(padded)).toBe(60); // 34 + 10 + 16
+    expect(estimateHeadingHeight(padded)).toBe(44); // 34 + 10
   });
 });

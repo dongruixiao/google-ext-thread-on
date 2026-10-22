@@ -64,9 +64,6 @@ const STYLE_PROPERTIES = [
   'font-synthesis',
 ] as const;
 
-/** 条内左右留白（与 estimateHeadingHeight 保持一致） */
-export const BAR_PADDING_BLOCK = 8;
-
 const MAX_CLONED_DESCENDANTS = 32;
 
 function copyComputedStyles(source: Element, target: HTMLElement): void {
@@ -121,8 +118,8 @@ export function estimateHeadingHeight(source: HTMLElement | null): number {
   if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
     lineHeight = (Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 17) * 1.5;
   }
-  const height = lineHeight + padding + border + BAR_PADDING_BLOCK * 2;
-  return Math.round(Math.min(Math.max(height, 32), 96));
+  const height = lineHeight + padding + border;
+  return Math.round(Math.min(Math.max(height, 24), 96));
 }
 
 /**

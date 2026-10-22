@@ -243,8 +243,8 @@ try {
     { cloneText: scrolled.cloneText, crumbs: scrolled.crumbs },
   );
   check(
-    '吸顶条高度跟随标题自然高度',
-    Math.abs(scrolled.barHeight - (scrolled.cloneHeight + 16)) <= 2,
+    '吸顶层高度与标题自身行高一致',
+    Math.abs(scrolled.barHeight - scrolled.cloneHeight) <= 1,
     { barHeight: scrolled.barHeight, cloneHeight: scrolled.cloneHeight },
   );
   check('大纲包含全部正文标题', scrolled.rows === EXPECTED_HEADINGS, scrolled.rows);

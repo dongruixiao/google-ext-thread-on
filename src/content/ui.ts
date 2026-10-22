@@ -1,7 +1,7 @@
 import styleText from './style.css?inline';
 import type { HeadingNode } from './extractor';
 import { buildVisiblePath, type PathOptions } from './path';
-import { BAR_PADDING_BLOCK, cloneHeading, estimateHeadingHeight } from './heading-clone';
+import { cloneHeading, estimateHeadingHeight } from './heading-clone';
 import type { Appearance, BarWidth, PillPosition, ThemeMode } from '../shared/settings';
 import { HOST_ID, Z_INDEX } from '../shared/constants';
 
@@ -403,7 +403,7 @@ export class StickyUI {
     const measured = slot.getBoundingClientRect().height;
     const height =
       measured > 4
-        ? Math.round(measured + BAR_PADDING_BLOCK * 2)
+        ? Math.round(measured)
         : estimateHeadingHeight(node?.element ?? null);
     root.style.setProperty('--wss-bar-height', `${height}px`);
   }
