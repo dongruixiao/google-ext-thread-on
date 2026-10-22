@@ -220,7 +220,7 @@ try {
   await page.waitForTimeout(400);
   const scrolled = await probe(page);
   check('向下滚动后浮现', scrolled.visible === 'true', scrolled);
-  check('吸顶条贴在固定顶栏下方', Math.abs(scrolled.top - TOPBAR_HEIGHT) <= 1, scrolled.top);
+  check('无痕标题紧贴在页面顶部进度线下方', Math.abs(scrolled.top - 1) <= 1, scrolled.top);
   check(
     '无痕模式使用与标题同高的全宽液态玻璃',
     !scrolled.hasBarSheet &&
@@ -265,7 +265,7 @@ try {
   });
   check(
     '正文粘性元素与固定侧栏不会把吸顶条带偏',
-    stickyState.stickyTop === 0 && scrolled.top === TOPBAR_HEIGHT,
+    stickyState.stickyTop === 0 && scrolled.top === 1,
     { ...stickyState, barTop: scrolled.top },
   );
   check(
@@ -501,7 +501,7 @@ try {
   await page.waitForTimeout(2200);
   await page.evaluate(() => {
     const heading = document.getElementById('s2-1');
-    window.scrollTo(0, heading.getBoundingClientRect().top + window.scrollY - 60);
+    window.scrollTo(0, heading.getBoundingClientRect().top + window.scrollY - 1);
   });
   await page.waitForTimeout(600);
   await page.mouse.move(barPoint.x, barPoint.y);

@@ -586,9 +586,9 @@ class StickyScrollApp {
   }
 
   private pillTop(): number {
-    // 吸顶条直接贴在导航栏下方（VS Code 式），胶囊再多留一点呼吸位
-    const gap = this.settings.appearance === 'bar' ? 0 : PILL_GAP;
-    return this.overlayHeight + gap + this.settings.offsetY;
+    // 无痕标题固定在页面最顶部、紧贴 1px 进度线；胶囊保留自动避让与垂直微调。
+    if (this.settings.appearance === 'bar') return 1;
+    return this.overlayHeight + PILL_GAP + this.settings.offsetY;
   }
 
   /**
