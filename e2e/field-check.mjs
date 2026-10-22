@@ -79,6 +79,9 @@ const inspect = (page) =>
     const clone = shadow?.querySelector('[data-wss-clone="true"]');
     const barHeight = shadow?.querySelector('.wss-bar')?.getBoundingClientRect().height ?? null;
     const cloneHeight = clone?.getBoundingClientRect().height ?? null;
+    const scrimHeight = root
+      ? Number.parseFloat(getComputedStyle(root, '::before').height)
+      : null;
     const scope = document.querySelector('[data-wss-scope], [data-wss-stats]');
     const dockTop = Number.parseFloat(root?.style.getPropertyValue('--wss-top') ?? 'NaN');
 
@@ -177,6 +180,7 @@ const inspect = (page) =>
       shownHeading: shownHeading ? shownHeading.slice(0, 24) : null,
       barHeight: barHeight === null ? null : Math.round(barHeight),
       cloneHeight: cloneHeight === null ? null : Math.round(cloneHeight),
+      scrimHeight: scrimHeight === null || !Number.isFinite(scrimHeight) ? null : Math.round(scrimHeight),
       columnRef,
       cloneLeft,
       // 吸顶标题与正文文字列的偏差（越接近 0 越好）

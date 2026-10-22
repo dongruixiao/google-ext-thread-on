@@ -99,6 +99,7 @@ const probe = (page) =>
       barBorderWidth: barStyle?.borderBottomWidth ?? null,
       titleMaskBackground: titleMaskStyle?.backgroundImage ?? null,
       titleMaskFilter: titleMaskStyle?.filter ?? null,
+      titleMaskHeight: titleMaskStyle ? Math.round(Number.parseFloat(titleMaskStyle.height)) : null,
       drawerBackground: drawerStyle?.backgroundColor ?? null,
       drawerShadow: drawerStyle?.boxShadow ?? null,
       drawerBackdrop: drawerStyle?.backdropFilter ?? null,
@@ -222,7 +223,8 @@ try {
       scrolled.barShadow === 'none' &&
       scrolled.barBorderWidth === '0px' &&
       scrolled.titleMaskFilter === 'none' &&
-      !!scrolled.titleMaskBackground?.includes('linear-gradient'),
+      !!scrolled.titleMaskBackground?.includes('linear-gradient') &&
+      scrolled.titleMaskHeight === scrolled.barHeight + 4,
     scrolled,
   );
   const transparentArea = await page.evaluate(() => {
