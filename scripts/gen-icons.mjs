@@ -1,6 +1,6 @@
 // 生成扩展图标（16/48/128）：手写 PNG 编码，避免为一个图标引入图像处理依赖。
 //
-// 图形：深色圆角底座 + 拉丝金属胶囊 + 紫色阅读进度环。
+// 图形：品牌紫圆角底 + 三条长度递减的圆头横线。
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,39 +67,9 @@ function insideRect(px, py, x, y, width, height, radius) {
   return dx * dx + dy * dy <= r * r;
 }
 
-function insideCircle(px, py, cx, cy, radius) {
-  const dx = px - cx;
-  const dy = py - cy;
-  return dx * dx + dy * dy <= radius * radius;
-}
-
-/** 圆角矩形描边：外圈内、内圈外 */
-function inStroke(px, py, x, y, width, height, stroke, radius) {
-  if (!insideRect(px, py, x, y, width, height, radius)) return false;
-  return !insideRect(
-    px,
-    py,
-    x + stroke,
-    y + stroke,
-    width - stroke * 2,
-    height - stroke * 2,
-    Math.max(0, radius - stroke),
-  );
-}
-
 function mix(from, to, t) {
   return Math.round(from + (to - from) * t);
 }
-
-function blend(base, color, alpha) {
-  return [
-    mix(base[0], color[0], alpha),
-    mix(base[1], color[1], alpha),
-    mix(base[2], color[2], alpha),
-  ];
-}
-
-const WHITE = [255, 255, 255];
 
 function drawIcon(size) {
   const scale = SUPERSAMPLE;
@@ -108,32 +78,13 @@ function drawIcon(size) {
   const buffer = Buffer.alloc(size * size * 4);
   const cardRadius = w * 0.235;
 
-  const simple = size <= 16;
-  const pill = {
-    x: w * 0.1,
-    y: h * 0.3,
-    width: w * 0.8,
-    height: h * 0.4,
-  };
-  const pillInset = Math.max(1, w * 0.022);
-  const badgeX = w * 0.29;
-  const badgeY = h * 0.5;
-  const badgeRadius = h * 0.23;
-  const ringRadius = badgeRadius + w * 0.028;
-  const ringWidth = Math.max(scale, w * 0.04);
-  const titleBar = {
-    x: w * 0.47,
-    y: h * 0.43,
-    width: w * (simple ? 0.31 : 0.34),
-    height: h * 0.09,
-  };
-  const secondBar = {
-    x: w * 0.47,
-    y: h * 0.57,
-    width: w * (simple ? 0.2 : 0.25),
-    height: h * 0.07,
-  };
-  const progressEnd = Math.PI * 2 * 0.68;
+  const lineHeight = h * 0.11;
+  const lineX = w * 0.22;
+  const lines = [
+    { y: h * 0.26, width: w * 0.56 },
+    { y: h * 0.445, width: w * 0.4 },
+    { y: h * 0.63, width: w * 0.25 },
+  ];
 
   const accum = new Float64Array(size * size * 4);
   for (let y = 0; y < h; y += 1) {
@@ -143,55 +94,13 @@ function drawIcon(size) {
       if (!insideRect(px, py, 0, 0, w, h, cardRadius)) continue;
 
       const bgT = (x * 0.22 + y * 0.78) / h;
-      let color = [mix(55, 27, bgT), mix(56, 28, bgT), mix(62, 32, bgT)];
+      let color = [mix(122, 72, bgT), mix(89, 53, bgT), mix(252, 211, bgT)];
 
-      if (!insideRect(px, py, w * 0.025, h * 0.025, w * 0.95, h * 0.95, cardRadius * 0.9)) {
-        color = blend(color, WHITE, 0.26);
-      }
-
-      if (insideRect(px, py, pill.x, pill.y, pill.width, pill.height, pill.height / 2)) {
-        const metalT = (py - pill.y) / pill.height;
-        color = [
-          mix(248, 155, metalT),
-          mix(246, 153, metalT),
-          mix(238, 149, metalT),
-        ];
-        if (
-          !insideRect(
-            px,
-            py,
-            pill.x + pillInset,
-            pill.y + pillInset,
-            pill.width - pillInset * 2,
-            pill.height - pillInset * 2,
-            pill.height / 2 - pillInset,
-          )
-        ) {
-          color = blend(color, metalT < 0.5 ? WHITE : [46, 45, 42], 0.56);
-        }
-      }
-
-      const dist = Math.hypot(px - badgeX, py - badgeY);
-      if (dist <= badgeRadius) {
-        const highlight = Math.max(0, 1 - dist / (badgeRadius * 1.7)) * 0.24;
-        color = blend([20, 21, 24], WHITE, highlight);
-      }
-
-      if (dist <= ringRadius && dist >= ringRadius - ringWidth) {
-        const angle = (Math.atan2(py - badgeY, px - badgeX) + Math.PI / 2 + Math.PI * 2) %
-          (Math.PI * 2);
-        color =
-          angle <= progressEnd
-            ? [128, 99, 255]
-            : blend(color, WHITE, 0.18);
-      }
-
-      if (insideRect(px, py, titleBar.x, titleBar.y, titleBar.width, titleBar.height, titleBar.height / 2)) {
-        color = [38, 38, 42];
-      } else if (
-        insideRect(px, py, secondBar.x, secondBar.y, secondBar.width, secondBar.height, secondBar.height / 2)
-      ) {
-        color = blend([38, 38, 42], [190, 188, 180], 0.46);
+      const line = lines.find(({ y, width }) =>
+        insideRect(px, py, lineX, y, width, lineHeight, lineHeight / 2),
+      );
+      if (line) {
+        color = [255, 253, 248];
       }
 
       const target = (Math.floor(y / scale) * size + Math.floor(x / scale)) * 4;

@@ -84,8 +84,12 @@ const probe = (page) =>
       pill: !!active,
       position: root?.dataset.position ?? null,
       dragging: root?.dataset.dragging ?? null,
-      floatingLeft: root ? Math.round(Number.parseFloat(root.style.left) || 0) : null,
-      floatingTop: root ? Math.round(Number.parseFloat(root.style.top) || 0) : null,
+      floatingLeft: root
+        ? Math.round(Number.parseFloat(root.style.getPropertyValue('--wss-x')) || 0)
+        : null,
+      floatingTop: root
+        ? Math.round(Number.parseFloat(root.style.getPropertyValue('--wss-y')) || 0)
+        : null,
       visible: root?.dataset.visible ?? null,
       opacity: rootStyle?.opacity ?? null,
       compact: root?.dataset.compact ?? null,

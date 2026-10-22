@@ -97,7 +97,8 @@
   top: 0;
   left: 0;
   right: auto;
-  transform: none;
+  transform: translate3d(var(--wss-x, 0px), var(--wss-y, 0px), 0);
+  will-change: transform;
 }
 
 .wss-root[data-dragging='true'] .wss-pill {
@@ -137,6 +138,7 @@
     0 13px 24px -18px color-mix(in srgb, var(--wss-case-seam) 70%, transparent);
   color: var(--wss-case-ink);
   cursor: grab;
+  touch-action: none;
   user-select: none;
   pointer-events: auto;
   transition: box-shadow 0.18s ease;

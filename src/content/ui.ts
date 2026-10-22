@@ -69,8 +69,11 @@ export class StickyUI {
         width: number;
         height: number;
         moved: boolean;
+        latestLeft: number;
+        latestTop: number;
       }
     | null = null;
+  private dragFrame = 0;
   private suppressClickUntil = 0;
 
   constructor(
@@ -201,6 +204,10 @@ export class StickyUI {
     this.pinned = false;
     this.floatingPosition = null;
     this.drag = null;
+    if (this.dragFrame !== 0) {
+      cancelAnimationFrame(this.dragFrame);
+      this.dragFrame = 0;
+    }
     this.snapshot = { ...EMPTY_SNAPSHOT };
     this.presentation = { ...DEFAULT_PRESENTATION };
   }
@@ -482,8 +489,8 @@ export class StickyUI {
     if (!root || !pill) return;
     if (!this.floatingPosition) {
       root.dataset.position = 'top-center';
-      root.style.removeProperty('left');
-      root.style.removeProperty('top');
+      root.style.removeProperty('--wss-x');
+      root.style.removeProperty('--wss-y');
       this.syncPillWidthLimit();
       this.layoutDrawer();
       return;
@@ -504,8 +511,8 @@ export class StickyUI {
     const root = this.root;
     if (!root) return;
     root.dataset.position = 'custom';
-    root.style.left = `${Math.round(left)}px`;
-    root.style.top = `${Math.round(top)}px`;
+    root.style.setProperty('--wss-x', `${Math.round(left)}px`);
+    root.style.setProperty('--wss-y', `${Math.round(top)}px`);
     this.layoutDrawer();
   }
 
@@ -581,6 +588,8 @@ export class StickyUI {
         width: rect.width,
         height: rect.height,
         moved: false,
+        latestLeft: rect.left,
+        latestTop: rect.top,
       };
       this.closeDrawer();
       try {
@@ -606,8 +615,23 @@ export class StickyUI {
       const maxY = Math.max(8, window.innerHeight - drag.height - 8);
       const left = Math.max(8, Math.min(maxX, event.clientX - drag.offsetX));
       const top = Math.max(8, Math.min(maxY, event.clientY - drag.offsetY));
-      this.applyPixelPosition(left, top);
+      drag.latestLeft = left;
+      drag.latestTop = top;
+      if (this.dragFrame === 0) {
+        this.dragFrame = requestAnimationFrame(this.flushDragFrame);
+      }
     });
+  };
+
+  private flushDragFrame = (): void => {
+    this.dragFrame = 0;
+    const drag = this.drag;
+    if (!drag) return;
+    const root = this.root;
+    if (!root) return;
+    root.dataset.position = 'custom';
+    root.style.setProperty('--wss-x', `${Math.round(drag.latestLeft)}px`);
+    root.style.setProperty('--wss-y', `${Math.round(drag.latestTop)}px`);
   };
 
   private handleDragEnd = (event: PointerEvent): void => {
@@ -616,6 +640,12 @@ export class StickyUI {
       const root = this.root;
       const pill = this.pill;
       if (!drag || !root || drag.pointerId !== event.pointerId) return;
+      if (this.dragFrame !== 0) {
+        cancelAnimationFrame(this.dragFrame);
+        this.dragFrame = 0;
+      }
+      root.style.setProperty('--wss-x', `${Math.round(drag.latestLeft)}px`);
+      root.style.setProperty('--wss-y', `${Math.round(drag.latestTop)}px`);
       this.drag = null;
       root.dataset.dragging = 'false';
       try {
@@ -625,9 +655,12 @@ export class StickyUI {
       }
       if (!drag.moved || !pill) return;
 
-      const rect = pill.getBoundingClientRect();
       this.suppressClickUntil = Date.now() + 350;
-      this.floatingPosition = this.normalizedPosition(rect.left, rect.top, rect.height);
+      this.floatingPosition = this.normalizedPosition(
+        drag.latestLeft,
+        drag.latestTop,
+        drag.height,
+      );
       this.onFloatingPositionChange?.(this.floatingPosition);
     });
   };
