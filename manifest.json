@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TopClip — 读长文，不掉线",
-  "description": "读长文不掉线：把当前章节标题原样吸在页面顶部，提醒你这一节在讲什么。悬停展开完整目录，附整篇阅读进度。",
-  "version": "0.11.1",
+  "description": "读长文不掉线：用可拖动的液态玻璃胶囊提醒当前章节，悬停展开目录，并显示整篇阅读进度。",
+  "version": "0.12.0",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon16.png",
@@ -10,7 +10,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Web Sticky Scroll",
+    "default_title": "TopClip",
     "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -31,13 +31,13 @@
       "suggested_key": {
         "default": "Alt+Shift+S"
       },
-      "description": "在当前站点启用 / 禁用吸顶面包屑"
+      "description": "在当前站点启用 / 禁用章节胶囊"
     },
     "toggle-global": {
       "suggested_key": {
         "default": "Alt+Shift+W"
       },
-      "description": "全局启用 / 禁用吸顶面包屑"
+      "description": "全局启用 / 禁用章节胶囊"
     }
   },
   "content_scripts": [

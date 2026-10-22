@@ -1,17 +1,13 @@
 import styleText from './style.css?inline';
 import type { HeadingNode } from './extractor';
 import { buildVisiblePath, type PathOptions } from './path';
-import { cloneHeading, estimateHeadingHeight } from './heading-clone';
 import type {
-  Appearance,
-  BarWidth,
   FloatingPosition,
   PillPosition,
   ThemeMode,
 } from '../shared/settings';
 import { HOST_ID, Z_INDEX } from '../shared/constants';
 
-import type { PageStyle } from './palette';
 import type { TrackerSnapshot } from './tracker';
 
 const ICON_SVG = `<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.75 4h10.5M2.75 8h7.5M2.75 12h4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/></svg>`;
@@ -30,31 +26,22 @@ export interface Presentation {
   compact: boolean;
 }
 
-export interface ColumnBox {
-  left: number;
-  right: number;
-  width: number;
-}
-
 const DEFAULT_PRESENTATION: Presentation = { visible: true, dim: false, compact: false };
 const DEFAULT_PATH_OPTIONS: PathOptions = { hideArticleTitle: true, maxCrumbs: 3 };
 
-const HOVER_TARGET = '.wss-pill, .wss-bar-inner, .wss-drawer';
+const HOVER_TARGET = '.wss-pill, .wss-drawer';
 
 /**
- * Shadow DOM 渲染层，支持两种形态：
- * - bar：无痕阅读。把当前标题**原样克隆**进来（字体、字号、颜色全部照搬页面），
- *        悬停展开大纲，点击标题可以把大纲钉住。
- * - pill：液态玻璃胶囊，用紧凑单行显示当前标题。
+ * Shadow DOM 渲染层：可拖动的液态玻璃胶囊、悬停大纲和全局阅读进度。
  */
 export class StickyUI {
   private host: HTMLDivElement | null = null;
   private root: HTMLDivElement | null = null;
   private pill: HTMLDivElement | null = null;
-  private headingSlot: HTMLElement | null = null;
   private glassTitle: HTMLElement | null = null;
   private progressLayer: HTMLDivElement | null = null;
   private progressFill: HTMLElement | null = null;
+  private below: HTMLDivElement | null = null;
   private drawer: HTMLDivElement | null = null;
   private drawerPath: HTMLDivElement | null = null;
   private drawerProgress: HTMLElement | null = null;
@@ -65,8 +52,6 @@ export class StickyUI {
   private levels: number[] = [];
   private position: PillPosition = 'top-center';
   private themeMode: ThemeMode = 'auto';
-  private appearance: Appearance = 'bar';
-  private barWidth: BarWidth = 'full';
   private pathOptions: PathOptions = { ...DEFAULT_PATH_OPTIONS };
   private snapshot: TrackerSnapshot = { ...EMPTY_SNAPSHOT };
   private presentation: Presentation = { ...DEFAULT_PRESENTATION };
@@ -76,7 +61,6 @@ export class StickyUI {
   private drawerOpen = false;
   private pinned = false;
   private pathKey = '';
-  private cloneIndex = -2;
   private currentIndex = -2;
   private progressLabel = '';
   private floatingPosition: FloatingPosition | null = null;
@@ -124,8 +108,6 @@ export class StickyUI {
     root.className = 'wss-root';
     root.dataset.visible = 'false';
     root.dataset.position = this.position;
-    root.dataset.appearance = this.appearance;
-    root.dataset.barWidth = this.barWidth;
     root.dataset.pinned = 'false';
     root.dataset.dragging = 'false';
     root.dataset.wssActive = 'true';
@@ -133,15 +115,6 @@ export class StickyUI {
     root.setAttribute('role', 'navigation');
     root.setAttribute('aria-label', '当前章节位置');
     root.innerHTML = `
-      <div class="wss-bar" part="bar">
-        <div class="wss-bar-inner">
-          <div class="wss-bar-heading" data-wss-role="heading" role="button" tabindex="0"
-               aria-label="展开或固定文章目录"></div>
-          <span class="wss-bar-caret" aria-hidden="true">
-            <svg width="12" height="12" viewBox="0 0 16 16"><path d="M4 6.5 8 10.5l4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-          </span>
-        </div>
-      </div>
       <div class="wss-pill" part="pill">
         <span class="wss-icon">${ICON_SVG}</span>
         <div class="wss-glass-title" data-wss-role="heading" role="button" tabindex="0"
@@ -164,10 +137,10 @@ export class StickyUI {
     this.host = host;
     this.root = root;
     this.pill = root.querySelector<HTMLDivElement>('.wss-pill');
-    this.headingSlot = root.querySelector<HTMLElement>('.wss-bar-heading');
     this.glassTitle = root.querySelector<HTMLElement>('.wss-glass-title');
     this.progressLayer = progressLayer;
     this.progressFill = progressLayer.querySelector<HTMLElement>('i');
+    this.below = root.querySelector<HTMLDivElement>('.wss-below');
     this.drawer = root.querySelector<HTMLDivElement>('.wss-drawer');
     this.drawerPath = root.querySelector<HTMLDivElement>('.wss-drawer-path');
     this.drawerProgress = root.querySelector<HTMLElement>('.wss-drawer-progress');
@@ -189,6 +162,7 @@ export class StickyUI {
     window.addEventListener('pointermove', this.handleDragMove, { passive: false });
     window.addEventListener('pointerup', this.handleDragEnd);
     window.addEventListener('pointercancel', this.handleDragEnd);
+    window.addEventListener('resize', this.handleViewportResize, { passive: true });
 
     if (typeof window.matchMedia === 'function') {
       this.mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -217,22 +191,22 @@ export class StickyUI {
     window.removeEventListener('pointermove', this.handleDragMove);
     window.removeEventListener('pointerup', this.handleDragEnd);
     window.removeEventListener('pointercancel', this.handleDragEnd);
+    window.removeEventListener('resize', this.handleViewportResize);
     this.mediaQuery?.removeEventListener('change', this.applyTheme);
     this.mediaQuery = null;
     this.host?.remove();
     this.host = null;
     this.root = null;
     this.pill = null;
-    this.headingSlot = null;
     this.glassTitle = null;
     this.progressLayer = null;
     this.progressFill = null;
+    this.below = null;
     this.drawer = null;
     this.drawerPath = null;
     this.drawerProgress = null;
     this.rows = new Map();
     this.pathKey = '';
-    this.cloneIndex = -2;
     this.currentIndex = -2;
     this.drawerOpen = false;
     this.pinned = false;
@@ -245,6 +219,7 @@ export class StickyUI {
 
   setTop(px: number): void {
     this.root?.style.setProperty('--wss-top', `${Math.round(px)}px`);
+    this.layoutDrawer();
   }
 
   setDiagnostics(scope: string, stats: string): void {
@@ -262,7 +237,7 @@ export class StickyUI {
   setPosition(position: PillPosition): void {
     this.position = position;
     if (!this.floatingPosition && this.root) this.root.dataset.position = position;
-    if (this.floatingPosition) this.applyFloatingPosition();
+    this.applyFloatingPosition();
   }
 
   setFloatingPosition(position: FloatingPosition | null): void {
@@ -273,57 +248,6 @@ export class StickyUI {
   setTheme(mode: ThemeMode): void {
     this.themeMode = mode;
     this.applyTheme();
-  }
-
-  setAppearance(appearance: Appearance): void {
-    if (appearance === this.appearance) return;
-    this.appearance = appearance;
-    this.pathKey = '';
-    this.cloneIndex = -2; // 形态切换后需要重新克隆并重新量高度
-    if (this.root) this.root.dataset.appearance = appearance;
-    this.render();
-    this.applyFloatingPosition();
-  }
-
-  setBarWidth(width: BarWidth): void {
-    this.barWidth = width;
-    if (this.root) this.root.dataset.barWidth = width;
-    this.render();
-  }
-
-  /** 正文列的位置：吸顶条按它对齐，看起来像是文章自己的标题栏 */
-  setColumn(column: ColumnBox | null): void {
-    const root = this.root;
-    if (!root) return;
-    if (!column) {
-      root.style.removeProperty('--wss-col-left');
-      root.style.removeProperty('--wss-col-width');
-      root.style.removeProperty('--wss-col-right');
-      return;
-    }
-    const viewport = window.innerWidth;
-    const left = Math.max(0, Math.min(column.left, viewport));
-    const right = Math.max(left, Math.min(column.right, viewport));
-    root.style.setProperty('--wss-col-left', `${Math.round(left)}px`);
-    root.style.setProperty('--wss-col-width', `${Math.round(right - left)}px`);
-    root.style.setProperty('--wss-col-right', `${Math.round(viewport - right)}px`);
-  }
-
-  /** 用页面自身的配色给条与抽屉上色（标题本身由克隆自带样式） */
-  setPageStyle(page: PageStyle): void {
-    const root = this.root;
-    if (!root) return;
-    for (const [name, value] of [
-      ['--wss-page-bg', page.background],
-      ['--wss-page-fg', page.color],
-    ] as const) {
-      if (value) root.style.setProperty(name, value);
-      else root.style.removeProperty(name);
-    }
-    root.style.setProperty('--wss-title-size', `${page.titleSize}px`);
-    root.style.setProperty('--wss-title-weight', page.fontWeight);
-    if (page.fontFamily) root.style.setProperty('--wss-page-font', page.fontFamily);
-    if (page.letterSpacing) root.style.setProperty('--wss-letter-spacing', page.letterSpacing);
   }
 
   setPathOptions(options: Partial<PathOptions>): void {
@@ -345,12 +269,6 @@ export class StickyUI {
     return this.drawerOpen;
   }
 
-  /** Web 字体晚到后重新克隆当前标题，避免条里保留旧字体快照 */
-  refreshHeadingClone(): void {
-    this.cloneIndex = -2;
-    this.render();
-  }
-
   // ── 渲染 ────────────────────────────────────────────
 
   private render(): void {
@@ -370,7 +288,16 @@ export class StickyUI {
     root.dataset.visible = String(visible);
     root.dataset.dim = String(visible && presentation.dim);
     root.dataset.compact = String(presentation.compact);
-    if (this.progressLayer) this.progressLayer.dataset.visible = String(visible);
+    // 整篇进度线是全局阅读反馈，不跟胶囊的智能显隐一起消失。
+    if (this.progressLayer) this.progressLayer.dataset.visible = 'true';
+    if (this.progressFill) {
+      this.progressFill.style.width = `${(snapshot.progress * 100).toFixed(1)}%`;
+    }
+    const progressLabel = `${Math.round(snapshot.progress * 100)}%`;
+    if (this.drawerProgress && progressLabel !== this.progressLabel) {
+      this.drawerProgress.textContent = progressLabel;
+      this.progressLabel = progressLabel;
+    }
 
     if (!visible) {
       this.unpin();
@@ -380,7 +307,6 @@ export class StickyUI {
 
     if (presentation.compact && this.drawerOpen) this.closeDrawer();
 
-    if (this.appearance === 'bar') this.ensureHeadingClone(snapshot.index);
     this.renderGlassTitle(snapshot.index);
 
     const key = [
@@ -399,59 +325,20 @@ export class StickyUI {
       this.currentIndex = snapshot.index;
     }
 
-    if (this.progressFill) {
-      this.progressFill.style.width = `${(snapshot.progress * 100).toFixed(1)}%`;
-    }
-
-    const label = `${Math.round(snapshot.progress * 100)}%`;
-    if (this.drawerProgress && label !== this.progressLabel) {
-      this.drawerProgress.textContent = label;
-      this.progressLabel = label;
-    }
-  }
-
-  /** 吸顶主体：把网页里的当前标题原样克隆进条里 */
-  private ensureHeadingClone(index: number): void {
-    const slot = this.headingSlot;
-    if (!slot) return;
-    if (this.cloneIndex === index && slot.firstElementChild) {
-      this.applyBarHeight();
-      return;
-    }
-    const node = this.headings[index];
-    slot.replaceChildren();
-    this.cloneIndex = index;
-    if (node) {
-      const clone = cloneHeading(node.element);
-      clone.dataset.wssClone = 'true';
-      slot.appendChild(clone);
-      slot.dataset.wssIndex = String(index);
-      slot.title = `${node.text}（点击固定目录）`;
-    }
-    this.applyBarHeight();
   }
 
   private renderGlassTitle(index: number): void {
     const title = this.glassTitle;
     const node = this.headings[index];
     if (!title || !node) return;
-    title.textContent = node.text || '(无标题)';
+    const text = node.text || '(无标题)';
+    const changed = title.textContent !== text;
+    title.textContent = text;
     title.title = `${node.text}（点击固定目录）`;
     title.dataset.wssIndex = String(index);
-  }
-
-  /** 吸顶条高度跟着标题的自然高度走（VS Code 里行高决定 sticky 行高） */
-  private applyBarHeight(): void {
-    const root = this.root;
-    const slot = this.headingSlot;
-    if (!root || !slot) return;
-    const node = this.cloneIndex >= 0 ? this.headings[this.cloneIndex] : undefined;
-    const measured = slot.getBoundingClientRect().height;
-    const height =
-      measured > 4
-        ? Math.round(measured)
-        : estimateHeadingHeight(node?.element ?? null);
-    root.style.setProperty('--wss-bar-height', `${height}px`);
+    if (changed && this.floatingPosition) {
+      requestAnimationFrame(() => this.applyFloatingPosition());
+    }
   }
 
   /** 大纲按标题树渲染成嵌套列表：层级关系一眼能看出来 */
@@ -491,7 +378,7 @@ export class StickyUI {
     return build(roots, 0);
   }
 
-  /** 大纲顶部的“上级路径”：吸顶条里不堆层级，层级放这里 */
+  /** 大纲顶部的“上级路径”：胶囊里不堆层级，层级放这里 */
   private renderDrawerPath(snapshot: TrackerSnapshot, presentation: Presentation): void {
     const path = this.drawerPath;
     if (!path) return;
@@ -549,6 +436,7 @@ export class StickyUI {
   private openDrawer = (): void => {
     this.clearCloseTimer();
     if (this.drawerOpen || !this.drawer || this.presentation.compact) return;
+    this.layoutDrawer();
     this.drawerOpen = true;
     this.drawer.classList.add('is-open');
     this.scrollRowIntoDrawer(this.currentIndex);
@@ -620,10 +508,11 @@ export class StickyUI {
     const root = this.root;
     const pill = this.pill;
     if (!root || !pill) return;
-    if (this.appearance !== 'pill' || !this.floatingPosition) {
+    if (!this.floatingPosition) {
       root.dataset.position = this.position;
       root.style.removeProperty('left');
       root.style.removeProperty('top');
+      this.layoutDrawer();
       return;
     }
 
@@ -643,7 +532,49 @@ export class StickyUI {
     root.dataset.position = 'custom';
     root.style.left = `${Math.round(left)}px`;
     root.style.top = `${Math.round(top)}px`;
+    this.layoutDrawer();
   }
+
+  /**
+   * 自由拖动后，目录不能仍然假设自己在顶部。
+   * 下方空间不足就向上展开，左右空间不足就换边，保证控件始终留在视口内。
+   */
+  private layoutDrawer(): void {
+    const root = this.root;
+    const below = this.below;
+    const pill = this.pill;
+    if (!root || !below || !pill) return;
+
+    const rect = pill.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
+    const margin = 12;
+    const gap = 6;
+    const availableBelow = window.innerHeight - rect.bottom - gap - margin;
+    const availableAbove = rect.top - gap - margin;
+    const placement = availableBelow >= 210 || availableBelow >= availableAbove ? 'below' : 'above';
+    const availableHeight =
+      placement === 'below' ? availableBelow : availableAbove;
+    const maxHeight = Math.max(96, Math.min(520, Math.floor(availableHeight)));
+    below.dataset.placement = placement;
+    root.style.setProperty('--wss-drawer-max-height', `${maxHeight}px`);
+
+    if (!this.floatingPosition) {
+      root.dataset.drawerAlign = this.position === 'top-right' ? 'right' : 'center';
+      return;
+    }
+
+    const leftSpace = rect.left - margin;
+    const rightSpace = window.innerWidth - rect.right - margin;
+    root.dataset.drawerAlign = rightSpace >= leftSpace ? 'left' : 'right';
+  }
+
+  private handleViewportResize = (): void => {
+    this.safely('ui:resize', () => {
+      this.applyFloatingPosition();
+      this.layoutDrawer();
+    });
+  };
 
   private normalizedPosition(
     left: number,
@@ -661,7 +592,7 @@ export class StickyUI {
 
   private handleDragStart = (event: PointerEvent): void => {
     this.safely('ui:drag-start', () => {
-      if (this.appearance !== 'pill' || !this.pill || event.button !== 0) return;
+      if (!this.pill || event.button !== 0) return;
       const rect = this.pill.getBoundingClientRect();
       this.drag = {
         pointerId: event.pointerId,
@@ -725,7 +656,6 @@ export class StickyUI {
 
   private handlePillDoubleClick = (event: MouseEvent): void => {
     this.safely('ui:drag-reset', () => {
-      if (this.appearance !== 'pill') return;
       event.preventDefault();
       event.stopPropagation();
       this.suppressClickUntil = Date.now() + 350;
@@ -747,7 +677,7 @@ export class StickyUI {
       const trigger = target?.closest<HTMLElement>('[data-wss-index], [data-wss-role="heading"]');
       if (!trigger) return;
       event.stopPropagation();
-      // 点击吸顶条里的标题 → 固定/取消固定目录
+      // 点击胶囊里的标题 → 固定/取消固定目录
       if (trigger.dataset.wssRole === 'heading') {
         this.togglePin();
         return;

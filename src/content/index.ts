@@ -2,7 +2,6 @@ import {
   HOST_ID,
   IDLE_DIM_DELAY,
   IDLE_TICK_INTERVAL,
-  PEEK_HIDE_DELAY,
   PILL_GAP,
   PILL_HEIGHT,
   REINDEX_DEBOUNCE,
@@ -21,13 +20,11 @@ import {
   type WssSettings,
 } from '../shared/settings';
 import {
-  SITE_CHROME_SELECTOR,
   buildHeadingIndex,
   headingSignature,
   headingIndexStillAttached,
   type HeadingIndex,
 } from './extractor';
-import { deriveColumnBox, type Box } from './column';
 import { FailureGuard } from './failure-guard';
 import {
   classifyTopChrome,
@@ -37,12 +34,9 @@ import {
   isPositionedWithin,
   type ChromeCandidate,
 } from './chrome-detect';
-import { estimateHeadingHeight } from './heading-clone';
-import { samplePageStyle } from './palette';
 import { findTocCandidates, isAnyTocVisible } from './page-toc';
 import { ScrollTracker, type TrackerSnapshot } from './tracker';
 import { StickyUI } from './ui';
-import type { VisualSafetyReason } from './visual-safety';
 
 declare const __WSS_VERSION__: string;
 
@@ -64,8 +58,6 @@ class StickyScrollApp {
   private forced = false;
   private overlayHeight = 0;
   private foreignZIndex = 0;
-  private visualSafe = true;
-  private visualReason: VisualSafetyReason = 'safe';
   /** 顶部被遮罩层挡住（对话框 / cookie 墙），此时收起 UI */
   private overlayBlocked = false;
   /** 用户正在用浏览器的页面查找（Ctrl/⌘+F）：收起 UI，别挡住查找条与命中的文字 */
@@ -143,11 +135,6 @@ class StickyScrollApp {
 
     const tocStrategyChanged = previous.pageTocMode !== next.pageTocMode;
     const policyChanged = previous.displayPolicy !== next.displayPolicy;
-    const appearanceChanged = previous.appearance !== next.appearance;
-    if (appearanceChanged) {
-      this.rebuild(true);
-      return;
-    }
     if (tocStrategyChanged) {
       this.tocCandidates = this.collectTocCandidates();
       this.tocVisible = this.evaluateToc();
@@ -273,8 +260,6 @@ class StickyScrollApp {
     this.removePageMarkers();
     this.index = index;
     this.signature = signature;
-    this.visualSafe = index?.isVisualSafe ?? false;
-    this.visualReason = index?.visualReason ?? 'background-complex';
 
     if (!index || !this.canActivate(index)) {
       // 非文章页（列表页 / 搜索页 / 应用页）：保持静默，不注入任何 UI
@@ -319,7 +304,7 @@ class StickyScrollApp {
         },
         scope: index.scope,
         dockTop: () => this.pillTop(),
-        heightOf: (headingIndex) => this.heightForHeading(headingIndex),
+        heightOf: () => PILL_HEIGHT,
         onError: (action, error) => this.guard.report(`tracker-${action}`, error),
       },
     );
@@ -335,15 +320,6 @@ class StickyScrollApp {
     observer.observe(index.scope);
     if (document.body) observer.observe(document.body);
     this.resizeObserver = observer;
-    const fonts = document.fonts;
-    if (!fonts) return;
-    fonts.addEventListener('loadingdone', this.handleFontsLoaded);
-    void this.guard.runAsync('fonts-ready', async () => {
-      await fonts.ready;
-      // Web 字体晚于 document_idle 加载时，标题克隆里的字体快照会过期。
-      this.ui?.refreshHeadingClone();
-      this.refreshLayout();
-    });
   }
 
   private observe(): void {
@@ -377,7 +353,6 @@ class StickyScrollApp {
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     window.removeEventListener('keydown', this.handleGlobalKeyDown, true);
     window.removeEventListener('pointerdown', this.handleGlobalPointerDown, true);
-    document.fonts?.removeEventListener('loadingdone', this.handleFontsLoaded);
   }
 
   private handleVisibilityChange = (): void => {
@@ -443,13 +418,6 @@ class StickyScrollApp {
     });
   };
 
-  private handleFontsLoaded = (): void => {
-    this.guard.run('fonts-loaded', () => {
-      this.ui?.refreshHeadingClone();
-      this.refreshLayout();
-    });
-  };
-
   private setFindMode(active: boolean): void {
     if (this.findMode === active) return;
     this.findMode = active;
@@ -491,14 +459,10 @@ class StickyScrollApp {
   private refreshLayout(): void {
     if (!this.index) return;
     this.updateLayoutMetrics();
-    this.ui?.setAppearance(this.settings.appearance);
-    this.ui?.setBarWidth(this.settings.barWidth);
     this.ui?.setTop(this.pillTop());
     this.ui?.setZIndex(this.layerZIndex());
     this.ui?.setPosition(this.settings.position);
     this.ui?.setTheme(this.settings.theme);
-    this.ui?.setColumn(this.columnBox());
-    this.ui?.setPageStyle(this.sampleStyle());
     this.tracker?.refresh();
     this.probeToc();
     this.applyPresentation();
@@ -511,90 +475,15 @@ class StickyScrollApp {
     this.foreignZIndex = foreignZIndex;
   }
 
-  /** 正文列的位置：吸顶条按它对齐，看起来像文章自己的标题栏 */
-  private columnBox(): { left: number; right: number; width: number } | null {
-    const index = this.index;
-    if (!index) return null;
-
-    const toBox = (element: Element): Box | null => {
-      const rect = element.getBoundingClientRect();
-      if (!Number.isFinite(rect.left) || !Number.isFinite(rect.right) || rect.width <= 0) return null;
-      return { left: rect.left, right: rect.right, width: rect.width };
-    };
-
-    // 正文列从内容本身量：标题的左缘 + 同列段落的右缘
-    const headingBoxes = index.headings
-      .map((heading) => toBox(heading.element))
-      .filter((box): box is Box => box !== null);
-
-    const paragraphBoxes: Box[] = [];
-    const blockBoxes: Box[] = [];
-    for (const block of index.scope.querySelectorAll<HTMLElement>('p, pre, blockquote, li')) {
-      if (blockBoxes.length >= 80) break;
-      if (block.closest(`#${HOST_ID}`)) continue;
-      if (block.closest(SITE_CHROME_SELECTOR)) continue;
-      const box = toBox(block);
-      if (!box || box.width < 120) continue;
-      if (block.tagName === 'P') paragraphBoxes.push(box);
-      else blockBoxes.push(box);
-    }
-
-    // 兜底用容器内容盒（扣掉内边距与边框），而不是外框
-    const scopeElement = index.scope;
-    const scopeRect = scopeElement.getBoundingClientRect();
-    const scopeStyle = getComputedStyle(scopeElement);
-    let scopeBox: Box | null = null;
-    if (scopeRect.width > 0) {
-      const left =
-        scopeRect.left +
-        (Number.parseFloat(scopeStyle.paddingLeft) || 0) +
-        (Number.parseFloat(scopeStyle.borderLeftWidth) || 0);
-      const right =
-        scopeRect.right -
-        (Number.parseFloat(scopeStyle.paddingRight) || 0) -
-        (Number.parseFloat(scopeStyle.borderRightWidth) || 0);
-      scopeBox = { left, right, width: right - left };
-    }
-
-    return deriveColumnBox({
-      headingBoxes,
-      paragraphBoxes,
-      blockBoxes,
-      scopeBox,
-      viewportWidth: window.innerWidth,
-    });
-  }
-
-  /** 采样正文配色：优先用二级标题（最常见的正文小节标题）的排版 */
-  private sampleStyle(): ReturnType<typeof samplePageStyle> {
-    const index = this.index;
-    const sample =
-      index?.headings.find((node) => node.level === 2)?.element ??
-      index?.headings.find((node) => node.level === 1)?.element ??
-      index?.headings[0]?.element ??
-      null;
-    return samplePageStyle(index?.scope ?? null, sample);
-  }
-
-  /** 某个标题吸顶后会占用的高度（吸顶条随标题行高变化，胶囊固定高度） */
-  private heightForHeading(index: number): number {
-    const heading = this.index?.headings[index];
-    if (!heading) return PILL_HEIGHT;
-    return this.settings.appearance === 'bar'
-      ? estimateHeadingHeight(heading.element)
-      : PILL_HEIGHT;
-  }
-
   private pillTop(): number {
-    // 无痕标题固定在页面最顶部、紧贴 1px 进度线；胶囊保留自动避让与垂直微调。
-    if (this.settings.appearance === 'bar') return 1;
+    // 玻璃胶囊自动避让站点固定导航栏，并允许用户垂直微调。
     return this.overlayHeight + PILL_GAP + this.settings.offsetY;
   }
 
   /**
    * 探测页面顶部是什么：
-   * - 站点导航条（又宽又矮的固定条）→ 吸顶条贴在它下面；
-   * - 正文里的粘性元素 → 无视（不然会带着吸顶条掉到页面中间）；
+   * - 站点导航条（又宽又矮的固定条）→ 默认胶囊贴在它下面；
+   * - 正文里的粘性元素 → 无视（不然会带着胶囊掉到页面中间）；
    * - 全屏遮罩 → 收起 UI，不要浮在它上面。
    */
   private detectTopChrome(): { bottom: number; blocked: boolean; foreignZIndex: number } {
@@ -664,7 +553,7 @@ class StickyScrollApp {
     const element = heading.element;
     const previousMargin = element.style.scrollMarginTop;
     // 用临时 scroll-margin-top 让原生平滑滚动停在“该标题吸顶后的位置”上
-    element.style.scrollMarginTop = `${this.pillTop() + this.heightForHeading(headingIndex) + 2}px`;
+    element.style.scrollMarginTop = `${this.pillTop() + PILL_HEIGHT + 2}px`;
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     element.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     window.setTimeout(() => {
@@ -680,9 +569,6 @@ class StickyScrollApp {
 
     switch (this.settings.displayPolicy) {
       case 'always':
-        this.shown = true;
-        break;
-      case 'peek':
         this.shown = true;
         break;
       default:
@@ -705,13 +591,6 @@ class StickyScrollApp {
     const policy = this.settings.displayPolicy;
     if (policy === 'always') return;
     const idle = Date.now() - this.lastActivityAt;
-    if (policy === 'peek') {
-      if (this.shown && idle > PEEK_HIDE_DELAY) {
-        this.shown = false;
-        this.applyPresentation();
-      }
-      return;
-    }
     const shouldDim = idle > IDLE_DIM_DELAY;
     if (shouldDim !== this.dimmed) {
       this.dimmed = shouldDim;
@@ -749,10 +628,7 @@ class StickyScrollApp {
 
   private canActivate(index: HeadingIndex | null): boolean {
     if (!index || index.isConversation) return false;
-    if (this.settings.appearance === 'pill') {
-      return index.isReadingCandidate || this.forced;
-    }
-    return index.isArticle || this.forced;
+    return index.isReadingCandidate || this.forced;
   }
 
   private saveFloatingPosition(position: FloatingPosition | null): void {
@@ -890,8 +766,6 @@ class StickyScrollApp {
     statusReason: string;
     isArticle: boolean;
     geometryReliable: boolean;
-    visualSafe: boolean;
-    visualReason: VisualSafetyReason;
     pageTocVisible: boolean;
     dockTop: number;
     layerZIndex: number;
@@ -916,8 +790,6 @@ class StickyScrollApp {
       statusReason: this.statusReason(index),
       isArticle: index?.isArticle ?? false,
       geometryReliable: index?.stats.geometryReliable ?? false,
-      visualSafe: this.visualSafe,
-      visualReason: this.visualReason,
       pageTocVisible: this.tocVisible,
       dockTop: this.pillTop(),
       layerZIndex: this.layerZIndex(),

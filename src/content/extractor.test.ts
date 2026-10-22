@@ -202,7 +202,7 @@ describe('buildHeadingIndex', () => {
     expect(index?.diagnostics).toContain('conv=1');
   });
 
-  it('渐变背景页面使用中性玻璃标题，不依赖网页背景色', () => {
+  it('渐变背景不影响文章识别，玻璃标题不依赖网页背景色', () => {
     document.body.innerHTML = `
       <article style="background-image: linear-gradient(red, blue)">
         <h1 style="color: white; font-size: 40px">文章标题</h1>
@@ -214,8 +214,6 @@ describe('buildHeadingIndex', () => {
       </article>
     `;
     const index = buildHeadingIndex();
-    expect(index?.isVisualSafe).toBe(false);
-    expect(index?.visualReason).toBe('background-complex');
     expect(index?.isReadingCandidate).toBe(true);
     expect(index?.isArticle).toBe(true);
   });

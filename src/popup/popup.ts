@@ -6,7 +6,6 @@ import {
   saveSettings,
   toggleSite,
   type DisplayPolicy,
-  type Appearance,
   type WssSettings,
 } from '../shared/settings';
 
@@ -24,8 +23,6 @@ interface PageStatus {
   statusReason: string;
   isArticle: boolean;
   geometryReliable: boolean;
-  visualSafe: boolean;
-  visualReason: string;
   pageTocVisible: boolean;
   dockTop: number;
   layerZIndex: number;
@@ -36,13 +33,7 @@ interface PageStatus {
 
 const POLICY_HINTS: Record<DisplayPolicy, string> = {
   smart: '向下滚动浮现，向上滚动让位',
-  always: '始终停在页面顶部',
-  peek: '仅在滚动时短暂出现',
-};
-
-const APPEARANCE_HINTS: Record<Appearance, string> = {
-  bar: '无痕阅读：全宽页面渐隐，最自然',
-  pill: '液态玻璃：可拖动定位，双击恢复',
+  always: '始终显示，位置可自由拖动',
 };
 
 function getElement<T extends HTMLElement>(selector: string): T {
@@ -52,8 +43,6 @@ function getElement<T extends HTMLElement>(selector: string): T {
 }
 
 const enabledInput = getElement<HTMLInputElement>('#enabled');
-const appearanceSelect = getElement<HTMLSelectElement>('#appearance');
-const appearanceHint = getElement<HTMLElement>('#appearanceHint');
 const policySelect = getElement<HTMLSelectElement>('#displayPolicy');
 const policyHint = getElement<HTMLElement>('#policyHint');
 const statusBox = getElement<HTMLDivElement>('#status');
@@ -61,18 +50,16 @@ const siteButton = getElement<HTMLButtonElement>('#site');
 const rescanButton = getElement<HTMLButtonElement>('#rescan');
 const copyButton = getElement<HTMLButtonElement>('#copy');
 const optionsButton = getElement<HTMLButtonElement>('#options');
+const versionLabel = getElement<HTMLElement>('#version');
 
 let settings: WssSettings = { ...DEFAULT_SETTINGS };
 let pageStatus: PageStatus | null = null;
 
 function render(): void {
   enabledInput.checked = settings.enabled;
-  appearanceSelect.value = settings.appearance;
-  appearanceHint.textContent = APPEARANCE_HINTS[settings.appearance];
   policySelect.value = settings.displayPolicy;
   policyHint.textContent = POLICY_HINTS[settings.displayPolicy];
   policySelect.disabled = !settings.enabled;
-  appearanceSelect.disabled = !settings.enabled;
 
   const host = pageStatus?.host;
   siteButton.disabled = !host;
@@ -194,8 +181,6 @@ function diagnosticText(): string {
           `scope=${status.scope ?? '-'}`,
           `isArticle=${status.isArticle}`,
           `geometryReliable=${status.geometryReliable}`,
-          `visualSafe=${status.visualSafe}`,
-          `visualReason=${status.visualReason}`,
           `pageTocVisible=${status.pageTocVisible}`,
           `dockTop=${status.dockTop}`,
           `layerZIndex=${status.layerZIndex}`,
@@ -232,6 +217,7 @@ async function copyDiagnostics(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  versionLabel.textContent = `v${chrome.runtime.getManifest().version}`;
   settings = await loadSettings();
   render();
   await refreshStatus();
@@ -249,12 +235,6 @@ async function main(): Promise<void> {
 
   policySelect.addEventListener('change', () => {
     settings = { ...settings, displayPolicy: policySelect.value as DisplayPolicy };
-    render();
-    persist();
-  });
-
-  appearanceSelect.addEventListener('change', () => {
-    settings = { ...settings, appearance: appearanceSelect.value as Appearance };
     render();
     persist();
   });

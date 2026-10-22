@@ -20,8 +20,6 @@ describe('normalizeSettings', () => {
       position: 'bottom-left',
       theme: 'sepia',
       displayPolicy: 'chaos',
-      appearance: 'floating',
-      barWidth: 'huge',
       offsetY: 9999,
       maxCrumbs: 42,
       siteAccess: 'nope',
@@ -34,8 +32,6 @@ describe('normalizeSettings', () => {
     expect(result.position).toBe(DEFAULT_SETTINGS.position);
     expect(result.theme).toBe(DEFAULT_SETTINGS.theme);
     expect(result.displayPolicy).toBe(DEFAULT_SETTINGS.displayPolicy);
-    expect(result.appearance).toBe('bar');
-    expect(result.barWidth).toBe('full');
     expect(result.enabled).toBe(true);
     expect(result.offsetY).toBe(400);
     expect(result.maxCrumbs).toBe(6);
@@ -55,11 +51,9 @@ describe('normalizeSettings', () => {
     expect(result.hideArticleTitle).toBe(true);
     expect(result.maxCrumbs).toBe(3);
     expect(result.pageTocMode).toBe('adapt');
-    expect(result.appearance).toBe('bar');
-    expect(result.barWidth).toBe('full');
   });
 
-  it('v2 配置升级到 v3 时保留用户已有选择', () => {
+  it('旧版配置升级时保留用户选择，已删除的轻提示迁移为智能', () => {
     const legacy = {
       version: 2,
       enabled: true,
@@ -75,12 +69,11 @@ describe('normalizeSettings', () => {
     };
     const result = normalizeSettings(legacy);
     expect(result.version).toBe(SETTINGS_VERSION);
-    expect(result.displayPolicy).toBe('peek');
+    expect(result.displayPolicy).toBe('smart');
     expect(result.pageTocMode).toBe('full');
     expect(result.hideArticleTitle).toBe(false);
     expect(result.maxCrumbs).toBe(2);
     expect(result.sites).toEqual(['example.com']);
-    expect(result.appearance).toBe('bar');
   });
 });
 

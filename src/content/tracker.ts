@@ -38,7 +38,7 @@ function clamp01(value: number): number {
 /**
  * 滚动监听与层级推导。
  *
- * 吸顶时机只用一个判据：**标题是否已经滑到吸顶条的后面**（越过条顶边）。
+ * 标题交接只用一个判据：**标题是否已经滑到胶囊停靠线的后面**。
  *
  * - 向下滚动：下一个标题必须完全滑到条后面（被条盖住、屏幕上再也看不到它）才切换，
  *   所以不会出现“标题还在下面露着，条已经提前显示它”的悬浮感；
@@ -178,7 +178,7 @@ export class ScrollTracker {
       tops[i] = headings[i].element.getBoundingClientRect().top;
     }
 
-    // 当前章节：最后一个已经滑到吸顶条后面的标题
+    // 当前章节：最后一个已经滑到胶囊停靠线后面的标题
     const line = this.behindLine();
     let index = -1;
     for (let i = 0; i < count; i += 1) {

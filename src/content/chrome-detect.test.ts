@@ -29,7 +29,7 @@ describe('classifyTopChrome', () => {
     expect(result).toEqual({ bottom: 64, blocked: false });
   });
 
-  it('正文里的 sticky 元素被无视（否则吸顶条会掉到页面中间）', () => {
+  it('正文里的 sticky 元素被无视（否则胶囊会掉到页面中间）', () => {
     const result = classifyTopChrome(
       [candidate({ insideContent: true, bottom: 900, height: 900 })],
       VIEWPORT,

@@ -259,31 +259,14 @@
       <section>
         <h2>基础</h2>
         <label class="row switch">
-          <span class="label">启用吸顶面包屑</span>
+          <span class="label">启用液态玻璃标题</span>
           <input id="enabled" type="checkbox" />
         </label>
         <label class="row">
           <span class="label">
-            外观形态
-            <small>无痕阅读是中性全宽玻璃；液态玻璃胶囊可自由拖动并记住位置</small>
+            默认悬浮位置
+            <small>拖动胶囊后以当前站点记住的自定义位置为准</small>
           </span>
-          <select id="appearance">
-            <option value="bar">无痕阅读（推荐）</option>
-            <option value="pill">液态玻璃（可拖动）</option>
-          </select>
-        </label>
-        <label class="row">
-          <span class="label">
-            无痕标题宽度
-            <small>背景始终全宽渐隐；满宽或只覆盖正文列只影响标题层</small>
-          </span>
-          <select id="barWidth">
-            <option value="full">标题层满宽（文字对齐正文列）</option>
-            <option value="column">标题层与正文列同宽</option>
-          </select>
-        </label>
-        <label class="row">
-          <span class="label">悬浮位置</span>
           <select id="position">
             <option value="top-center">顶部居中</option>
             <option value="top-right">右上角</option>
@@ -300,7 +283,7 @@
         <label class="row">
           <span class="label">
             垂直微调
-            <small>仅用于液态玻璃胶囊，在自动避让固定导航栏的基础上微调</small>
+            <small>用于默认位置；拖动胶囊后，以自定义位置为准</small>
           </span>
           <input id="offsetY" type="number" step="2" min="-20" max="400" />
         </label>
@@ -316,19 +299,18 @@
           <select id="displayPolicy">
             <option value="smart">智能（推荐）</option>
             <option value="always">常驻</option>
-            <option value="peek">轻提示</option>
           </select>
         </label>
         <label class="row switch">
           <span class="label">
-            不显示文章大标题
-            <small>面包屑从二级标题开始，例如「实现方式 › 边界处理」</small>
+            大纲路径不显示文章大标题
+            <small>展开目录时从二级标题开始，例如「实现方式 › 边界处理」</small>
           </span>
           <input id="hideArticleTitle" type="checkbox" />
         </label>
         <label class="row">
           <span class="label">
-            最多显示层级
+            大纲路径最多层级
             <small>超出的上级标题折叠为 …，悬停胶囊时展开</small>
           </span>
           <select id="maxCrumbs">

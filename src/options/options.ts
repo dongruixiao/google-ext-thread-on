@@ -4,8 +4,6 @@ import {
   normalizeHost,
   normalizeSettings,
   saveSettings,
-  type Appearance,
-  type BarWidth,
   type DisplayPolicy,
   type PageTocMode,
   type PillPosition,
@@ -21,8 +19,6 @@ function getElement<T extends HTMLElement>(selector: string): T {
 }
 
 const enabledInput = getElement<HTMLInputElement>('#enabled');
-const appearanceSelect = getElement<HTMLSelectElement>('#appearance');
-const barWidthSelect = getElement<HTMLSelectElement>('#barWidth');
 const positionSelect = getElement<HTMLSelectElement>('#position');
 const themeSelect = getElement<HTMLSelectElement>('#theme');
 const offsetInput = getElement<HTMLInputElement>('#offsetY');
@@ -56,11 +52,7 @@ function notify(message: string): void {
 
 function render(): void {
   enabledInput.checked = settings.enabled;
-  appearanceSelect.value = settings.appearance;
-  barWidthSelect.value = settings.barWidth;
   positionSelect.value = settings.position;
-  barWidthSelect.disabled = settings.appearance !== 'bar';
-  positionSelect.disabled = settings.appearance !== 'pill';
   themeSelect.value = settings.theme;
   offsetInput.value = String(settings.offsetY);
   policySelect.value = settings.displayPolicy;
@@ -79,8 +71,6 @@ function collect(): WssSettings {
   return normalizeSettings({
     ...settings,
     enabled: enabledInput.checked,
-    appearance: appearanceSelect.value as Appearance,
-    barWidth: barWidthSelect.value as BarWidth,
     position: positionSelect.value as PillPosition,
     theme: themeSelect.value as ThemeMode,
     offsetY: Number.parseInt(offsetInput.value, 10),
@@ -140,8 +130,6 @@ async function main(): Promise<void> {
 
   for (const element of [
     enabledInput,
-    appearanceSelect,
-    barWidthSelect,
     positionSelect,
     themeSelect,
     policySelect,

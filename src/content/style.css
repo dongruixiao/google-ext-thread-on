@@ -8,31 +8,27 @@
   position: fixed;
   z-index: var(--wss-z-index, 2147483600);
   pointer-events: none;
-  font-family: var(--wss-page-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-      'Hiragino Sans GB', 'Microsoft YaHei', sans-serif);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+      'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   font-size: 13px;
   line-height: 1.2;
   -webkit-font-smoothing: antialiased;
-
-  /* 页面配色（由 JS 采样写入），失败时退回主题色 */
-  --wss-page-bg: var(--wss-surface);
-  --wss-page-fg: var(--wss-fg);
-  --wss-title-size: 17px;
-  --wss-title-weight: 600;
-  --wss-letter-spacing: normal;
-  --wss-bar-height: 44px;
-  --wss-col-left: 16px;
-  --wss-col-width: calc(100vw - 32px);
-  --wss-col-right: 16px;
+  top: var(--wss-top, 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 
   --wss-fg: #0f172a;
   --wss-surface: #ffffff;
-  --wss-border: color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
+  --wss-border: color-mix(in srgb, var(--wss-fg) 12%, transparent);
   --wss-shadow: none;
-  --wss-muted: color-mix(in srgb, var(--wss-page-fg) 58%, transparent);
-  --wss-accent: color-mix(in srgb, var(--wss-page-fg) 72%, transparent);
-  --wss-accent-soft: color-mix(in srgb, var(--wss-page-fg) 8%, transparent);
-  --wss-hover: color-mix(in srgb, var(--wss-page-fg) 7%, transparent);
+  --wss-muted: color-mix(in srgb, var(--wss-fg) 58%, transparent);
+  --wss-accent: color-mix(in srgb, var(--wss-fg) 72%, transparent);
+  --wss-accent-soft: color-mix(in srgb, var(--wss-fg) 8%, transparent);
+  --wss-hover: color-mix(in srgb, var(--wss-fg) 7%, transparent);
   --wss-brand: #6c4df6;
 
   opacity: 1;
@@ -92,31 +88,19 @@
   opacity: 1;
 }
 
-/* ── 形态切换 ───────────────────────────────────────── */
+/* ── 胶囊位置 ───────────────────────────────────────── */
 
-.wss-root[data-appearance='pill'] {
-  top: var(--wss-top, 12px);
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.wss-root[data-appearance='pill'][data-position='top-right'] {
+.wss-root[data-position='top-right'] {
   left: auto;
   right: 16px;
   transform: none;
-  align-items: flex-end;
 }
 
-.wss-root[data-appearance='pill'][data-position='custom'] {
+.wss-root[data-position='custom'] {
   top: 0;
   left: 0;
   right: auto;
   transform: none;
-  align-items: flex-start;
 }
 
 .wss-root[data-dragging='true'] .wss-pill {
@@ -124,169 +108,12 @@
   scale: 1.02;
 }
 
-.wss-root[data-appearance='pill'] .wss-bar {
-  display: none;
-}
-
-.wss-root[data-appearance='bar'] {
-  top: var(--wss-top, 0px);
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.wss-root[data-appearance='bar'] .wss-pill {
-  display: none;
-}
-
-.wss-root[data-appearance='bar'][data-visible='false'] {
-  /* 用固定位移而不是 -100%：抽屉常驻在 root 里，-100% 会连带多滑很多 */
-  translate: 0 -48px;
-}
-
-.wss-root[data-appearance='pill'][data-visible='false'] {
+.wss-root[data-visible='false'] {
   translate: 0 -8px;
 }
 
-.wss-root[data-visible='false'] :is(.wss-pill, .wss-bar-inner, .wss-drawer) {
+.wss-root[data-visible='false'] :is(.wss-pill, .wss-drawer) {
   pointer-events: none;
-}
-
-/* ── 吸顶层：无图板、无边框，只保留原样标题 ─────────── */
-
-.wss-root[data-appearance='bar']::before {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  top: 0;
-  right: 0;
-  bottom: auto;
-  left: 0;
-  height: var(--wss-bar-height);
-  pointer-events: none;
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--wss-surface) 58%, transparent),
-      color-mix(in srgb, var(--wss-surface) 34%, transparent)
-    );
-  border-bottom: 1px solid color-mix(in srgb, var(--wss-fg) 10%, transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 72%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, var(--wss-fg) 7%, transparent);
-  backdrop-filter: blur(18px) saturate(165%);
-  -webkit-backdrop-filter: blur(18px) saturate(165%);
-}
-
-.wss-bar {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  height: var(--wss-bar-height);
-  box-sizing: border-box;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  pointer-events: none;
-  transition: height 0.18s ease;
-}
-
-.wss-bar-inner {
-  position: relative;
-  height: 100%;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  padding-left: var(--wss-col-left);
-  padding-right: var(--wss-col-right);
-  pointer-events: none;
-  cursor: pointer;
-  user-select: none;
-}
-
-/* 克隆进来的标题：样式全部来自页面，这里只负责占位与裁切 */
-.wss-bar-heading {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  flex: 0 1 auto;
-  pointer-events: auto;
-}
-
-.wss-bar-heading > * {
-  position: relative;
-  z-index: 1;
-  min-width: 0;
-  max-width: 100%;
-}
-
-/* 中性玻璃表面不依赖网页背景色；标题保持原字号与字重，改用可读主题色。 */
-.wss-bar-heading [data-wss-clone],
-.wss-bar-heading [data-wss-clone] * {
-  color: var(--wss-fg) !important;
-  -webkit-text-fill-color: var(--wss-fg) !important;
-  background: transparent !important;
-  mix-blend-mode: normal !important;
-  filter: none !important;
-}
-
-.wss-bar-heading[data-wss-role='heading'] {
-  cursor: pointer;
-}
-
-.wss-bar-heading:focus-visible {
-  outline: 2px solid var(--wss-accent);
-  outline-offset: 2px;
-  border-radius: 6px;
-}
-
-/* 可点击提示：悬停时出现的小箭头，钉住时翻转 */
-.wss-bar-caret {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 18px;
-  height: 18px;
-  margin-left: 6px;
-  border-radius: 6px;
-  color: color-mix(in srgb, var(--wss-page-fg) 55%, transparent);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.12s ease, rotate 0.18s ease, background-color 0.12s ease;
-}
-
-.wss-bar-inner:hover .wss-bar-caret,
-.wss-bar-inner:focus-within .wss-bar-caret,
-.wss-root[data-pinned='true'] .wss-bar-caret {
-  opacity: 0.85;
-}
-
-.wss-bar-inner:hover .wss-bar-caret:hover {
-  background: color-mix(in srgb, var(--wss-page-fg) 10%, transparent);
-}
-
-.wss-root[data-pinned='true'] .wss-bar-caret {
-  rotate: 180deg;
-  opacity: 1;
-}
-
-/* 与正文列对齐的窄条形态 */
-.wss-root[data-bar-width='column'] .wss-bar {
-  margin-left: var(--wss-col-left);
-  margin-right: var(--wss-col-right);
-  width: auto;
-}
-
-.wss-root[data-bar-width='column'] .wss-bar-inner {
-  padding-left: 14px;
-  padding-right: 14px;
 }
 
 /* ── 液态玻璃胶囊 ───────────────────────────────────── */
@@ -409,28 +236,42 @@
 /* ── 悬停大纲：顶部是上级路径，下面是全文目录 ───────── */
 
 .wss-below {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  width: max-content;
+  max-width: min(84vw, 320px);
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   pointer-events: none;
 }
 
-.wss-root[data-appearance='bar'] .wss-below {
-  align-self: flex-start;
-  margin-left: var(--wss-col-left);
-  margin-right: var(--wss-col-right);
-  max-width: min(var(--wss-col-width), 360px);
+.wss-below[data-placement='above'] {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.wss-root[data-drawer-align='left'] .wss-below {
+  left: 0;
+  transform: none;
+}
+
+.wss-root[data-drawer-align='right'] .wss-below {
+  right: 0;
+  left: auto;
+  transform: none;
 }
 
 .wss-drawer {
   width: 280px;
   max-width: min(84vw, 320px);
-  max-height: min(62vh, 560px);
+  max-height: var(--wss-drawer-max-height, min(62vh, 520px));
   box-sizing: border-box;
   padding: 8px;
-  margin-top: 6px;
   overflow: auto;
   border-radius: 12px;
-  background: var(--wss-page-bg);
+  background: var(--wss-surface);
   border: 1px solid var(--wss-border);
   box-shadow: none;
   backdrop-filter: none;
@@ -441,7 +282,7 @@
   visibility: hidden;
   transition: opacity 0.16s ease, translate 0.16s ease, visibility 0s 0.16s;
   scrollbar-width: thin;
-  color: var(--wss-page-fg);
+  color: var(--wss-fg);
 }
 
 .wss-drawer.is-open {
@@ -463,7 +304,7 @@
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
-  color: color-mix(in srgb, var(--wss-page-fg) 52%, transparent);
+  color: color-mix(in srgb, var(--wss-fg) 52%, transparent);
 }
 
 .wss-drawer-progress {
@@ -478,7 +319,7 @@
   gap: 2px;
   margin: 0 2px 6px;
   padding-bottom: 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--wss-fg) 12%, transparent);
   overflow: hidden;
   font-size: 11.5px;
 }
@@ -490,13 +331,13 @@
 .wss-drawer-path .wss-crumb {
   max-width: 12ch;
   padding: 3px 5px;
-  color: color-mix(in srgb, var(--wss-page-fg) 62%, transparent);
+  color: color-mix(in srgb, var(--wss-fg) 62%, transparent);
   font-size: 11.5px;
 }
 
 .wss-drawer-path .wss-crumb:hover {
-  color: var(--wss-page-fg);
-  background: color-mix(in srgb, var(--wss-page-fg) 8%, transparent);
+  color: var(--wss-fg);
+  background: color-mix(in srgb, var(--wss-fg) 8%, transparent);
 }
 
 /* ── 大纲：按标题树嵌套，用细线画层级 ───────────────── */
@@ -515,7 +356,7 @@
 .wss-outline-level[data-depth] {
   margin-left: 11px;
   padding-left: 9px;
-  border-left: 1px solid color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--wss-fg) 12%, transparent);
 }
 
 .wss-outline-item {
@@ -533,7 +374,7 @@
   font-size: 12.5px;
   line-height: 1.4;
   text-align: left;
-  color: color-mix(in srgb, var(--wss-page-fg) 58%, transparent);
+  color: color-mix(in srgb, var(--wss-fg) 58%, transparent);
   padding: 6px 10px 6px 14px;
   border-radius: 8px;
   overflow: hidden;
@@ -552,13 +393,13 @@
   height: 4px;
   margin-top: -2px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--wss-page-fg) 26%, transparent);
+  background: color-mix(in srgb, var(--wss-fg) 26%, transparent);
   transition: background-color 0.15s ease, scale 0.15s ease;
 }
 
 .wss-row:hover {
-  background: color-mix(in srgb, var(--wss-page-fg) 8%, transparent);
-  color: var(--wss-page-fg);
+  background: color-mix(in srgb, var(--wss-fg) 8%, transparent);
+  color: var(--wss-fg);
 }
 
 .wss-row:focus-visible {
@@ -567,7 +408,7 @@
 }
 
 .wss-row[data-in-path='true'] {
-  color: var(--wss-page-fg);
+  color: var(--wss-fg);
 }
 
 .wss-row[data-in-path='true']::before {
@@ -576,7 +417,7 @@
 
 .wss-row[data-current='true'] {
   background: var(--wss-accent-soft);
-  color: var(--wss-page-fg);
+  color: var(--wss-fg);
   font-weight: 600;
 }
 
@@ -597,7 +438,6 @@
 @media (prefers-reduced-motion: reduce) {
   .wss-root,
   .wss-pill,
-  .wss-bar,
   .wss-drawer,
   .wss-global-progress > i,
   .wss-crumb,

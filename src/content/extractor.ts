@@ -1,9 +1,5 @@
 import { HOST_ID } from '../shared/constants';
 import { detectConversationSurface, type ConversationReason } from './conversation';
-import {
-  assessVisualSafety,
-  type VisualSafetyReason,
-} from './visual-safety';
 
 export interface HeadingNode {
   /** 原生 id 或自动生成的占位 id */
@@ -47,15 +43,11 @@ export interface HeadingIndex {
   headings: HeadingNode[];
   /** 智能阅读模式判定：只有“像文章/文档”的页面才自动激活 */
   isArticle: boolean;
-  /** 内容上是可阅读文章；无痕模式还需通过视觉安全门禁，液态玻璃可独立显示 */
+  /** 内容结构上像可阅读文章，值得提供章节提醒 */
   isReadingCandidate: boolean;
   /** 持续对话 / 代理工作区：即使有过长标题也不展示 */
   isConversation: boolean;
   conversationReason: ConversationReason;
-  /** 页面背景、对比度和标题效果是否支持自然融合 */
-  isVisualSafe: boolean;
-  visualReason: VisualSafetyReason;
-  visualBackground: string;
   stats: HeadingStats;
   /** 稳定的本地诊断快照，不依赖页面后续是否保留 data 属性 */
   diagnostics: string;
@@ -384,7 +376,7 @@ function selectSectionHeadings(raw: HeadingNode[], lengths: number[]): HeadingNo
   return raw.filter((_, index) => selected.has(index));
 }
 
-/** 智能阅读模式：判断当前页面是否值得激活吸顶面包屑 */
+/** 智能阅读模式：判断当前页面是否值得激活章节胶囊 */
 function decideArticle(stats: HeadingStats, semanticScope: boolean): boolean {
   if (stats.headingCount < 2) return false;
   if (stats.scopeText < 400) return false;
@@ -568,10 +560,6 @@ export function buildHeadingIndex(): HeadingIndex | null {
         : Math.min(1, headings.length / bodyHeadingCount);
     const geometry = assessHeadingGeometry(headings);
     const columnAligned = geometry.reliable && geometry.alignedRatio >= 0.7;
-    const visualSafety = assessVisualSafety(
-      attempt.scope,
-      headings.map((heading) => heading.element),
-    );
     const stats: HeadingStats = {
       headingCount: headings.length,
       scopeText,
@@ -613,9 +601,6 @@ export function buildHeadingIndex(): HeadingIndex | null {
       `conv=${conversation.detected ? 1 : 0}`,
       `convReason=${conversation.reason}`,
       `convTurns=${conversation.turns}`,
-      `visual=${visualSafety.safe ? 1 : 0}`,
-      `visualReason=${visualSafety.reason}`,
-      `contrast=${visualSafety.contrast}`,
       `reading=${isReadingCandidate ? 1 : 0}`,
       `art=${isArticle ? 1 : 0}`,
     ].join(' ');
@@ -627,9 +612,6 @@ export function buildHeadingIndex(): HeadingIndex | null {
       isReadingCandidate,
       isConversation: conversation.detected,
       conversationReason: conversation.reason,
-      isVisualSafe: visualSafety.safe,
-      visualReason: visualSafety.reason,
-      visualBackground: visualSafety.background,
       stats,
       diagnostics,
     };

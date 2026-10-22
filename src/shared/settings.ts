@@ -1,15 +1,10 @@
 export type PillPosition = 'top-center' | 'top-right';
 export type ThemeMode = 'auto' | 'light' | 'dark';
-/** 显示策略：smart 智能浮现 / always 常驻 / peek 滚动时短暂出现 */
-export type DisplayPolicy = 'smart' | 'always' | 'peek';
+/** 显示策略：smart 智能浮现 / always 常驻 */
+export type DisplayPolicy = 'smart' | 'always';
 /** 原站已有可见目录时的行为：adapt 退让为极简指示器 / full 保持完整功能 */
 export type PageTocMode = 'adapt' | 'full';
 export type SiteAccess = 'all' | 'blocklist' | 'allowlist';
-/** 界面形态：bar 无痕阅读 / pill 液态玻璃 */
-export type Appearance = 'bar' | 'pill';
-/** 吸顶条宽度：full 满宽 / column 与正文列对齐 */
-export type BarWidth = 'full' | 'column';
-
 export interface FloatingPosition {
   /** 可移动区域内相对横坐标，0..100 */
   x: number;
@@ -35,10 +30,6 @@ export interface WssSettings {
   displayPolicy: DisplayPolicy;
   /** 原站目录适配策略 */
   pageTocMode: PageTocMode;
-  /** 界面形态 */
-  appearance: Appearance;
-  /** 吸顶条宽度 */
-  barWidth: BarWidth;
   /** 站点访问策略 */
   siteAccess: SiteAccess;
   /** 站点规则列表（黑名单 / 白名单） */
@@ -47,7 +38,7 @@ export interface WssSettings {
   floatingPositions: Record<string, FloatingPosition>;
 }
 
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 5;
 export const SETTINGS_KEY = 'wss:settings';
 
 export const DEFAULT_SETTINGS: WssSettings = {
@@ -60,8 +51,6 @@ export const DEFAULT_SETTINGS: WssSettings = {
   maxCrumbs: 3,
   displayPolicy: 'always',
   pageTocMode: 'adapt',
-  appearance: 'bar',
-  barWidth: 'full',
   siteAccess: 'all',
   sites: [],
   floatingPositions: {},
@@ -69,12 +58,9 @@ export const DEFAULT_SETTINGS: WssSettings = {
 
 const POSITIONS: readonly PillPosition[] = ['top-center', 'top-right'];
 const THEMES: readonly ThemeMode[] = ['auto', 'light', 'dark'];
-const POLICIES: readonly DisplayPolicy[] = ['smart', 'always', 'peek'];
+const POLICIES: readonly DisplayPolicy[] = ['smart', 'always'];
 const TOC_MODES: readonly PageTocMode[] = ['adapt', 'full'];
 const SITE_ACCESS: readonly SiteAccess[] = ['all', 'blocklist', 'allowlist'];
-const APPEARANCES: readonly Appearance[] = ['bar', 'pill'];
-const BAR_WIDTHS: readonly BarWidth[] = ['full', 'column'];
-
 const MIN_OFFSET = -20;
 const MAX_OFFSET = 400;
 const MIN_CRUMBS = 1;
@@ -151,6 +137,10 @@ export function normalizeSettings(raw: unknown): WssSettings {
       ? clamp(Math.round(input.maxCrumbs), MIN_CRUMBS, MAX_CRUMBS)
       : DEFAULT_SETTINGS.maxCrumbs;
 
+  const displayPolicy =
+    input.displayPolicy === 'peek'
+      ? 'smart'
+      : pick(input.displayPolicy, POLICIES, DEFAULT_SETTINGS.displayPolicy);
   return {
     version: SETTINGS_VERSION,
     enabled: typeof input.enabled === 'boolean' ? input.enabled : DEFAULT_SETTINGS.enabled,
@@ -162,10 +152,8 @@ export function normalizeSettings(raw: unknown): WssSettings {
         ? input.hideArticleTitle
         : DEFAULT_SETTINGS.hideArticleTitle,
     maxCrumbs,
-    displayPolicy: pick(input.displayPolicy, POLICIES, DEFAULT_SETTINGS.displayPolicy),
+    displayPolicy,
     pageTocMode: pick(input.pageTocMode, TOC_MODES, DEFAULT_SETTINGS.pageTocMode),
-    appearance: pick(input.appearance, APPEARANCES, DEFAULT_SETTINGS.appearance),
-    barWidth: pick(input.barWidth, BAR_WIDTHS, DEFAULT_SETTINGS.barWidth),
     siteAccess: pick(input.siteAccess, SITE_ACCESS, DEFAULT_SETTINGS.siteAccess),
     sites: normalizeSites(input.sites),
     floatingPositions: normalizeFloatingPositions(input.floatingPositions),

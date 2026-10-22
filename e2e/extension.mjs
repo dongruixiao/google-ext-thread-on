@@ -1,6 +1,6 @@
 /**
  * 端到端验证：用真实浏览器加载打包后的 dist/，
- * 检查注入、吸顶条形态、层级、跳转、显示策略、原站目录适配与设置链路。
+ * 检查注入、可拖动液态玻璃胶囊、层级、跳转、显示策略、原站目录适配与设置链路。
  *
  *   npm run build && npm run e2e
  *
@@ -20,8 +20,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const EXTENSION_DIR = join(HERE, '..', 'dist');
 const EXPECTED_HEADINGS = 7; // h1 + 3×h2 + 3×h3（侧边栏与页脚的标题必须被排除）
 const TOPBAR_HEIGHT = 57; // fixture 顶栏 56px + 1px 边框
-const BAR_DETECT_HEIGHT = 56; // 判定基准线用的固定条高
-const READING_LINE = TOPBAR_HEIGHT + BAR_DETECT_HEIGHT + 2;
+const READING_LINE = TOPBAR_HEIGHT + 10;
 
 const failures = [];
 const report = {};
@@ -70,26 +69,18 @@ const probe = (page) =>
     const host = document.getElementById('__web_sticky_scroll_host__');
     const shadow = host?.shadowRoot;
     const root = shadow?.querySelector('.wss-root');
-    const surface = root?.dataset.appearance === 'bar' ? '.wss-bar-inner' : '.wss-pill';
-    const active = shadow?.querySelector(surface);
-    const crumbs = [...(active?.querySelectorAll('.wss-crumb') ?? [])].map((node) => node.textContent);
-    const clone = shadow?.querySelector('[data-wss-clone="true"]');
+    const active = shadow?.querySelector('.wss-pill');
     const glassTitle = shadow?.querySelector('.wss-glass-title');
-    const bar = shadow?.querySelector('.wss-bar');
-    const barStyle = bar ? getComputedStyle(bar) : null;
-    const titleMaskStyle = root ? getComputedStyle(root, '::before') : null;
     const drawer = shadow?.querySelector('.wss-drawer');
     const drawerStyle = drawer ? getComputedStyle(drawer) : null;
     const pill = shadow?.querySelector('.wss-pill');
     const pillStyle = pill ? getComputedStyle(pill) : null;
     const progressLayer = shadow?.querySelector('.wss-global-progress');
     const progressRect = progressLayer?.getBoundingClientRect();
-    const article = document.querySelector('article');
-    const anchor = root?.dataset.appearance === 'bar' ? clone : glassTitle;
     return {
       host: !!host,
       attachedToHtml: host?.parentElement?.tagName === 'HTML',
-      appearance: root?.dataset.appearance ?? null,
+      pill: !!active,
       position: root?.dataset.position ?? null,
       dragging: root?.dataset.dragging ?? null,
       floatingLeft: root ? Math.round(Number.parseFloat(root.style.left) || 0) : null,
@@ -97,14 +88,6 @@ const probe = (page) =>
       visible: root?.dataset.visible ?? null,
       compact: root?.dataset.compact ?? null,
       top: Number.parseFloat(root?.style.getPropertyValue('--wss-top') ?? 'NaN'),
-      hasBarSheet: !!shadow?.querySelector('.wss-bar-sheet'),
-      barBackground: barStyle?.backgroundColor ?? null,
-      barShadow: barStyle?.boxShadow ?? null,
-      barBorderWidth: barStyle?.borderBottomWidth ?? null,
-      titleMaskBackground: titleMaskStyle?.backgroundImage ?? null,
-      titleMaskFilter: titleMaskStyle?.filter ?? null,
-      titleMaskHeight: titleMaskStyle ? Math.round(Number.parseFloat(titleMaskStyle.height)) : null,
-      titleMaskWidth: titleMaskStyle ? Math.round(Number.parseFloat(titleMaskStyle.width)) : null,
       drawerBackground: drawerStyle?.backgroundColor ?? null,
       drawerShadow: drawerStyle?.boxShadow ?? null,
       drawerBackdrop: drawerStyle?.backdropFilter ?? null,
@@ -113,21 +96,39 @@ const probe = (page) =>
       pillShadow: pillStyle?.boxShadow ?? null,
       progressTop: progressRect ? Math.round(progressRect.top) : null,
       progressHeight: progressRect ? Math.round(progressRect.height) : null,
+      progressVisible: progressLayer?.dataset.visible ?? null,
       surfaceTop: active ? Math.round(active.getBoundingClientRect().top) : null,
-      barHeight: Math.round(shadow?.querySelector('.wss-bar')?.getBoundingClientRect().height ?? 0),
-      cloneText: clone?.textContent?.trim() ?? null,
       glassTitle: glassTitle?.textContent?.trim() ?? null,
-      cloneHeight: Math.round(clone?.getBoundingClientRect().height ?? 0),
-      crumbLeft: anchor ? Math.round(anchor.getBoundingClientRect().left) : null,
-      articleLeft: article ? Math.round(article.getBoundingClientRect().left) : null,
-      crumbs,
+      pillHeight: active ? Math.round(active.getBoundingClientRect().height) : null,
       drawerPath: [...(shadow?.querySelectorAll('.wss-drawer-path .wss-crumb') ?? [])].map(
         (node) => node.textContent,
       ),
       rows: shadow?.querySelectorAll('.wss-row').length ?? 0,
       drawerOpen: shadow?.querySelector('.wss-drawer')?.classList.contains('is-open') ?? null,
+      drawerPlacement: shadow?.querySelector('.wss-below')?.dataset.placement ?? null,
+      drawerAlign: root?.dataset.drawerAlign ?? null,
+      drawerRect: drawer
+        ? {
+            left: Math.round(drawer.getBoundingClientRect().left),
+            right: Math.round(drawer.getBoundingClientRect().right),
+            top: Math.round(drawer.getBoundingClientRect().top),
+            bottom: Math.round(drawer.getBoundingClientRect().bottom),
+          }
+        : null,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
       scrollY: Math.round(window.scrollY),
     };
+  });
+
+const pillPoint = (page) =>
+  page.evaluate(() => {
+    const rect = document
+      .getElementById('__web_sticky_scroll_host__')
+      ?.shadowRoot?.querySelector('.wss-pill')
+      ?.getBoundingClientRect();
+    return rect
+      ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+      : null;
   });
 
 try {
@@ -175,10 +176,6 @@ try {
     unsafeColor.headings >= 3 && unsafeColor.host,
     unsafeColor,
   );
-  const modeOptions = await context.newPage();
-  await modeOptions.goto(`chrome-extension://${extensionId}/src/options/options.html`);
-  await modeOptions.selectOption('#appearance', 'pill');
-  await unsafeColorPage.reload({ waitUntil: 'load' });
   await unsafeColorPage.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await unsafeColorPage.waitForTimeout(1200);
   const unsafeGlass = await unsafeColorPage.evaluate(() => {
@@ -186,20 +183,16 @@ try {
     const root = shadow?.querySelector('.wss-root');
     const pill = shadow?.querySelector('.wss-pill');
     return {
-      appearance: root?.dataset.appearance ?? null,
+      pill: !!pill,
       title: shadow?.querySelector('.wss-glass-title')?.textContent?.trim() ?? null,
       pill: !!pill,
       progressTop: Math.round(shadow?.querySelector('.wss-global-progress')?.getBoundingClientRect().top ?? -1),
     };
   });
-  await modeOptions.selectOption('#appearance', 'bar');
-  await unsafeColorPage.waitForTimeout(600);
-  await modeOptions.close();
   await unsafeColorPage.close();
   check(
-    '复杂背景可手动使用液态玻璃',
-    unsafeGlass.appearance === 'pill' &&
-      unsafeGlass.pill &&
+    '复杂背景可使用液态玻璃',
+    unsafeGlass.pill &&
       !!unsafeGlass.title &&
       unsafeGlass.progressTop === 0,
     unsafeGlass,
@@ -212,47 +205,24 @@ try {
     console.error('内容脚本没有注入，后续断言无法进行');
     process.exit(1);
   }
-  check('默认是吸顶条形态', atTop.appearance === 'bar', atTop.appearance);
+  check('默认使用液态玻璃胶囊', atTop.pill === true, atTop.pill);
   check('页面顶部保持静默', atTop.visible === 'false', atTop);
 
-  // 向下滚动：吸顶条浮现，且默认不显示文章大标题
+  // 向下滚动：玻璃胶囊浮现，且默认不显示文章大标题
   await page.mouse.wheel(0, 1400);
   await page.waitForTimeout(400);
   const scrolled = await probe(page);
   check('向下滚动后浮现', scrolled.visible === 'true', scrolled);
-  check('无痕标题紧贴在页面顶部进度线下方', Math.abs(scrolled.top - 1) <= 1, scrolled.top);
+  check('玻璃胶囊避让固定顶栏', Math.abs(scrolled.top - (TOPBAR_HEIGHT + 10)) <= 1, scrolled.top);
   check(
-    '无痕模式使用与标题同高的全宽液态玻璃',
-    !scrolled.hasBarSheet &&
-      scrolled.barBackground === 'rgba(0, 0, 0, 0)' &&
-      scrolled.barShadow === 'none' &&
-      scrolled.barBorderWidth === '0px' &&
-      !!scrolled.titleMaskBackground?.includes('linear-gradient') &&
-      scrolled.titleMaskHeight === scrolled.barHeight &&
-      scrolled.titleMaskWidth === 1280,
+    '玻璃胶囊保持紧凑单行',
+    !!scrolled.glassTitle && scrolled.pillHeight === 38,
     scrolled,
   );
-  const transparentArea = await page.evaluate(() => {
-    const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
-    const bar = shadow.querySelector('.wss-bar').getBoundingClientRect();
-    const hit = document.elementFromPoint(bar.right - 8, bar.top + bar.height / 2);
-    return {
-      hit: hit?.id || hit?.tagName || null,
-      hitsPlugin: hit?.id === '__web_sticky_scroll_host__',
-    };
-  });
-  check('无图板的空白区域不拦截页面点击', !transparentArea.hitsPlugin, transparentArea);
   check(
-    '条里只显示当前小节标题',
-    !!scrolled.cloneText &&
-      !scrolled.cloneText.includes('端到端验证用文章') &&
-      scrolled.crumbs.length === 0,
-    { cloneText: scrolled.cloneText, crumbs: scrolled.crumbs },
-  );
-  check(
-    '吸顶层高度与标题自身行高一致',
-    Math.abs(scrolled.barHeight - scrolled.cloneHeight) <= 1,
-    { barHeight: scrolled.barHeight, cloneHeight: scrolled.cloneHeight },
+    '胶囊里只显示当前小节标题',
+    !!scrolled.glassTitle && !scrolled.glassTitle.includes('端到端验证用文章'),
+    scrolled.glassTitle,
   );
   check('大纲包含全部正文标题', scrolled.rows === EXPECTED_HEADINGS, scrolled.rows);
   const stickyState = await page.evaluate(() => {
@@ -264,42 +234,20 @@ try {
     };
   });
   check(
-    '正文粘性元素与固定侧栏不会把吸顶条带偏',
-    stickyState.stickyTop === 0 && scrolled.top === 1,
-    { ...stickyState, barTop: scrolled.top },
-  );
-  check(
-    '吸顶条文字与正文列对齐',
-    scrolled.crumbLeft !== null &&
-      scrolled.articleLeft !== null &&
-      Math.abs(scrolled.crumbLeft - scrolled.articleLeft) <= 2,
-    { crumbLeft: scrolled.crumbLeft, articleLeft: scrolled.articleLeft },
+    '正文粘性元素与固定侧栏不会把胶囊带偏',
+    stickyState.stickyTop === 0 && scrolled.top === TOPBAR_HEIGHT + 10,
+    { ...stickyState, pillTop: scrolled.top },
   );
 
-  // 克隆出来的标题必须和页面里那个标题渲染得一模一样
-  const fidelity = await page.evaluate(() => {
-    const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
-    const clone = shadow.querySelector('[data-wss-clone="true"]');
-    const source = [...document.querySelectorAll('h1,h2,h3,h4')].find(
-      (node) => node.textContent.trim() === clone?.textContent?.trim(),
-    );
-    const snapshot = (element) => {
-      const style = getComputedStyle(element);
-      return [style.fontSize, style.fontWeight, style.lineHeight, style.fontFamily].join(' | ');
-    };
-    return { clone: snapshot(clone), source: snapshot(source), match: snapshot(clone) === snapshot(source) };
-  });
-  check('吸顶条标题保持页面同款字体与字号', fidelity.match, fidelity);
-
-  // 吸顶时机不变式：条里显示的标题，必须已经滑到条的后面
+  // 标题交接不变式：胶囊里显示的标题，必须已经滑到停靠线之后
   // （向下滚不会提前显示还露在下面的标题；回滚时上级标题一露头就会交接）
   const timingScan = await page.evaluate(async () => {
     const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
-    // 用吸顶区顶部（站点顶栏下方）而不是入场动画途中的实际位置
-    const barTop = () => Math.round(shadow.querySelector('.wss-root').style.getPropertyValue('--wss-top').replace('px', '')) || 0;
+    // 用胶囊停靠基准线，而不是入场动画途中的实际位置
+    const dockTop = () => Math.round(shadow.querySelector('.wss-root').style.getPropertyValue('--wss-top').replace('px', '')) || 0;
     const visible = () => shadow.querySelector('.wss-root').dataset.visible === 'true';
     const cloneText = () =>
-      shadow.querySelector('[data-wss-clone="true"]')?.textContent?.trim() ?? null;
+      shadow.querySelector('.wss-glass-title')?.textContent?.trim() ?? null;
     const source = (text) =>
       [...document.querySelectorAll('h1,h2,h3,h4')].find((node) => node.textContent.trim() === text);
     const frame = () =>
@@ -314,17 +262,17 @@ try {
       const text = cloneText();
       const node = text ? source(text) : null;
       if (!node) return;
-      const delta = Math.round(node.getBoundingClientRect().top - barTop());
+      const delta = Math.round(node.getBoundingClientRect().top - dockTop());
       samples.push(delta);
       // delta > 0 表示这个标题还露在条下面 —— 不该已经显示在条里
-      if (delta > 24) {
+      if (delta > 8) {
         violations.push({
           text: text.slice(0, 10),
           tag: node.tagName,
           delta,
           top: Math.round(node.getBoundingClientRect().top),
-          barTop: Math.round(barTop()),
-          barHeight: Math.round(shadow.querySelector('.wss-bar').getBoundingClientRect().height),
+          dockTop: Math.round(dockTop()),
+          pillHeight: Math.round(shadow.querySelector('.wss-pill').getBoundingClientRect().height),
           y: Math.round(window.scrollY),
         });
       }
@@ -348,7 +296,7 @@ try {
     };
   });
   check(
-    '条里只显示已经滑到条后面的标题（向下不提前 / 回滚不赖着下级）',
+    '胶囊只显示已经滑过停靠线的标题（向下不提前 / 回滚不赖着下级）',
     timingScan.samples > 50 && timingScan.violations.length === 0,
     timingScan,
   );
@@ -365,8 +313,8 @@ try {
     const finalHeading = headings.at(-1)?.textContent?.trim() ?? null;
 
     const inspect = () => {
-      const clone = shadow.querySelector('[data-wss-clone="true"]');
-      const text = clone?.textContent?.trim() ?? null;
+      const title = shadow.querySelector('.wss-glass-title');
+      const text = title?.textContent?.trim() ?? null;
       const source = text ? headings.find((node) => node.textContent.trim() === text) : null;
       return {
         visible: root.dataset.visible === 'true',
@@ -458,13 +406,7 @@ try {
   );
 
   // 原站目录可见时退让：只显示当前小节，且悬停不弹抽屉
-  const barPoint = await page.evaluate(() => {
-    const rect = document
-      .getElementById('__web_sticky_scroll_host__')
-      .shadowRoot.querySelector('.wss-bar-inner')
-      .getBoundingClientRect();
-    return { x: rect.left + 240, y: rect.top + rect.height / 2 };
-  });
+  const barPoint = await pillPoint(page);
   await page.mouse.move(barPoint.x, barPoint.y);
   await page.waitForTimeout(400);
   const withToc = await probe(page);
@@ -489,7 +431,8 @@ try {
       /%$/.test(outlinePanel.progress) &&
       withToc.drawerShadow === 'none' &&
       withToc.drawerBackdrop === 'none' &&
-      !!withToc.drawerBackground?.startsWith('rgb('),
+      (!!withToc.drawerBackground?.startsWith('rgb(') ||
+        !!withToc.drawerBackground?.startsWith('color(srgb')),
     outlinePanel,
   );
 
@@ -517,7 +460,7 @@ try {
   await page.evaluate(() => {
     document
       .getElementById('__web_sticky_scroll_host__')
-      .shadowRoot.querySelector('.wss-bar-heading')
+      .shadowRoot.querySelector('.wss-glass-title')
       .click();
   });
   await page.mouse.move(10, 600);
@@ -546,7 +489,7 @@ try {
     unpinnedState,
   );
 
-  // 重新悬停打开，点击第一级（祖先小节）：落点停在吸顶条下方
+  // 重新悬停打开，点击第一级（祖先小节）：落点停在胶囊下方
   await page.mouse.move(barPoint.x, barPoint.y);
   await page.waitForTimeout(400);
   const reopened = await probe(page);
@@ -569,11 +512,11 @@ try {
     const heading = [...document.querySelectorAll('h1,h2,h3,h4')].find(
       (node) => node.textContent.trim() === text,
     );
-    const clone = shadow.querySelector('[data-wss-clone="true"]');
+    const title = shadow.querySelector('.wss-glass-title');
     return {
       clicked: text,
       top: Math.round(heading?.getBoundingClientRect().top ?? -1),
-      shown: clone?.textContent?.trim() ?? null,
+      shown: title?.textContent?.trim() ?? null,
     };
   }, clickedText);
   check(
@@ -583,7 +526,7 @@ try {
   );
   check('跳转后吸顶标题跟随目标小节', landed.shown === landed.clicked, landed);
   const afterJump = await probe(page);
-  check('跳转后吸顶条保持可见', afterJump.visible === 'true', afterJump);
+  check('跳转后胶囊保持可见', afterJump.visible === 'true', afterJump);
 
   // 键盘阅读流：Alt+] / Alt+[ 在相邻标题之间移动
   await page.keyboard.press('Alt+]');
@@ -594,9 +537,9 @@ try {
   const keyboardPrevious = await probe(page);
   check(
     '键盘可跳到下一节 / 上一节',
-    keyboardNext.cloneText === '小节二：边界处理' &&
-      keyboardPrevious.cloneText === '第二节：实现方式',
-    { next: keyboardNext.cloneText, previous: keyboardPrevious.cloneText },
+    keyboardNext.glassTitle === '小节二：边界处理' &&
+      keyboardPrevious.glassTitle === '第二节：实现方式',
+    { next: keyboardNext.glassTitle, previous: keyboardPrevious.glassTitle },
   );
 
   // 浏览器页面查找（Ctrl/⌘+F）：不能压住查找条，也不能挡住被滚到顶部的命中文字
@@ -785,86 +728,142 @@ try {
     { ...faultResult, pageErrors: faultPageErrors },
   );
 
-  // options：切显示策略为智能、形态切回胶囊 → 页面实时响应
+  // options：只保留智能 / 常驻；切换到智能后页面实时响应
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);
   await options.waitForTimeout(500);
   await page.bringToFront();
   const optionsState = await options.evaluate(() => ({
     sections: document.querySelectorAll('section h2').length,
-    appearance: document.querySelector('#appearance')?.value,
     hideTitle: document.querySelector('#hideArticleTitle')?.checked,
+    policy: document.querySelector('#displayPolicy')?.value,
   }));
-  check('options 正常渲染', optionsState.sections >= 4 && optionsState.appearance === 'bar', optionsState);
+  check('options 正常渲染', optionsState.sections >= 4 && optionsState.policy === 'always', optionsState);
 
-  await options.selectOption('#appearance', 'pill');
   await options.selectOption('#displayPolicy', 'smart');
   await options.waitForTimeout(700);
   const switched = await probe(page);
   check(
-    '切换形态实时生效',
-    switched.appearance === 'pill' &&
+    '智能策略下液态玻璃胶囊保持稳定',
+    switched.pill &&
       Math.abs(switched.top - (TOPBAR_HEIGHT + 10)) <= 1 &&
       !!switched.glassTitle &&
       !!switched.pillBackground?.includes('linear-gradient') &&
       switched.pillShadow !== 'none',
     switched,
   );
-  const pillRect = await page.evaluate(() => {
-    const rect = document
-      .getElementById('__web_sticky_scroll_host__')
-      .shadowRoot.querySelector('.wss-pill')
-      .getBoundingClientRect();
-    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-  });
-  await page.mouse.move(pillRect.x, pillRect.y);
+
+  await page.evaluate(() => window.scrollTo(0, 2200));
+  await page.waitForTimeout(500);
+  await page.mouse.move(10, 600);
+  await page.mouse.wheel(0, -320);
+  await page.waitForTimeout(450);
+  const scrolledUp = await probe(page);
+  check(
+    '智能策略向上滚动收起胶囊',
+    scrolledUp.visible === 'false',
+    scrolledUp,
+  );
+  check(
+    '胶囊收起时全局阅读进度仍留在视口顶部',
+    scrolledUp.progressVisible === 'true' &&
+      scrolledUp.progressTop === 0 &&
+      scrolledUp.progressHeight === 1,
+    scrolledUp,
+  );
+  await page.mouse.wheel(0, 320);
+  await page.waitForTimeout(450);
+
+  const pillBeforeDrag = await pillPoint(page);
+  await page.mouse.move(pillBeforeDrag.x, pillBeforeDrag.y);
   await page.mouse.down();
   await page.mouse.move(240, 520, { steps: 10 });
   await page.mouse.up();
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(500);
+  await page.mouse.move(240, 520);
+  await page.waitForTimeout(350);
   const dragged = await probe(page);
+  check(
+    '液态玻璃胶囊可自由拖动并记住位置',
+    dragged.position === 'custom' &&
+      dragged.floatingLeft > 100 &&
+      dragged.floatingTop > 400,
+    dragged,
+  );
+  check(
+    '拖到页面下半部时目录向上展开并留在视口内',
+    dragged.drawerPlacement === 'above' &&
+      dragged.drawerRect !== null &&
+      dragged.drawerRect.top >= 0 &&
+      dragged.drawerRect.bottom < dragged.surfaceTop &&
+      dragged.drawerRect.left >= 0 &&
+      dragged.drawerRect.right <= dragged.viewport.width,
+    dragged,
+  );
+
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(1000);
   const draggedPersisted = await probe(page);
   check(
-    '液态玻璃可自由拖动并记住位置',
-    dragged.position === 'custom' &&
-      dragged.floatingLeft > 100 &&
-      dragged.floatingTop > 400 &&
-      draggedPersisted.position === 'custom' &&
+    '刷新页面后按站点恢复拖动位置',
+    draggedPersisted.position === 'custom' &&
       Math.abs(draggedPersisted.floatingLeft - dragged.floatingLeft) <= 2 &&
       Math.abs(draggedPersisted.floatingTop - dragged.floatingTop) <= 2,
     { dragged, persisted: draggedPersisted },
   );
 
-  // 智能策略：向上滚动让位
-  await page.mouse.move(10, 600);
-  await page.mouse.wheel(0, -600);
-  await page.waitForTimeout(400);
-  const scrolledUp = await probe(page);
-  check('智能策略向上滚动收起', scrolledUp.visible === 'false', scrolledUp);
-
-  // 吸顶条可以切成与正文列同宽
-  await options.selectOption('#appearance', 'bar');
-  await options.selectOption('#barWidth', 'column');
-  await page.mouse.wheel(0, 700);
-  await options.waitForTimeout(700);
-  const columnBar = await page.evaluate(() => {
-    const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
-    const bar = shadow.querySelector('.wss-bar').getBoundingClientRect();
-    const article = document.querySelector('article').getBoundingClientRect();
+  await page.setViewportSize({ width: 860, height: 560 });
+  await page.waitForTimeout(500);
+  const resized = await page.evaluate(() => {
+    const shadow = document.getElementById('__web_sticky_scroll_host__')?.shadowRoot;
+    const pill = shadow?.querySelector('.wss-pill')?.getBoundingClientRect();
     return {
-      visible: shadow.querySelector('.wss-root').dataset.visible,
-      bar: [Math.round(bar.left), Math.round(bar.right)],
-      article: [Math.round(article.left), Math.round(article.right)],
+      left: pill ? Math.round(pill.left) : null,
+      top: pill ? Math.round(pill.top) : null,
+      right: pill ? Math.round(pill.right) : null,
+      bottom: pill ? Math.round(pill.bottom) : null,
+      width: window.innerWidth,
+      height: window.innerHeight,
     };
   });
   check(
-    '吸顶条可切成与正文列同宽',
-    columnBar.visible === 'true' &&
-      Math.abs(columnBar.bar[0] - columnBar.article[0]) <= 2 &&
-      Math.abs(columnBar.bar[1] - columnBar.article[1]) <= 2,
-    columnBar,
+    '缩小窗口后胶囊自动夹在可视区域内',
+    resized.left !== null &&
+      resized.top !== null &&
+      resized.right !== null &&
+      resized.bottom !== null &&
+      resized.left >= 8 &&
+      resized.top >= 8 &&
+      resized.right <= resized.width - 8 &&
+      resized.bottom <= resized.height - 8,
+    resized,
+  );
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.evaluate(() => window.scrollTo(0, 1000));
+  await page.waitForTimeout(500);
+  await page.evaluate(() => window.scrollTo(0, 1400));
+  await page.waitForTimeout(500);
+  const beforeReset = await probe(page);
+  check('双击复位前胶囊可见', beforeReset.visible === 'true', beforeReset);
+  const resetPoint = await pillPoint(page);
+  await page.mouse.dblclick(resetPoint.x, resetPoint.y);
+  await page.waitForTimeout(500);
+  const reset = await probe(page);
+  check(
+    '双击胶囊恢复默认顶部位置',
+    reset.position === 'top-center' &&
+      Math.abs(reset.surfaceTop - (TOPBAR_HEIGHT + 10)) <= 1,
+    reset,
+  );
+
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(900);
+  const resetPersisted = await probe(page);
+  check(
+    '恢复默认位置后刷新仍保持默认',
+    resetPersisted.position === 'top-center',
+    resetPersisted,
   );
 
   check('运行期间没有页面报错', pageErrors.length === 0, pageErrors);
@@ -879,7 +878,6 @@ try {
   const popupState = await popup.evaluate(() => ({
     title: document.querySelector('h1')?.textContent ?? '',
     policy: document.querySelector('#displayPolicy')?.value ?? '',
-    appearance: document.querySelector('#appearance')?.value ?? '',
     siteButtonDisabled: document.querySelector('#site')?.disabled ?? true,
     hasDiagnostics: !!document.querySelector('#copy'),
   }));

@@ -25,10 +25,7 @@ export const SECTION_PROGRESS_EPS = 0.004;
 /** 停止滚动多久后开始淡出（智能策略） */
 export const IDLE_DIM_DELAY = 2600;
 
-/** 轻提示策略下，停止滚动多久后完全收起 */
-export const PEEK_HIDE_DELAY = 1600;
-
-/** 空闲检查间隔：用于淡出/收起这类与滚动无关的状态推进 */
+/** 空闲检查间隔：用于智能模式淡出等与滚动无关的状态推进 */
 export const IDLE_TICK_INTERVAL = 400;
 
 /** 原站目录可见性的探测间隔 */

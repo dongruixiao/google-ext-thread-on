@@ -2,12 +2,10 @@
  * 判断页面顶部的到底是「站点框架」（导航条 / 遮罩），还是正文内容（粘性小节头等）。
  *
  * 目的：
- * 1. 站点导航条 → 吸顶条贴在它下面；
- * 2. 正文里的 sticky 元素 → 完全无视（否则条会跟着它掉到页面中间）；
+ * 1. 站点导航条 → 默认胶囊贴在它下面；
+ * 2. 正文里的 sticky 元素 → 完全无视（否则胶囊会跟着它掉到页面中间）；
  * 3. 全屏遮罩 / 对话框 → 收起 UI，不要浮在别人头上。
  */
-
-import { isOpaqueColor } from './palette';
 
 export interface ChromeCandidate {
   /** 元素顶部（视口坐标） */
@@ -51,6 +49,11 @@ const MIN_BLOCKER_HEIGHT_RATIO = 0.6;
 /** 弹层（站点搜索面板、对话框）至少要有这么大，才值得让位 */
 const MIN_DIALOG_WIDTH_RATIO = 0.2;
 const MIN_DIALOG_HEIGHT = 80;
+const TRANSPARENT = /^(transparent|rgba\(0,\s*0,\s*0,\s*0\))$/;
+
+function isOpaqueColor(color: string | undefined | null): boolean {
+  return !!color && !TRANSPARENT.test(color.trim());
+}
 
 export function classifyTopChrome(candidates: ChromeCandidate[], viewport: Viewport): TopChrome {
   const cap = viewport.height * MAX_BAR_HEIGHT_RATIO;

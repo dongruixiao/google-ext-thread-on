@@ -55,7 +55,7 @@ const shoot = async (page, file, scrollY, options = {}) => {
     const point = await page.evaluate(() => {
       const rect = document
         .getElementById('__web_sticky_scroll_host__')
-        .shadowRoot.querySelector('.wss-bar-inner, .wss-pill')
+        .shadowRoot.querySelector('.wss-pill')
         .getBoundingClientRect();
       return { x: rect.left + Math.min(220, rect.width / 2), y: rect.top + rect.height / 2 };
     });
@@ -68,13 +68,13 @@ const shoot = async (page, file, scrollY, options = {}) => {
 
 mkdirSync(OUT_DIR, { recursive: true });
 
-// 1) 浅色：吸顶条 + 正文
+// 1) 浅色：默认液态玻璃胶囊 + 正文
 await applySettings({
-  appearance: 'bar',
   theme: 'auto',
   displayPolicy: 'always',
   position: 'top-center',
   enabled: true,
+  floatingPositions: {},
 });
 const light = await context.newPage();
 await light.goto(url, { waitUntil: 'load' });
@@ -91,20 +91,36 @@ const dark = await context.newPage();
 await dark.goto(`${url}?dark=1`, { waitUntil: 'load' });
 await dark.mouse.move(640, 400);
 await dark.waitForTimeout(1200);
-await shoot(dark, '03-dark-site.png', 1000);
+  await shoot(dark, '03-dark-site.png', 1000);
 await dark.close();
 
-// 4) 悬浮胶囊形态
-await applySettings({ appearance: 'pill' });
+// 4) 自由拖动到文章右下角，目录自动向上展开
 const pill = await context.newPage();
 await pill.goto(url, { waitUntil: 'load' });
 await pill.mouse.move(640, 400);
 await pill.waitForTimeout(1200);
-await shoot(pill, '04-pill.png', 900, { hover: true });
+await pill.evaluate(() => window.scrollTo(0, 1100));
+await pill.waitForTimeout(500);
+const start = await pill.evaluate(() => {
+  const rect = document
+    .getElementById('__web_sticky_scroll_host__')
+    .shadowRoot.querySelector('.wss-pill')
+    .getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+});
+await pill.mouse.move(start.x, start.y);
+await pill.mouse.down();
+await pill.mouse.move(960, 680, { steps: 12 });
+await pill.mouse.up();
+await pill.waitForTimeout(500);
+await pill.mouse.move(960, 680);
+await pill.waitForTimeout(500);
+await pill.screenshot({ path: join(OUT_DIR, '04-draggable-pill.png') });
+console.log('✓', '04-draggable-pill.png');
 await pill.close();
 
 // 恢复默认
-await applySettings({ appearance: 'bar' });
+await applySettings({ position: 'top-center', floatingPositions: {} });
 
 await context.close();
 server.close();

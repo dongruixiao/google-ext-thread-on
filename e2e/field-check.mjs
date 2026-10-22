@@ -5,7 +5,7 @@
  *   WSS_CHROME_PATH=... npm run field-check              # 跑内置站点列表
  *   WSS_CHROME_PATH=... npm run field-check https://...  # 只跑指定页面
  *
- * 输出每个站点的：是否注入、识别到的正文容器、标题数量、吸顶条位置、
+ * 输出每个站点的：是否注入、识别到的正文容器、标题数量、胶囊状态、
  * 是否与原站目录共存、以及页面报错。
  */
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -35,7 +35,7 @@ const DEFAULT_TARGETS = [
   { name: 'Paul Graham 长文', url: 'https://paulgraham.com/lisp.html', expect: 'silent', note: '无小节标题' },
   { name: 'ar5iv 论文', url: 'https://ar5iv.labs.arxiv.org/html/1706.03762', expect: 'active' },
   { name: 'Cornell 法律条目', url: 'https://www.law.cornell.edu/wex/contract', expect: 'active' },
-  // 整宽 main 里塞了左侧目录的文档站：吸顶标题必须对齐正文列，而不是贴视口左边
+  // 整宽 main 里塞了左侧目录的文档站：胶囊与原站目录应能共存
   { name: 'pi.dev 文档', url: 'https://pi.dev/docs/latest', expect: 'active' },
   // 不该激活：列表页、搜索结果、营销首页
   { name: 'HN 列表', url: 'https://news.ycombinator.com/', expect: 'silent' },
@@ -76,12 +76,10 @@ const inspect = (page) =>
     const host = document.getElementById('__web_sticky_scroll_host__');
     const shadow = host?.shadowRoot;
     const root = shadow?.querySelector('.wss-root');
-    const clone = shadow?.querySelector('[data-wss-clone="true"]');
-    const barHeight = shadow?.querySelector('.wss-bar')?.getBoundingClientRect().height ?? null;
-    const cloneHeight = clone?.getBoundingClientRect().height ?? null;
-    const scrimHeight = root
-      ? Number.parseFloat(getComputedStyle(root, '::before').height)
-      : null;
+    const pill = shadow?.querySelector('.wss-pill');
+    const pillRect = pill?.getBoundingClientRect();
+    const progress = shadow?.querySelector('.wss-global-progress');
+    const progressRect = progress?.getBoundingClientRect();
     const scope = document.querySelector('[data-wss-scope], [data-wss-stats]');
     const dockTop = Number.parseFloat(root?.style.getPropertyValue('--wss-top') ?? 'NaN');
 
@@ -101,35 +99,10 @@ const inspect = (page) =>
       }
     }
 
-    const shownHeading = clone?.textContent?.trim() ?? null;
+    const shownHeading = shadow?.querySelector('.wss-glass-title')?.textContent?.trim() ?? null;
     const source = shownHeading
       ? [...document.querySelectorAll('h1,h2,h3,h4')].find((node) => node.textContent.trim() === shownHeading)
       : null;
-
-    // 参考列：用网页自己的段落算出正文文字列（与插件实现无关）
-    const columnRef = (() => {
-      let best = [];
-      for (const scope of document.querySelectorAll('main, article, [role="main"]')) {
-        const paragraphs = [...scope.querySelectorAll('p')].filter((paragraph) => {
-          if (
-            paragraph.closest(
-              'nav, aside, footer, header, [role="navigation"], [role="complementary"], #__web_sticky_scroll_host__',
-            )
-          ) {
-            return false;
-          }
-          const rect = paragraph.getBoundingClientRect();
-          return rect.width >= 160 && rect.height > 0;
-        });
-        if (paragraphs.length > best.length) best = paragraphs;
-      }
-      if (best.length === 0) return null;
-      const lefts = best.map((p) => Math.round(p.getBoundingClientRect().left)).sort((a, b) => a - b);
-      const rights = best.map((p) => Math.round(p.getBoundingClientRect().right)).sort((a, b) => a - b);
-      const mid = Math.floor(lefts.length / 2);
-      return { left: lefts[mid], right: rights[mid], count: best.length };
-    })();
-    const cloneLeft = clone ? Math.round(clone.getBoundingClientRect().left) : null;
 
     // 结构指标：用来区分「长文」和「导航/营销/搜索页」
     const metrics = (() => {
@@ -174,17 +147,21 @@ const inspect = (page) =>
       headings: shadow?.querySelectorAll('.wss-row').length ?? 0,
       visible: root?.dataset.visible ?? null,
       compact: root?.dataset.compact ?? null,
-      appearance: root?.dataset.appearance ?? null,
       dockTop: Number.isFinite(dockTop) ? Math.round(dockTop) : null,
       siteHeader,
       shownHeading: shownHeading ? shownHeading.slice(0, 24) : null,
-      barHeight: barHeight === null ? null : Math.round(barHeight),
-      cloneHeight: cloneHeight === null ? null : Math.round(cloneHeight),
-      scrimHeight: scrimHeight === null || !Number.isFinite(scrimHeight) ? null : Math.round(scrimHeight),
-      columnRef,
-      cloneLeft,
-      // 吸顶标题与正文文字列的偏差（越接近 0 越好）
-      alignmentDelta: cloneLeft !== null && columnRef ? cloneLeft - columnRef.left : null,
+      pill: !!pill,
+      pillRect: pillRect
+        ? {
+            left: Math.round(pillRect.left),
+            top: Math.round(pillRect.top),
+            right: Math.round(pillRect.right),
+            bottom: Math.round(pillRect.bottom),
+            height: Math.round(pillRect.height),
+          }
+        : null,
+      progressTop: progressRect ? Math.round(progressRect.top) : null,
+      progressHeight: progressRect ? Math.round(progressRect.height) : null,
       shownHeadingOffset: source ? Math.round(source.getBoundingClientRect().top - (Number.isFinite(dockTop) ? dockTop : 0)) : null,
       scrollY: Math.round(window.scrollY),
       docHeight: Math.round(document.documentElement.scrollHeight),
@@ -250,6 +227,7 @@ const startInstrumentation = (page) =>
 
 const results = [];
 let mismatches = 0;
+let inconclusive = 0;
 for (const target of targets) {
   const page = await context.newPage();
   const errors = [];
@@ -272,37 +250,52 @@ for (const target of targets) {
     // 以插件自己的判定为准（页面正文可能在首屏之外，用“条是否可见”会误判）
     const statsText = entry.deeper.stats ?? entry.scrolled.stats ?? '';
     const activated = /(^|\s)art=1(\s|$)/.test(statsText);
-    const alignment = entry.deeper.alignmentDelta ?? entry.scrolled.alignmentDelta ?? null;
-    const barVisible = entry.deeper.visible === 'true' || entry.scrolled.visible === 'true';
-    entry.alignmentDelta = alignment;
-    // 只在“真的显示了”的页面上校验对齐：与正文文字列偏差 ≤ 2px
-    entry.aligned = !barVisible || alignment === null ? null : Math.abs(alignment) <= 2;
-    if (entry.aligned === false) mismatches += 1;
+    const pillVisible = entry.deeper.visible === 'true' || entry.scrolled.visible === 'true';
+    const surface = entry.deeper.pillRect ?? entry.scrolled.pillRect;
+    entry.pillVisible = pillVisible;
+    entry.pillInViewport =
+      !pillVisible ||
+      (surface !== null &&
+        surface.left >= 0 &&
+        surface.top >= 0 &&
+        surface.right <= 1280 &&
+        surface.bottom <= 800);
+    if (entry.pillInViewport === false) mismatches += 1;
+    const progress = entry.deeper.progressTop ?? entry.scrolled.progressTop;
+    const progressHeight = entry.deeper.progressHeight ?? entry.scrolled.progressHeight;
+    entry.progressPass = !pillVisible || (progress === 0 && progressHeight === 1);
+    if (entry.progressPass === false) mismatches += 1;
     // 真实站点自身的长任务无法可靠归因给扩展，因此作为观测值记录；
     // 只有明确由插件宿主造成的布局位移才判失败。
     entry.performancePass =
       !entry.performance || entry.performance.pluginLayoutShifts === 0;
     if (entry.performancePass === false) mismatches += 1;
-    entry.barVisible = entry.deeper.visible === 'true' || entry.scrolled.visible === 'true';
+    entry.barVisible = pillVisible;
     entry.activated = activated;
     entry.pass = target.expect === 'active' ? activated : !activated;
   } catch (error) {
     entry.failed = String(error).slice(0, 160);
-    entry.pass = false;
+    entry.inconclusive = /net::ERR_|Timeout .*goto|page\.goto/i.test(entry.failed);
+    entry.pass = entry.inconclusive ? null : false;
   }
+  if (entry.pass === null) inconclusive += 1;
   if (entry.pass === false) mismatches += 1;
   results.push(entry);
   await page.close();
   console.log(
     [
-      entry.pass ? '✓' : '✗',
+      entry.pass ? '✓' : entry.pass === null ? '?' : '✗',
       (target.expect === 'active' ? '[应激活]' : '[应静默]').padEnd(9),
       entry.name.padEnd(15),
       `scope=${entry.scrolled?.scope ?? '-'}`,
       `headings=${entry.scrolled?.headings ?? 0}`,
       `activated=${entry.activated ?? '-'}`,
-      `alignΔ=${entry.alignmentDelta ?? '-'}`,
-      entry.aligned === false ? '✗错位' : entry.aligned ? '✓对齐' : '',
+      `pill=${entry.pillVisible ? '✓' : '-'}`,
+      entry.pillInViewport === false
+        ? '✗越界'
+        : entry.progressPass === false
+          ? '✗进度线异常'
+          : '',
       entry.performancePass === false
         ? `✗插件布局位移=${entry.performance?.pluginLayoutShifts}`
         : entry.performance?.longTasks
@@ -317,4 +310,8 @@ const reportPath = join(HERE, '..', 'field-report.json');
 writeFileSync(reportPath, JSON.stringify(results, null, 2));
 await context.close();
 console.log(`\n完整报告: ${reportPath}`);
-console.log(mismatches === 0 ? '✓ 激活范围全部符合预期' : `✗ ${mismatches} 个站点与预期不符`);
+console.log(
+  mismatches === 0
+    ? `✓ 激活范围全部符合预期${inconclusive ? `（${inconclusive} 个站点因网络不可达未判定）` : ''}`
+    : `✗ ${mismatches} 个站点与预期不符${inconclusive ? `，${inconclusive} 个未判定` : ''}`,
+);
