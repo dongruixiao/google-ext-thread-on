@@ -47,6 +47,8 @@ export interface HeadingIndex {
   headings: HeadingNode[];
   /** 智能阅读模式判定：只有“像文章/文档”的页面才自动激活 */
   isArticle: boolean;
+  /** 内容上是可阅读文章；无痕模式还需通过视觉安全门禁，液态玻璃可独立显示 */
+  isReadingCandidate: boolean;
   /** 持续对话 / 代理工作区：即使有过长标题也不展示 */
   isConversation: boolean;
   conversationReason: ConversationReason;
@@ -584,11 +586,11 @@ export function buildHeadingIndex(): HeadingIndex | null {
       linkRatio: ratios.linkRatio,
       paragraphRatio: ratios.paragraphRatio,
     };
-    const isArticle =
+    const isReadingCandidate =
       !conversation.detected &&
-      visualSafety.safe &&
       geometry.reliable &&
       decideArticle(stats, attempt.semantic);
+    const isArticle = isReadingCandidate && visualSafety.safe;
     if (isArticle) ensureIds(headings, attempt.scope);
     // 判定依据挂在 DOM 上，便于排查“为什么这个页面激活/没激活”
     const diagnostics = [
@@ -614,6 +616,7 @@ export function buildHeadingIndex(): HeadingIndex | null {
       `visual=${visualSafety.safe ? 1 : 0}`,
       `visualReason=${visualSafety.reason}`,
       `contrast=${visualSafety.contrast}`,
+      `reading=${isReadingCandidate ? 1 : 0}`,
       `art=${isArticle ? 1 : 0}`,
     ].join(' ');
     attempt.scope.dataset.wssStats = diagnostics;
@@ -621,6 +624,7 @@ export function buildHeadingIndex(): HeadingIndex | null {
       scope: attempt.scope,
       headings,
       isArticle,
+      isReadingCandidate,
       isConversation: conversation.detected,
       conversationReason: conversation.reason,
       isVisualSafe: visualSafety.safe,

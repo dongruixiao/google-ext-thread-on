@@ -216,6 +216,7 @@ describe('buildHeadingIndex', () => {
     const index = buildHeadingIndex();
     expect(index?.isVisualSafe).toBe(false);
     expect(index?.visualReason).toBe('background-complex');
+    expect(index?.isReadingCandidate).toBe(true);
     expect(index?.isArticle).toBe(false);
   });
 

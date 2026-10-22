@@ -59,6 +59,8 @@ function render(): void {
   appearanceSelect.value = settings.appearance;
   barWidthSelect.value = settings.barWidth;
   positionSelect.value = settings.position;
+  barWidthSelect.disabled = settings.appearance !== 'bar';
+  positionSelect.disabled = settings.appearance !== 'pill';
   themeSelect.value = settings.theme;
   offsetInput.value = String(settings.offsetY);
   policySelect.value = settings.displayPolicy;

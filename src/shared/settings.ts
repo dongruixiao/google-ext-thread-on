@@ -5,7 +5,7 @@ export type DisplayPolicy = 'smart' | 'always' | 'peek';
 /** 原站已有可见目录时的行为：adapt 退让为极简指示器 / full 保持完整功能 */
 export type PageTocMode = 'adapt' | 'full';
 export type SiteAccess = 'all' | 'blocklist' | 'allowlist';
-/** 界面形态：bar 吸顶条（VS Code 式）/ pill 悬浮胶囊 */
+/** 界面形态：bar 无痕阅读 / pill 液态玻璃 */
 export type Appearance = 'bar' | 'pill';
 /** 吸顶条宽度：full 满宽 / column 与正文列对齐 */
 export type BarWidth = 'full' | 'column';

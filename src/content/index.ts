@@ -143,6 +143,11 @@ class StickyScrollApp {
 
     const tocStrategyChanged = previous.pageTocMode !== next.pageTocMode;
     const policyChanged = previous.displayPolicy !== next.displayPolicy;
+    const appearanceChanged = previous.appearance !== next.appearance;
+    if (appearanceChanged) {
+      this.rebuild(true);
+      return;
+    }
     if (tocStrategyChanged) {
       this.tocCandidates = this.collectTocCandidates();
       this.tocVisible = this.evaluateToc();
@@ -271,13 +276,7 @@ class StickyScrollApp {
     this.visualReason = index?.visualReason ?? 'background-complex';
     this.visualBackground = index?.visualBackground ?? '';
 
-    if (
-      !index ||
-      !(
-        index.isArticle ||
-        (this.forced && !index.isConversation && index.isVisualSafe)
-      )
-    ) {
+    if (!index || !this.canActivate(index)) {
       // 非文章页（列表页 / 搜索页 / 应用页）：保持静默，不注入任何 UI
       this.snapshot = null;
       return;
@@ -763,10 +762,22 @@ class StickyScrollApp {
   private applyPresentation(): void {
     this.ui?.setPresentation({
       // 顶部被遮罩层盖住时不显示，免得浮在对话框上面
-      visible: this.visualSafe && this.shown && !this.overlayBlocked && !this.findMode,
+      visible:
+        (this.visualSafe || this.settings.appearance === 'pill') &&
+        this.shown &&
+        !this.overlayBlocked &&
+        !this.findMode,
       dim: this.dimmed,
       compact: this.settings.pageTocMode === 'adapt' && this.tocVisible,
     });
+  }
+
+  private canActivate(index: HeadingIndex | null): boolean {
+    if (!index || index.isConversation) return false;
+    if (this.settings.appearance === 'pill') {
+      return index.isReadingCandidate || this.forced;
+    }
+    return index.isArticle || (this.forced && index.isVisualSafe);
   }
 
   // ── 原站目录适配 ────────────────────────────────────
@@ -904,7 +915,7 @@ class StickyScrollApp {
   } {
     const index = this.index;
     return {
-      active: this.visualSafe && !!this.ui && !!this.tracker,
+      active: this.canActivate(index) && !!this.ui && !!this.tracker,
       enabled: this.settings.enabled,
       siteEnabled: this.siteAllowed,
       host: location.hostname,
@@ -937,11 +948,13 @@ class StickyScrollApp {
     if (!this.siteAllowed) return 'site-disabled';
     if (!index) return 'no-heading-index';
     if (index.isConversation) return 'conversation-surface';
-    if (!index.isVisualSafe || !this.visualSafe) return 'visual-unreliable';
-    if (!index.isArticle && !this.forced) {
+    if (this.settings.appearance === 'bar' && (!index.isVisualSafe || !this.visualSafe)) {
+      return 'visual-unreliable';
+    }
+    if (!index.isReadingCandidate && !this.forced) {
       return index.stats.geometryReliable ? 'content-not-article' : 'heading-geometry-unreliable';
     }
-    return this.ui && this.tracker ? 'active' : 'inactive';
+    return this.canActivate(index) && this.ui && this.tracker ? 'active' : 'inactive';
   }
 }
 

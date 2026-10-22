@@ -1,8 +1,8 @@
 /** 插件 UI 宿主节点 id（同时用于把自身从 DOM 扫描中排除） */
 export const HOST_ID = '__web_sticky_scroll_host__';
 
-/** 胶囊高度，与 style.css 中的 .wss-pill 保持一致 */
-export const PILL_HEIGHT = 36;
+/** 液态玻璃胶囊高度，与 style.css 中的 .wss-pill 保持一致 */
+export const PILL_HEIGHT = 38;
 
 /** 胶囊与页面顶部（或原站固定导航栏底部）之间的留白 */
 export const PILL_GAP = 10;

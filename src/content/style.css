@@ -33,6 +33,7 @@
   --wss-accent: color-mix(in srgb, var(--wss-page-fg) 72%, transparent);
   --wss-accent-soft: color-mix(in srgb, var(--wss-page-fg) 8%, transparent);
   --wss-hover: color-mix(in srgb, var(--wss-page-fg) 7%, transparent);
+  --wss-brand: #6c4df6;
 
   opacity: 1;
   translate: 0 0;
@@ -42,6 +43,37 @@
 .wss-root[data-theme='dark'] {
   --wss-fg: #e9eaf3;
   --wss-surface: #14161d;
+  --wss-brand: #b1a1ff;
+}
+
+.wss-global-progress {
+  position: fixed;
+  z-index: var(--wss-z-index, 2147483600);
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 1px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--wss-brand, #6c4df6) 14%, transparent);
+  opacity: 1;
+  transition: opacity 0.18s ease;
+}
+
+.wss-global-progress[data-theme='dark'] {
+  --wss-brand: #b1a1ff;
+}
+
+.wss-global-progress[data-visible='false'] {
+  opacity: 0;
+}
+
+.wss-global-progress > i {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: var(--wss-brand, #6c4df6);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--wss-brand, #6c4df6) 38%, transparent);
+  transition: width 0.12s linear;
 }
 
 .wss-root[data-visible='false'] {
@@ -110,8 +142,27 @@
 
 /* ── 吸顶层：无图板、无边框，只保留原样标题 ─────────── */
 
+.wss-root[data-appearance='bar']::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: 0;
+  bottom: -18px;
+  left: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    var(--wss-page-bg) 0%,
+    var(--wss-page-bg) 62%,
+    color-mix(in srgb, var(--wss-page-bg) 94%, transparent) 78%,
+    transparent 100%
+  );
+}
+
 .wss-bar {
   position: relative;
+  z-index: 1;
   width: 100%;
   height: var(--wss-bar-height);
   box-sizing: border-box;
@@ -136,24 +187,6 @@
   pointer-events: none;
   cursor: pointer;
   user-select: none;
-}
-
-.wss-bar-inner::before {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  top: 0;
-  right: var(--wss-col-right);
-  bottom: -18px;
-  left: var(--wss-col-left);
-  pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    var(--wss-page-bg) 0%,
-    var(--wss-page-bg) 62%,
-    color-mix(in srgb, var(--wss-page-bg) 94%, transparent) 78%,
-    transparent 100%
-  );
 }
 
 /* 克隆进来的标题：样式全部来自页面，这里只负责占位与裁切 */
@@ -227,57 +260,86 @@
   padding-right: 14px;
 }
 
-.wss-root[data-bar-width='column'] .wss-bar-inner::before {
-  right: 0;
-  left: 0;
-}
-
-/* ── 悬浮胶囊 ───────────────────────────────────────── */
+/* ── 液态玻璃胶囊 ───────────────────────────────────── */
 
 .wss-pill {
   position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 8px;
   box-sizing: border-box;
-  height: 36px;
-  padding: 0 12px 0 10px;
+  height: 38px;
+  padding: 0 14px 0 12px;
+  overflow: hidden;
   border-radius: 999px;
-  background: var(--wss-page-bg);
-  border: 1px solid var(--wss-border);
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  max-width: min(76vw, 720px);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--wss-surface) 54%, transparent),
+      color-mix(in srgb, var(--wss-surface) 30%, transparent)
+    );
+  border: 1px solid color-mix(in srgb, var(--wss-fg) 16%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 72%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--wss-fg) 8%, transparent),
+    0 12px 30px -22px color-mix(in srgb, var(--wss-fg) 55%, transparent);
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
+  max-width: min(calc(100vw - 32px), 460px);
   pointer-events: auto;
   cursor: default;
   user-select: none;
+  color: var(--wss-fg);
+}
+
+.wss-pill::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: -20px;
+  right: 18px;
+  width: 45%;
+  height: 34px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 24%);
+  filter: blur(11px);
+  pointer-events: none;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .wss-pill {
+    background: color-mix(in srgb, var(--wss-surface) 94%, transparent);
+  }
 }
 
 .wss-icon {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   flex: none;
-  opacity: 0.72;
-  color: var(--wss-accent);
+  color: var(--wss-brand);
 }
 
-/* ── 面包屑（胶囊与抽屉路径共用） ───────────────────── */
-
-.wss-crumbs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.wss-glass-title {
+  position: relative;
+  z-index: 1;
   min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.wss-crumbs > li {
-  display: flex;
-  align-items: center;
-  min-width: 0;
+.wss-glass-title:focus-visible {
+  outline: 2px solid var(--wss-brand);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
+
+/* ── 抽屉顶部路径 ────────────────────────────────────── */
 
 .wss-sep {
   flex: none;
@@ -312,76 +374,6 @@
 .wss-crumb:focus-visible {
   outline: 2px solid var(--wss-accent);
   outline-offset: 1px;
-}
-
-.wss-crumb[data-role='current'] {
-  opacity: 1;
-  font-weight: 600;
-}
-
-/* 被折叠的祖先层级：悬停或键盘聚焦时展开 */
-.wss-crumbs > li.is-ancestor {
-  display: none;
-}
-
-.wss-pill:hover .wss-crumbs > li.is-ancestor,
-.wss-pill:focus-within .wss-crumbs > li.is-ancestor {
-  display: flex;
-}
-
-.wss-more {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  color: inherit;
-  padding: 5px 6px;
-  border-radius: 7px;
-  cursor: default;
-  opacity: 0.6;
-}
-
-.wss-pill:hover .wss-more-item,
-.wss-pill:focus-within .wss-more-item,
-.wss-root[data-compact='true'] .wss-more-item,
-.wss-root[data-compact='true'] .wss-crumbs > li.is-ancestor {
-  display: none;
-}
-
-/* ── 进度条：整篇文章的阅读进度，贴在吸顶区域顶部 ───── */
-
-.wss-progress {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  top: 1px;
-  height: 2px;
-  border-radius: 2px;
-  overflow: hidden;
-  background: var(--wss-hover);
-}
-
-.wss-progress > i {
-  display: block;
-  width: 0%;
-  height: 100%;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--wss-page-fg) 48%, transparent);
-  transition: width 0.12s linear;
-}
-
-.wss-root[data-appearance='bar'] .wss-progress {
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 1px;
-  border-radius: 0;
-  background: color-mix(in srgb, var(--wss-page-fg) 12%, transparent);
-}
-
-.wss-root[data-bar-width='column'] .wss-progress {
-  height: 2px;
-  border-radius: 0;
 }
 
 /* ── 悬停大纲：顶部是上级路径，下面是全文目录 ───────── */
@@ -577,7 +569,7 @@
   .wss-pill,
   .wss-bar,
   .wss-drawer,
-  .wss-progress > i,
+  .wss-global-progress > i,
   .wss-crumb,
   .wss-row {
     transition: none;

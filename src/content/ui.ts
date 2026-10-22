@@ -37,20 +37,20 @@ const HOVER_TARGET = '.wss-pill, .wss-bar-inner, .wss-drawer';
 
 /**
  * Shadow DOM 渲染层，支持两种形态：
- * - bar：吸顶条。把当前标题**原样克隆**进来（字体、字号、颜色全部照搬页面），
+ * - bar：无痕阅读。把当前标题**原样克隆**进来（字体、字号、颜色全部照搬页面），
  *        悬停展开大纲，点击标题可以把大纲钉住。
- * - pill：悬浮毛玻璃胶囊，用插件自己的紧凑排版显示层级链。
+ * - pill：液态玻璃胶囊，用紧凑单行显示当前标题。
  */
 export class StickyUI {
   private host: HTMLDivElement | null = null;
   private root: HTMLDivElement | null = null;
-  private crumbs: HTMLOListElement | null = null;
   private headingSlot: HTMLElement | null = null;
+  private glassTitle: HTMLElement | null = null;
+  private progressLayer: HTMLDivElement | null = null;
+  private progressFill: HTMLElement | null = null;
   private drawer: HTMLDivElement | null = null;
   private drawerPath: HTMLDivElement | null = null;
   private drawerProgress: HTMLElement | null = null;
-  /** 进度条在两种形态里各有一个节点，宽度要一起更新 */
-  private progressFills: HTMLElement[] = [];
   /** 大纲行：标题下标 → 行按钮 */
   private rows = new Map<number, HTMLButtonElement>();
 
@@ -68,7 +68,7 @@ export class StickyUI {
   private closeTimer = 0;
   private drawerOpen = false;
   private pinned = false;
-  private crumbsKey = '';
+  private pathKey = '';
   private cloneIndex = -2;
   private currentIndex = -2;
   private progressLabel = '';
@@ -90,6 +90,12 @@ export class StickyUI {
     style.textContent = styleText;
     shadow.appendChild(style);
 
+    const progressLayer = document.createElement('div');
+    progressLayer.className = 'wss-global-progress';
+    progressLayer.dataset.visible = 'false';
+    progressLayer.style.setProperty('--wss-z-index', String(Z_INDEX));
+    progressLayer.innerHTML = '<i></i>';
+
     const root = document.createElement('div');
     root.className = 'wss-root';
     root.dataset.visible = 'false';
@@ -109,13 +115,12 @@ export class StickyUI {
           <span class="wss-bar-caret" aria-hidden="true">
             <svg width="12" height="12" viewBox="0 0 16 16"><path d="M4 6.5 8 10.5l4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
           </span>
-          <span class="wss-progress" aria-hidden="true"><i></i></span>
         </div>
       </div>
       <div class="wss-pill" part="pill">
         <span class="wss-icon">${ICON_SVG}</span>
-        <ol class="wss-crumbs"></ol>
-        <span class="wss-progress" aria-hidden="true"><i></i></span>
+        <div class="wss-glass-title" data-wss-role="heading" role="button" tabindex="0"
+             aria-label="展开或固定文章目录"></div>
       </div>
       <div class="wss-below">
         <div class="wss-drawer" part="drawer">
@@ -129,15 +134,17 @@ export class StickyUI {
       </div>
     `;
     shadow.appendChild(root);
+    shadow.appendChild(progressLayer);
 
     this.host = host;
     this.root = root;
-    this.crumbs = root.querySelector<HTMLOListElement>('.wss-pill > .wss-crumbs');
     this.headingSlot = root.querySelector<HTMLElement>('.wss-bar-heading');
+    this.glassTitle = root.querySelector<HTMLElement>('.wss-glass-title');
+    this.progressLayer = progressLayer;
+    this.progressFill = progressLayer.querySelector<HTMLElement>('i');
     this.drawer = root.querySelector<HTMLDivElement>('.wss-drawer');
     this.drawerPath = root.querySelector<HTMLDivElement>('.wss-drawer-path');
     this.drawerProgress = root.querySelector<HTMLElement>('.wss-drawer-progress');
-    this.progressFills = [...root.querySelectorAll<HTMLElement>('.wss-progress > i')];
     this.rows = new Map();
 
     const outline = root.querySelector<HTMLDivElement>('.wss-outline');
@@ -179,14 +186,15 @@ export class StickyUI {
     this.host?.remove();
     this.host = null;
     this.root = null;
-    this.crumbs = null;
     this.headingSlot = null;
+    this.glassTitle = null;
+    this.progressLayer = null;
+    this.progressFill = null;
     this.drawer = null;
     this.drawerPath = null;
     this.drawerProgress = null;
-    this.progressFills = [];
     this.rows = new Map();
-    this.crumbsKey = '';
+    this.pathKey = '';
     this.cloneIndex = -2;
     this.currentIndex = -2;
     this.drawerOpen = false;
@@ -207,7 +215,9 @@ export class StickyUI {
   }
 
   setZIndex(value: number): void {
-    this.root?.style.setProperty('--wss-z-index', String(Math.max(1, Math.round(value))));
+    const zIndex = String(Math.max(1, Math.round(value)));
+    this.root?.style.setProperty('--wss-z-index', zIndex);
+    this.progressLayer?.style.setProperty('--wss-z-index', zIndex);
   }
 
   setPosition(position: PillPosition): void {
@@ -223,7 +233,7 @@ export class StickyUI {
   setAppearance(appearance: Appearance): void {
     if (appearance === this.appearance) return;
     this.appearance = appearance;
-    this.crumbsKey = '';
+    this.pathKey = '';
     this.cloneIndex = -2; // 形态切换后需要重新克隆并重新量高度
     if (this.root) this.root.dataset.appearance = appearance;
     this.render();
@@ -272,7 +282,7 @@ export class StickyUI {
 
   setPathOptions(options: Partial<PathOptions>): void {
     this.pathOptions = { ...this.pathOptions, ...options };
-    this.crumbsKey = '';
+    this.pathKey = '';
   }
 
   update(snapshot: TrackerSnapshot): void {
@@ -314,6 +324,7 @@ export class StickyUI {
     root.dataset.visible = String(visible);
     root.dataset.dim = String(visible && presentation.dim);
     root.dataset.compact = String(presentation.compact);
+    if (this.progressLayer) this.progressLayer.dataset.visible = String(visible);
 
     if (!visible) {
       this.unpin();
@@ -323,7 +334,8 @@ export class StickyUI {
 
     if (presentation.compact && this.drawerOpen) this.closeDrawer();
 
-    this.ensureHeadingClone(snapshot.index);
+    if (this.appearance === 'bar') this.ensureHeadingClone(snapshot.index);
+    this.renderGlassTitle(snapshot.index);
 
     const key = [
       snapshot.path.join('>'),
@@ -331,10 +343,9 @@ export class StickyUI {
       this.pathOptions.maxCrumbs,
       presentation.compact ? 'compact' : 'full',
     ].join('|');
-    if (key !== this.crumbsKey) {
-      this.renderCrumbs(snapshot, presentation);
+    if (key !== this.pathKey) {
       this.renderDrawerPath(snapshot, presentation);
-      this.crumbsKey = key;
+      this.pathKey = key;
     }
 
     if (snapshot.index !== this.currentIndex) {
@@ -342,8 +353,9 @@ export class StickyUI {
       this.currentIndex = snapshot.index;
     }
 
-    const width = `${(snapshot.progress * 100).toFixed(1)}%`;
-    for (const fill of this.progressFills) fill.style.width = width;
+    if (this.progressFill) {
+      this.progressFill.style.width = `${(snapshot.progress * 100).toFixed(1)}%`;
+    }
 
     const label = `${Math.round(snapshot.progress * 100)}%`;
     if (this.drawerProgress && label !== this.progressLabel) {
@@ -371,6 +383,15 @@ export class StickyUI {
       slot.title = `${node.text}（点击固定目录）`;
     }
     this.applyBarHeight();
+  }
+
+  private renderGlassTitle(index: number): void {
+    const title = this.glassTitle;
+    const node = this.headings[index];
+    if (!title || !node) return;
+    title.textContent = node.text || '(无标题)';
+    title.title = `${node.text}（点击固定目录）`;
+    title.dataset.wssIndex = String(index);
   }
 
   /** 吸顶条高度跟着标题的自然高度走（VS Code 里行高决定 sticky 行高） */
@@ -422,59 +443,6 @@ export class StickyUI {
     };
 
     return build(roots, 0);
-  }
-
-  private renderCrumbs(snapshot: TrackerSnapshot, presentation: Presentation): void {
-    const crumbs = this.crumbs;
-    if (!crumbs) return;
-    crumbs.replaceChildren();
-
-    const visible = presentation.compact
-      ? { indexes: [snapshot.index], collapsed: [] }
-      : buildVisiblePath(snapshot.path, this.levels, this.pathOptions);
-    const ancestors = presentation.compact ? [] : visible.collapsed;
-    const sequence = [...ancestors, ...visible.indexes];
-
-    if (ancestors.length > 0) {
-      const item = document.createElement('li');
-      item.className = 'wss-more-item';
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'wss-more';
-      button.dataset.role = 'ancestor';
-      button.textContent = '…';
-      button.title = `还有 ${ancestors.length} 级上级标题，悬停展开`;
-      button.setAttribute('aria-label', `还有 ${ancestors.length} 级上级标题`);
-      item.appendChild(button);
-      crumbs.appendChild(item);
-    }
-
-    sequence.forEach((headingIndex, positionInSequence) => {
-      const node = this.headings[headingIndex];
-      if (!node) return;
-
-      if (positionInSequence > 0) {
-        const separator = document.createElement('li');
-        separator.className = 'wss-sep';
-        separator.textContent = '›';
-        separator.setAttribute('aria-hidden', 'true');
-        crumbs.appendChild(separator);
-      }
-
-      const isCurrent = headingIndex === snapshot.index;
-      const item = document.createElement('li');
-      if (ancestors.includes(headingIndex)) item.className = 'is-ancestor';
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'wss-crumb';
-      button.dataset.role = isCurrent ? 'current' : 'ancestor';
-      button.dataset.wssIndex = String(headingIndex);
-      button.dataset.current = String(isCurrent);
-      button.textContent = node.text || '(无标题)';
-      button.title = node.text;
-      item.appendChild(button);
-      crumbs.appendChild(item);
-    });
   }
 
   /** 大纲顶部的“上级路径”：吸顶条里不堆层级，层级放这里 */
@@ -675,6 +643,7 @@ export class StickyUI {
       const prefersDark = this.mediaQuery ? this.mediaQuery.matches : false;
       const resolved = this.themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : this.themeMode;
       this.root.dataset.theme = resolved;
+      if (this.progressLayer) this.progressLayer.dataset.theme = resolved;
     });
   };
 }

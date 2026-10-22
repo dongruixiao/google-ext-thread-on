@@ -74,14 +74,18 @@ const probe = (page) =>
     const active = shadow?.querySelector(surface);
     const crumbs = [...(active?.querySelectorAll('.wss-crumb') ?? [])].map((node) => node.textContent);
     const clone = shadow?.querySelector('[data-wss-clone="true"]');
+    const glassTitle = shadow?.querySelector('.wss-glass-title');
     const bar = shadow?.querySelector('.wss-bar');
     const barStyle = bar ? getComputedStyle(bar) : null;
-    const barInner = shadow?.querySelector('.wss-bar-inner');
-    const titleMaskStyle = barInner ? getComputedStyle(barInner, '::before') : null;
+    const titleMaskStyle = root ? getComputedStyle(root, '::before') : null;
     const drawer = shadow?.querySelector('.wss-drawer');
     const drawerStyle = drawer ? getComputedStyle(drawer) : null;
+    const pill = shadow?.querySelector('.wss-pill');
+    const pillStyle = pill ? getComputedStyle(pill) : null;
+    const progressLayer = shadow?.querySelector('.wss-global-progress');
+    const progressRect = progressLayer?.getBoundingClientRect();
     const article = document.querySelector('article');
-    const anchor = root?.dataset.appearance === 'bar' ? clone : active?.querySelector('.wss-crumb');
+    const anchor = root?.dataset.appearance === 'bar' ? clone : glassTitle;
     return {
       host: !!host,
       attachedToHtml: host?.parentElement?.tagName === 'HTML',
@@ -98,9 +102,15 @@ const probe = (page) =>
       drawerBackground: drawerStyle?.backgroundColor ?? null,
       drawerShadow: drawerStyle?.boxShadow ?? null,
       drawerBackdrop: drawerStyle?.backdropFilter ?? null,
+      pillBackdrop: pillStyle?.backdropFilter ?? null,
+      pillBackground: pillStyle?.backgroundImage ?? null,
+      pillShadow: pillStyle?.boxShadow ?? null,
+      progressTop: progressRect ? Math.round(progressRect.top) : null,
+      progressHeight: progressRect ? Math.round(progressRect.height) : null,
       surfaceTop: active ? Math.round(active.getBoundingClientRect().top) : null,
       barHeight: Math.round(shadow?.querySelector('.wss-bar')?.getBoundingClientRect().height ?? 0),
       cloneText: clone?.textContent?.trim() ?? null,
+      glassTitle: glassTitle?.textContent?.trim() ?? null,
       cloneHeight: Math.round(clone?.getBoundingClientRect().height ?? 0),
       crumbLeft: anchor ? Math.round(anchor.getBoundingClientRect().left) : null,
       articleLeft: article ? Math.round(article.getBoundingClientRect().left) : null,
@@ -154,11 +164,39 @@ try {
     headings: document.querySelectorAll('h1, h2').length,
     host: !!document.getElementById('__web_sticky_scroll_host__'),
   }));
-  await unsafeColorPage.close();
   check(
     '渐变和图片背景页面保持静默',
     unsafeColor.headings >= 3 && !unsafeColor.host,
     unsafeColor,
+  );
+  const modeOptions = await context.newPage();
+  await modeOptions.goto(`chrome-extension://${extensionId}/src/options/options.html`);
+  await modeOptions.selectOption('#appearance', 'pill');
+  await unsafeColorPage.reload({ waitUntil: 'load' });
+  await unsafeColorPage.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await unsafeColorPage.waitForTimeout(1200);
+  const unsafeGlass = await unsafeColorPage.evaluate(() => {
+    const shadow = document.getElementById('__web_sticky_scroll_host__')?.shadowRoot;
+    const root = shadow?.querySelector('.wss-root');
+    const pill = shadow?.querySelector('.wss-pill');
+    return {
+      appearance: root?.dataset.appearance ?? null,
+      title: shadow?.querySelector('.wss-glass-title')?.textContent?.trim() ?? null,
+      pill: !!pill,
+      progressTop: Math.round(shadow?.querySelector('.wss-global-progress')?.getBoundingClientRect().top ?? -1),
+    };
+  });
+  await modeOptions.selectOption('#appearance', 'bar');
+  await unsafeColorPage.waitForTimeout(600);
+  await modeOptions.close();
+  await unsafeColorPage.close();
+  check(
+    '复杂背景可手动使用液态玻璃',
+    unsafeGlass.appearance === 'pill' &&
+      unsafeGlass.pill &&
+      !!unsafeGlass.title &&
+      unsafeGlass.progressTop === 0,
+    unsafeGlass,
   );
 
   const atTop = await probe(page);
@@ -373,7 +411,7 @@ try {
   const readProgress = () =>
     page.evaluate(() => {
       const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
-      const fill = shadow.querySelector('.wss-progress > i');
+      const fill = shadow.querySelector('.wss-global-progress > i');
       return Number.parseFloat(fill?.style.width ?? '0');
     });
   await page.evaluate(() => window.scrollTo(0, 400));
@@ -392,23 +430,23 @@ try {
   );
   const progressTrack = await page.evaluate(() => {
     const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
-    const bar = shadow.querySelector('.wss-bar').getBoundingClientRect();
-    const track = shadow.querySelector('.wss-progress').getBoundingClientRect();
+    const track = shadow.querySelector('.wss-global-progress').getBoundingClientRect();
+    const fill = shadow.querySelector('.wss-global-progress > i');
     return {
-      barX: [Math.round(bar.left), Math.round(bar.right)],
       trackX: [Math.round(track.left), Math.round(track.right)],
-      barTop: Math.round(bar.top),
       trackTop: Math.round(track.top),
-      barBottom: Math.round(bar.bottom),
       trackHeight: Math.round(track.height),
+      viewportWidth: window.innerWidth,
+      fillBackground: fill ? getComputedStyle(fill).backgroundColor : null,
     };
   });
   check(
-    '进度条通栏贴在吸顶区域顶部，不像标题下划线',
-    progressTrack.barX[0] === progressTrack.trackX[0] &&
-      progressTrack.barX[1] === progressTrack.trackX[1] &&
-      Math.abs(progressTrack.barTop - progressTrack.trackTop) <= 1 &&
-      progressTrack.trackHeight === 1,
+    '紫色进度条固定在页面最顶部并横跨视口',
+    progressTrack.trackX[0] === 0 &&
+      progressTrack.trackX[1] === progressTrack.viewportWidth &&
+      progressTrack.trackTop === 0 &&
+      progressTrack.trackHeight === 1 &&
+      progressTrack.fillBackground === 'rgb(108, 77, 246)',
     progressTrack,
   );
 
@@ -760,7 +798,9 @@ try {
     '切换形态实时生效',
     switched.appearance === 'pill' &&
       Math.abs(switched.top - (TOPBAR_HEIGHT + 10)) <= 1 &&
-      switched.crumbs.length >= 1,
+      !!switched.glassTitle &&
+      !!switched.pillBackground?.includes('linear-gradient') &&
+      switched.pillShadow !== 'none',
     switched,
   );
 
