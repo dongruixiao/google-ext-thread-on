@@ -1,6 +1,6 @@
 /**
  * 端到端验证：用真实浏览器加载打包后的 dist/，
- * 检查注入、可拖动液态玻璃胶囊、层级、跳转、显示策略、原站目录适配与设置链路。
+ * 检查注入、可拖动拟物胶囊、层级、跳转、显示策略、原站目录适配与设置链路。
  *
  *   npm run build && npm run e2e
  *
@@ -70,7 +70,7 @@ const probe = (page) =>
     const shadow = host?.shadowRoot;
     const root = shadow?.querySelector('.wss-root');
     const active = shadow?.querySelector('.wss-pill');
-    const glassTitle = shadow?.querySelector('.wss-glass-title');
+    const chapterTitle = shadow?.querySelector('.wss-title');
     const drawer = shadow?.querySelector('.wss-drawer');
     const rootStyle = root ? getComputedStyle(root) : null;
     const drawerStyle = drawer ? getComputedStyle(drawer) : null;
@@ -103,7 +103,7 @@ const probe = (page) =>
       progressHeight: progressRect ? Math.round(progressRect.height) : null,
       progressVisible: progressLayer?.dataset.visible ?? null,
       surfaceTop: active ? Math.round(active.getBoundingClientRect().top) : null,
-      glassTitle: glassTitle?.textContent?.trim() ?? null,
+      title: chapterTitle?.textContent?.trim() ?? null,
       pillHeight: active ? Math.round(active.getBoundingClientRect().height) : null,
       drawerPath: [...(shadow?.querySelectorAll('.wss-drawer-path .wss-crumb') ?? [])].map(
         (node) => node.textContent,
@@ -177,7 +177,7 @@ try {
     host: !!document.getElementById('__web_sticky_scroll_host__'),
   }));
   check(
-    '渐变和图片背景页面可使用中性玻璃标题',
+    '渐变和图片背景页面可使用拟物胶囊',
     unsafeColor.headings >= 3 && unsafeColor.host,
     unsafeColor,
   );
@@ -189,14 +189,14 @@ try {
     const pill = shadow?.querySelector('.wss-pill');
     return {
       pill: !!pill,
-      title: shadow?.querySelector('.wss-glass-title')?.textContent?.trim() ?? null,
+      title: shadow?.querySelector('.wss-title')?.textContent?.trim() ?? null,
       pill: !!pill,
       progressTop: Math.round(shadow?.querySelector('.wss-global-progress')?.getBoundingClientRect().top ?? -1),
     };
   });
   await unsafeColorPage.close();
   check(
-    '复杂背景可使用液态玻璃',
+    '复杂背景可使用拟物胶囊',
     unsafeGlass.pill &&
       !!unsafeGlass.title &&
       unsafeGlass.progressTop === 0,
@@ -210,24 +210,24 @@ try {
     console.error('内容脚本没有注入，后续断言无法进行');
     process.exit(1);
   }
-  check('默认使用液态玻璃胶囊', atTop.pill === true, atTop.pill);
+  check('默认使用拟物胶囊', atTop.pill === true, atTop.pill);
   check('页面顶部保持静默', atTop.visible === 'false', atTop);
 
-  // 向下滚动：玻璃胶囊浮现，且默认不显示文章大标题
+  // 向下滚动：拟物胶囊浮现，且默认不显示文章大标题
   await page.mouse.wheel(0, 1400);
   await page.waitForTimeout(400);
   const scrolled = await probe(page);
   check('向下滚动后浮现', scrolled.visible === 'true', scrolled);
-  check('玻璃胶囊避让固定顶栏', Math.abs(scrolled.top - (TOPBAR_HEIGHT + 10)) <= 1, scrolled.top);
+  check('拟物胶囊避让固定顶栏', Math.abs(scrolled.top - (TOPBAR_HEIGHT + 10)) <= 1, scrolled.top);
   check(
-    '玻璃胶囊保持紧凑单行',
-    !!scrolled.glassTitle && scrolled.pillHeight === 38,
+    '拟物胶囊保持紧凑单行',
+    !!scrolled.title && scrolled.pillHeight === 40,
     scrolled,
   );
   check(
     '胶囊里只显示当前小节标题',
-    !!scrolled.glassTitle && !scrolled.glassTitle.includes('端到端验证用文章'),
-    scrolled.glassTitle,
+    !!scrolled.title && !scrolled.title.includes('端到端验证用文章'),
+    scrolled.title,
   );
   check('大纲包含全部正文标题', scrolled.rows === EXPECTED_HEADINGS, scrolled.rows);
   const stickyState = await page.evaluate(() => {
@@ -252,7 +252,7 @@ try {
     const dockTop = () => Math.round(shadow.querySelector('.wss-root').style.getPropertyValue('--wss-top').replace('px', '')) || 0;
     const visible = () => shadow.querySelector('.wss-root').dataset.visible === 'true';
     const cloneText = () =>
-      shadow.querySelector('.wss-glass-title')?.textContent?.trim() ?? null;
+      shadow.querySelector('.wss-title')?.textContent?.trim() ?? null;
     const source = (text) =>
       [...document.querySelectorAll('h1,h2,h3,h4')].find((node) => node.textContent.trim() === text);
     const frame = () =>
@@ -318,7 +318,7 @@ try {
     const finalHeading = headings.at(-1)?.textContent?.trim() ?? null;
 
     const inspect = () => {
-      const title = shadow.querySelector('.wss-glass-title');
+      const title = shadow.querySelector('.wss-title');
       const text = title?.textContent?.trim() ?? null;
       const source = text ? headings.find((node) => node.textContent.trim() === text) : null;
       return {
@@ -435,11 +435,11 @@ try {
       outlinePanel.rows === EXPECTED_HEADINGS &&
       /%$/.test(outlinePanel.progress) &&
       withToc.drawerShadow !== 'none' &&
-      !!withToc.drawerBackdrop?.includes('blur') &&
-      !!withToc.pillBackdrop?.includes('blur') &&
+      withToc.drawerBackdrop === 'none' &&
+      withToc.pillBackdrop === 'none' &&
       withToc.drawerScrollbar === 'none' &&
       !!withToc.drawerBackgroundImage?.includes('linear-gradient') &&
-      !!withToc.drawerBackgroundImage?.includes('radial-gradient') &&
+      !!withToc.drawerBackgroundImage?.includes('repeating-linear-gradient') &&
       !!withToc.pillBackground?.includes('linear-gradient') &&
       withToc.drawerBackground !== null,
     outlinePanel,
@@ -473,7 +473,7 @@ try {
   await page.evaluate(() => {
     document
       .getElementById('__web_sticky_scroll_host__')
-      .shadowRoot.querySelector('.wss-glass-title')
+      .shadowRoot.querySelector('.wss-title')
       .click();
   });
   await page.mouse.move(10, 600);
@@ -525,7 +525,7 @@ try {
     const heading = [...document.querySelectorAll('h1,h2,h3,h4')].find(
       (node) => node.textContent.trim() === text,
     );
-    const title = shadow.querySelector('.wss-glass-title');
+    const title = shadow.querySelector('.wss-title');
     return {
       clicked: text,
       top: Math.round(heading?.getBoundingClientRect().top ?? -1),
@@ -550,9 +550,9 @@ try {
   const keyboardPrevious = await probe(page);
   check(
     '键盘可跳到下一节 / 上一节',
-    keyboardNext.glassTitle === '小节二：边界处理' &&
-      keyboardPrevious.glassTitle === '第二节：实现方式',
-    { next: keyboardNext.glassTitle, previous: keyboardPrevious.glassTitle },
+    keyboardNext.title === '小节二：边界处理' &&
+      keyboardPrevious.title === '第二节：实现方式',
+    { next: keyboardNext.title, previous: keyboardPrevious.title },
   );
 
   // 浏览器页面查找（Ctrl/⌘+F）：不能压住查找条，也不能挡住被滚到顶部的命中文字
@@ -628,7 +628,7 @@ try {
     { ...foreignLayer, restored: foreignLayerGone },
   );
 
-  // 中性玻璃自带表面，网页背景变化不应让标题消失
+  // 拟物胶囊自带实体表面，网页背景变化不应让标题消失
   await page.evaluate(() => {
     document.querySelector('article').style.backgroundImage =
       'linear-gradient(135deg, #ff006e, #3a86ff)';
@@ -641,7 +641,7 @@ try {
   await page.waitForTimeout(1400);
   const dynamicSafe = await probe(page);
   check(
-    '网页背景变化不影响中性玻璃标题',
+    '网页背景变化不影响拟物胶囊',
     dynamicUnsafe.visible === 'true' && dynamicSafe.visible === 'true',
     { changed: dynamicUnsafe.visible, restored: dynamicSafe.visible },
   );
@@ -757,10 +757,10 @@ try {
   await options.waitForTimeout(700);
   const switched = await probe(page);
   check(
-    '智能策略下液态玻璃胶囊保持稳定',
+    '智能策略下拟物胶囊保持稳定',
     switched.pill &&
       Math.abs(switched.top - (TOPBAR_HEIGHT + 10)) <= 1 &&
-      !!switched.glassTitle &&
+      !!switched.title &&
       !!switched.pillBackground?.includes('linear-gradient') &&
       switched.pillShadow !== 'none',
     switched,
@@ -797,7 +797,7 @@ try {
   await page.waitForTimeout(350);
   const dragged = await probe(page);
   check(
-    '液态玻璃胶囊可自由拖动并记住位置',
+    '拟物胶囊可自由拖动并记住位置',
     dragged.position === 'custom' &&
       dragged.floatingLeft > 100 &&
       dragged.floatingTop > 400,

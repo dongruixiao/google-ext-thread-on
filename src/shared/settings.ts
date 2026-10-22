@@ -34,7 +34,7 @@ export interface WssSettings {
   siteAccess: SiteAccess;
   /** 站点规则列表（黑名单 / 白名单） */
   sites: string[];
-  /** 按站点保存的液态玻璃位置 */
+  /** 按站点保存的拟物胶囊位置 */
   floatingPositions: Record<string, FloatingPosition>;
 }
 

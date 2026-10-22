@@ -1,9 +1,9 @@
 {
   "name": "web-sticky-scroll",
   "private": true,
-  "version": "0.12.2",
+  "version": "0.13.0",
   "type": "module",
-  "description": "TopClip —— 读长文，不掉线（可拖动的液态玻璃章节胶囊与整篇阅读进度）",
+  "description": "TopClip —— 读长文，不掉线（可拖动的拟物章节胶囊与整篇阅读进度）",
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build",

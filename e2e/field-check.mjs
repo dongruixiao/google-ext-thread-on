@@ -99,7 +99,7 @@ const inspect = (page) =>
       }
     }
 
-    const shownHeading = shadow?.querySelector('.wss-glass-title')?.textContent?.trim() ?? null;
+    const shownHeading = shadow?.querySelector('.wss-title')?.textContent?.trim() ?? null;
     const source = shownHeading
       ? [...document.querySelectorAll('h1,h2,h3,h4')].find((node) => node.textContent.trim() === shownHeading)
       : null;

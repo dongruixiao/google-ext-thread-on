@@ -68,7 +68,7 @@ const shoot = async (page, file, scrollY, options = {}) => {
 
 mkdirSync(OUT_DIR, { recursive: true });
 
-// 1) 浅色：默认液态玻璃胶囊 + 正文
+// 1) 浅色：默认拟物胶囊 + 正文
 await applySettings({
   theme: 'auto',
   displayPolicy: 'always',

@@ -32,13 +32,13 @@ const DEFAULT_PATH_OPTIONS: PathOptions = { hideArticleTitle: true, maxCrumbs: 3
 const HOVER_TARGET = '.wss-pill, .wss-drawer';
 
 /**
- * Shadow DOM 渲染层：可拖动的液态玻璃胶囊、悬停大纲和全局阅读进度。
+ * Shadow DOM 渲染层：可拖动的拟物章节胶囊、悬停大纲和全局阅读进度。
  */
 export class StickyUI {
   private host: HTMLDivElement | null = null;
   private root: HTMLDivElement | null = null;
   private pill: HTMLDivElement | null = null;
-  private glassTitle: HTMLElement | null = null;
+  private chapterTitle: HTMLElement | null = null;
   private progressLayer: HTMLDivElement | null = null;
   private progressFill: HTMLElement | null = null;
   private below: HTMLDivElement | null = null;
@@ -64,7 +64,6 @@ export class StickyUI {
   private currentIndex = -2;
   private progressLabel = '';
   private floatingPosition: FloatingPosition | null = null;
-  private pillRect: { left: number; top: number; width: number; height: number } | null = null;
   private drag:
     | {
         pointerId: number;
@@ -118,8 +117,9 @@ export class StickyUI {
     root.innerHTML = `
       <div class="wss-pill" part="pill">
         <span class="wss-icon">${ICON_SVG}</span>
-        <div class="wss-glass-title" data-wss-role="heading" role="button" tabindex="0"
+        <div class="wss-title" data-wss-role="heading" role="button" tabindex="0"
              aria-label="展开或固定文章目录"></div>
+        <span class="wss-led" aria-hidden="true"></span>
       </div>
       <div class="wss-below">
         <div class="wss-drawer" part="drawer">
@@ -138,7 +138,7 @@ export class StickyUI {
     this.host = host;
     this.root = root;
     this.pill = root.querySelector<HTMLDivElement>('.wss-pill');
-    this.glassTitle = root.querySelector<HTMLElement>('.wss-glass-title');
+    this.chapterTitle = root.querySelector<HTMLElement>('.wss-title');
     this.progressLayer = progressLayer;
     this.progressFill = progressLayer.querySelector<HTMLElement>('i');
     this.below = root.querySelector<HTMLDivElement>('.wss-below');
@@ -146,14 +146,6 @@ export class StickyUI {
     this.drawerPath = root.querySelector<HTMLDivElement>('.wss-drawer-path');
     this.drawerProgress = root.querySelector<HTMLElement>('.wss-drawer-progress');
     this.rows = new Map();
-
-    // Keep the standard property as an inline declaration: the build minifier
-    // otherwise leaves only the WebKit alias, which is not honoured consistently.
-    const glassFilter = 'blur(26px) saturate(210%) contrast(1.04)';
-    this.pill?.style.setProperty('backdrop-filter', glassFilter);
-    this.pill?.style.setProperty('-webkit-backdrop-filter', glassFilter);
-    this.drawer?.style.setProperty('backdrop-filter', glassFilter);
-    this.drawer?.style.setProperty('-webkit-backdrop-filter', glassFilter);
 
     const outline = root.querySelector<HTMLDivElement>('.wss-outline');
     if (outline) outline.appendChild(this.buildOutline());
@@ -165,7 +157,6 @@ export class StickyUI {
     root.addEventListener('focusout', this.handleLeave, true);
     root.addEventListener('keydown', this.handleKeyDown);
     this.pill?.addEventListener('pointerdown', this.handleDragStart);
-    this.pill?.addEventListener('pointermove', this.handleGlassPointerMove);
     this.pill?.addEventListener('dblclick', this.handlePillDoubleClick);
     window.addEventListener('keydown', this.handleWindowKeyDown, true);
     window.addEventListener('pointerdown', this.handleOutsidePointerDown, true);
@@ -195,7 +186,6 @@ export class StickyUI {
       this.root.removeEventListener('keydown', this.handleKeyDown);
     }
     this.pill?.removeEventListener('pointerdown', this.handleDragStart);
-    this.pill?.removeEventListener('pointermove', this.handleGlassPointerMove);
     this.pill?.removeEventListener('dblclick', this.handlePillDoubleClick);
     window.removeEventListener('keydown', this.handleWindowKeyDown, true);
     window.removeEventListener('pointerdown', this.handleOutsidePointerDown, true);
@@ -209,7 +199,7 @@ export class StickyUI {
     this.host = null;
     this.root = null;
     this.pill = null;
-    this.glassTitle = null;
+    this.chapterTitle = null;
     this.progressLayer = null;
     this.progressFill = null;
     this.below = null;
@@ -223,7 +213,6 @@ export class StickyUI {
     this.pinned = false;
     this.progressLabel = '';
     this.floatingPosition = null;
-    this.pillRect = null;
     this.drag = null;
     this.snapshot = { ...EMPTY_SNAPSHOT };
     this.presentation = { ...DEFAULT_PRESENTATION };
@@ -231,7 +220,6 @@ export class StickyUI {
 
   setTop(px: number): void {
     this.root?.style.setProperty('--wss-top', `${Math.round(px)}px`);
-    this.pillRect = null;
     this.layoutDrawer();
   }
 
@@ -341,7 +329,7 @@ export class StickyUI {
   }
 
   private renderGlassTitle(index: number): void {
-    const title = this.glassTitle;
+    const title = this.chapterTitle;
     const node = this.headings[index];
     if (!title || !node) return;
     const text = node.text || '(无标题)';
@@ -349,11 +337,8 @@ export class StickyUI {
     title.textContent = text;
     title.title = `${node.text}（点击固定目录）`;
     title.dataset.wssIndex = String(index);
-    if (changed) {
-      requestAnimationFrame(() => {
-        if (this.floatingPosition) this.applyFloatingPosition();
-        else this.capturePillRect();
-      });
+    if (changed && this.floatingPosition) {
+      requestAnimationFrame(() => this.applyFloatingPosition());
     }
   }
 
@@ -528,7 +513,6 @@ export class StickyUI {
       root.dataset.position = this.position;
       root.style.removeProperty('left');
       root.style.removeProperty('top');
-      this.capturePillRect();
       this.layoutDrawer();
       return;
     }
@@ -549,10 +533,6 @@ export class StickyUI {
     root.dataset.position = 'custom';
     root.style.left = `${Math.round(left)}px`;
     root.style.top = `${Math.round(top)}px`;
-    if (this.pillRect) {
-      this.pillRect.left = Math.round(left);
-      this.pillRect.top = Math.round(top);
-    }
     this.layoutDrawer();
   }
 
@@ -615,12 +595,6 @@ export class StickyUI {
     this.safely('ui:drag-start', () => {
       if (!this.pill || event.button !== 0) return;
       const rect = this.pill.getBoundingClientRect();
-      this.pillRect = {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height,
-      };
       this.drag = {
         pointerId: event.pointerId,
         startX: event.clientX,
@@ -639,41 +613,6 @@ export class StickyUI {
       }
     });
   };
-
-  private handleGlassPointerMove = (event: PointerEvent): void => {
-    this.safely('ui:glass-pointer', () => {
-      const pill = this.pill;
-      if (!pill) return;
-      const rect = this.pillRect ?? this.capturePillRect();
-      if (!rect) return;
-      if (rect.width <= 0 || rect.height <= 0) return;
-      pill.style.setProperty(
-        '--wss-pointer-x',
-        `${Math.round(((event.clientX - rect.left) / rect.width) * 100)}%`,
-      );
-      pill.style.setProperty(
-        '--wss-pointer-y',
-        `${Math.round(((event.clientY - rect.top) / rect.height) * 100)}%`,
-      );
-    });
-  };
-
-  private capturePillRect(): {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-  } | null {
-    const rect = this.pill?.getBoundingClientRect();
-    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
-    this.pillRect = {
-      left: rect.left,
-      top: rect.top,
-      width: rect.width,
-      height: rect.height,
-    };
-    return this.pillRect;
-  }
 
   private handleDragMove = (event: PointerEvent): void => {
     this.safely('ui:drag-move', () => {
@@ -710,12 +649,6 @@ export class StickyUI {
       if (!drag.moved || !pill) return;
 
       const rect = pill.getBoundingClientRect();
-      this.pillRect = {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height,
-      };
       this.suppressClickUntil = Date.now() + 350;
       this.floatingPosition = this.normalizedPosition(rect.left, rect.top, rect.width, rect.height);
       this.onFloatingPositionChange?.(this.floatingPosition);
@@ -760,7 +693,6 @@ export class StickyUI {
       if (this.drag) return;
       const target = event.target as HTMLElement | null;
       if (!target?.closest(HOVER_TARGET)) return;
-      this.capturePillRect();
       this.clearCloseTimer();
       this.openDrawer();
     });
