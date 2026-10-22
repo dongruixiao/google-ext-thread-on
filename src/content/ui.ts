@@ -44,7 +44,6 @@ export class StickyUI {
   private below: HTMLDivElement | null = null;
   private drawer: HTMLDivElement | null = null;
   private drawerPath: HTMLDivElement | null = null;
-  private drawerProgress: HTMLElement | null = null;
   /** 大纲行：标题下标 → 行按钮 */
   private rows = new Map<number, HTMLButtonElement>();
 
@@ -62,7 +61,6 @@ export class StickyUI {
   private pinned = false;
   private pathKey = '';
   private currentIndex = -2;
-  private progressLabel = '';
   private floatingPosition: FloatingPosition | null = null;
   private drag:
     | {
@@ -123,10 +121,6 @@ export class StickyUI {
       </div>
       <div class="wss-below">
         <div class="wss-drawer" part="drawer">
-          <div class="wss-drawer-head">
-            <span class="wss-drawer-title">文章目录</span>
-            <span class="wss-drawer-progress"></span>
-          </div>
           <div class="wss-drawer-path"></div>
           <div class="wss-outline" role="list"></div>
         </div>
@@ -144,7 +138,6 @@ export class StickyUI {
     this.below = root.querySelector<HTMLDivElement>('.wss-below');
     this.drawer = root.querySelector<HTMLDivElement>('.wss-drawer');
     this.drawerPath = root.querySelector<HTMLDivElement>('.wss-drawer-path');
-    this.drawerProgress = root.querySelector<HTMLElement>('.wss-drawer-progress');
     this.rows = new Map();
 
     const outline = root.querySelector<HTMLDivElement>('.wss-outline');
@@ -205,13 +198,11 @@ export class StickyUI {
     this.below = null;
     this.drawer = null;
     this.drawerPath = null;
-    this.drawerProgress = null;
     this.rows = new Map();
     this.pathKey = '';
     this.currentIndex = -2;
     this.drawerOpen = false;
     this.pinned = false;
-    this.progressLabel = '';
     this.floatingPosition = null;
     this.drag = null;
     this.snapshot = { ...EMPTY_SNAPSHOT };
@@ -294,12 +285,6 @@ export class StickyUI {
     if (this.progressFill) {
       this.progressFill.style.width = `${(snapshot.progress * 100).toFixed(1)}%`;
     }
-    const progressLabel = `${Math.round(snapshot.progress * 100)}%`;
-    if (this.drawerProgress && progressLabel !== this.progressLabel) {
-      this.drawerProgress.textContent = progressLabel;
-      this.progressLabel = progressLabel;
-    }
-
     if (!visible) {
       this.unpin();
       this.currentIndex = -2;
@@ -337,8 +322,8 @@ export class StickyUI {
     title.textContent = text;
     title.title = `${node.text}（点击固定目录）`;
     title.dataset.wssIndex = String(index);
-    if (changed && this.floatingPosition) {
-      requestAnimationFrame(() => this.applyFloatingPosition());
+    if (changed) {
+      requestAnimationFrame(() => this.syncPillWidthLimit());
     }
   }
 
@@ -513,16 +498,18 @@ export class StickyUI {
       root.dataset.position = this.position;
       root.style.removeProperty('left');
       root.style.removeProperty('top');
+      this.syncPillWidthLimit();
       this.layoutDrawer();
       return;
     }
 
     const rect = pill.getBoundingClientRect();
-    const width = rect.width || 280;
-    const height = rect.height || 38;
-    const maxX = Math.max(0, window.innerWidth - width - 16);
+    const height = rect.height || 40;
+    const anchorRange = Math.max(1, window.innerWidth - 16);
     const maxY = Math.max(0, window.innerHeight - height - 16);
-    const left = 8 + (this.floatingPosition.x / 100) * maxX;
+    const left = 8 + (this.floatingPosition.x / 100) * anchorRange;
+    const availableWidth = Math.max(140, window.innerWidth - left - 16);
+    pill.style.maxWidth = `${Math.min(480, availableWidth)}px`;
     const top = 8 + (this.floatingPosition.y / 100) * maxY;
     this.applyPixelPosition(left, top);
   }
@@ -538,7 +525,7 @@ export class StickyUI {
 
   /**
    * 自由拖动后，目录不能仍然假设自己在顶部。
-   * 下方空间不足就向上展开；两者共享左边缘，宽度固定所以不需要横向换边。
+   * 下方空间不足就向上展开；胶囊左缘固定，目录使用固定的版心宽度。
    */
   private layoutDrawer(): void {
     const root = this.root;
@@ -571,15 +558,28 @@ export class StickyUI {
   private normalizedPosition(
     left: number,
     top: number,
-    width: number,
     height: number,
   ): FloatingPosition {
-    const maxX = Math.max(1, window.innerWidth - width - 16);
+    const anchorRange = Math.max(1, window.innerWidth - 16);
     const maxY = Math.max(1, window.innerHeight - height - 16);
     return {
-      x: Math.round(Math.max(0, Math.min(100, ((left - 8) / maxX) * 100)) * 10) / 10,
+      x: Math.round(Math.max(0, Math.min(100, ((left - 8) / anchorRange) * 100)) * 10) / 10,
       y: Math.round(Math.max(0, Math.min(100, ((top - 8) / maxY) * 100)) * 10) / 10,
     };
+  }
+
+  /**
+   * 标题决定右边界，左边界只由停靠位置决定。
+   * 这里只收缩最大宽度，避免长标题把胶囊推出视口。
+   */
+  private syncPillWidthLimit(): void {
+    const root = this.root;
+    const pill = this.pill;
+    if (!root || !pill) return;
+    pill.style.removeProperty('max-width');
+    const left = root.getBoundingClientRect().left;
+    const available = Math.max(140, window.innerWidth - left - 16);
+    pill.style.maxWidth = `${Math.min(480, available)}px`;
   }
 
   private handleDragStart = (event: PointerEvent): void => {
@@ -641,7 +641,7 @@ export class StickyUI {
 
       const rect = pill.getBoundingClientRect();
       this.suppressClickUntil = Date.now() + 350;
-      this.floatingPosition = this.normalizedPosition(rect.left, rect.top, rect.width, rect.height);
+      this.floatingPosition = this.normalizedPosition(rect.left, rect.top, rect.height);
       this.onFloatingPositionChange?.(this.floatingPosition);
     });
   };

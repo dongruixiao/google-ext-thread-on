@@ -263,7 +263,8 @@ try {
 
     const samples = [];
     const violations = [];
-    const pillWidths = [];
+    const pillLefts = [];
+    const pillHeights = [];
     const inspect = () => {
       if (!visible()) return;
       const text = cloneText();
@@ -271,7 +272,9 @@ try {
       if (!node) return;
       const delta = Math.round(node.getBoundingClientRect().top - dockTop());
       samples.push(delta);
-      pillWidths.push(Math.round(shadow.querySelector('.wss-pill').getBoundingClientRect().width));
+      const pillRect = shadow.querySelector('.wss-pill').getBoundingClientRect();
+      pillLefts.push(Math.round(pillRect.left));
+      pillHeights.push(Math.round(pillRect.height));
       // delta > 0 表示这个标题还露在条下面 —— 不该已经显示在条里
       if (delta > 8) {
         violations.push({
@@ -300,8 +303,10 @@ try {
       samples: samples.length,
       minDelta: Math.min(...samples),
       maxDelta: Math.max(...samples),
-      minPillWidth: Math.min(...pillWidths),
-      maxPillWidth: Math.max(...pillWidths),
+      minPillLeft: Math.min(...pillLefts),
+      maxPillLeft: Math.max(...pillLefts),
+      minPillHeight: Math.min(...pillHeights),
+      maxPillHeight: Math.max(...pillHeights),
       violations,
     };
   });
@@ -309,8 +314,41 @@ try {
     '胶囊只显示已经滑过停靠线的标题（向下不提前 / 回滚不赖着下级）',
     timingScan.samples > 50 &&
       timingScan.violations.length === 0 &&
-      timingScan.maxPillWidth - timingScan.minPillWidth <= 1,
+      timingScan.maxPillLeft - timingScan.minPillLeft <= 1 &&
+      timingScan.maxPillHeight - timingScan.minPillHeight <= 1,
     timingScan,
+  );
+
+  // 左边缘是锚点：标题变长时只允许右边界增长，高度保持稳定。
+  const titleGrowth = await page.evaluate(async () => {
+    const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
+    const pill = shadow.querySelector('.wss-pill');
+    const title = shadow.querySelector('.wss-title');
+    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+    const original = title.textContent;
+    const before = {
+      left: Math.round(pill.getBoundingClientRect().left),
+      width: Math.round(pill.getBoundingClientRect().width),
+      height: Math.round(pill.getBoundingClientRect().height),
+    };
+    title.textContent = '这是一个用于验证胶囊右侧自然增长而左侧绝不移动的超长章节标题';
+    await frame();
+    await frame();
+    const after = {
+      left: Math.round(pill.getBoundingClientRect().left),
+      width: Math.round(pill.getBoundingClientRect().width),
+      height: Math.round(pill.getBoundingClientRect().height),
+    };
+    title.textContent = original;
+    await frame();
+    return { before, after };
+  });
+  check(
+    '标题变长只向右扩展，左边缘和高度保持稳定',
+    titleGrowth.after.left === titleGrowth.before.left &&
+      titleGrowth.after.width > titleGrowth.before.width &&
+      titleGrowth.after.height === titleGrowth.before.height,
+    titleGrowth,
   );
 
   // 文章结尾：不能因为“已经到页面底部”就把仍在下方可见的标题提前放进条里
@@ -429,18 +467,20 @@ try {
   const outlinePanel = await page.evaluate(() => {
     const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
     return {
-      title: shadow.querySelector('.wss-drawer-title')?.textContent ?? '',
-      progress: shadow.querySelector('.wss-drawer-progress')?.textContent ?? '',
       nestedLevels: shadow.querySelectorAll('.wss-outline-level[data-depth]').length,
       rows: shadow.querySelectorAll('.wss-row').length,
     };
   });
   check(
-    '大纲面板结构完整（标题 / 进度 / 层级）',
-    outlinePanel.title === '文章目录' &&
-      outlinePanel.nestedLevels >= 1 &&
+    '大纲面板只保留层级内容，不显示标题和百分比',
+    outlinePanel.nestedLevels >= 1 &&
       outlinePanel.rows === EXPECTED_HEADINGS &&
-      /%$/.test(outlinePanel.progress) &&
+      (await page.evaluate(
+        () =>
+          !document
+            .getElementById('__web_sticky_scroll_host__')
+            .shadowRoot.querySelector('.wss-drawer-title, .wss-drawer-progress'),
+      )) &&
       withToc.drawerShadow !== 'none' &&
       withToc.drawerBackdrop === 'none' &&
       withToc.pillBackdrop === 'none' &&
@@ -810,9 +850,7 @@ try {
       dragged.floatingTop > 400 &&
       dragged.drawerRect !== null &&
       Math.abs(dragged.drawerRect.left - dragged.surfaceLeft) <= 1 &&
-      Math.abs(
-        dragged.drawerRect.right - (dragged.surfaceLeft + dragged.surfaceWidth),
-      ) <= 1,
+      Math.abs(dragged.drawerRect.right - dragged.drawerRect.left - 304) <= 1,
     dragged,
   );
   check(
