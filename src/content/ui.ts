@@ -3,8 +3,6 @@ import type { HeadingNode } from './extractor';
 import { buildVisiblePath, type PathOptions } from './path';
 import type {
   FloatingPosition,
-  PillPosition,
-  ThemeMode,
 } from '../shared/settings';
 import { HOST_ID, Z_INDEX } from '../shared/constants';
 
@@ -50,8 +48,6 @@ export class StickyUI {
 
   private headings: HeadingNode[] = [];
   private levels: number[] = [];
-  private position: PillPosition = 'top-center';
-  private themeMode: ThemeMode = 'auto';
   private pathOptions: PathOptions = { ...DEFAULT_PATH_OPTIONS };
   private snapshot: TrackerSnapshot = { ...EMPTY_SNAPSHOT };
   private presentation: Presentation = { ...DEFAULT_PRESENTATION };
@@ -100,7 +96,7 @@ export class StickyUI {
     const root = document.createElement('div');
     root.className = 'wss-root';
     root.dataset.visible = 'false';
-    root.dataset.position = this.position;
+    root.dataset.position = 'top-center';
     root.dataset.pinned = 'false';
     root.dataset.dragging = 'false';
     root.dataset.wssActive = 'true';
@@ -225,20 +221,9 @@ export class StickyUI {
     this.root?.style.setProperty('--wss-z-index', zIndex);
   }
 
-  setPosition(position: PillPosition): void {
-    this.position = position;
-    if (!this.floatingPosition && this.root) this.root.dataset.position = position;
-    this.applyFloatingPosition();
-  }
-
   setFloatingPosition(position: FloatingPosition | null): void {
     this.floatingPosition = position;
     this.applyFloatingPosition();
-  }
-
-  setTheme(mode: ThemeMode): void {
-    this.themeMode = mode;
-    this.applyTheme();
   }
 
   setPathOptions(options: Partial<PathOptions>): void {
@@ -496,7 +481,7 @@ export class StickyUI {
     const pill = this.pill;
     if (!root || !pill) return;
     if (!this.floatingPosition) {
-      root.dataset.position = this.position;
+      root.dataset.position = 'top-center';
       root.style.removeProperty('left');
       root.style.removeProperty('top');
       this.syncPillWidthLimit();
@@ -736,7 +721,7 @@ export class StickyUI {
     this.safely('ui:theme', () => {
       if (!this.root) return;
       const prefersDark = this.mediaQuery ? this.mediaQuery.matches : false;
-      const resolved = this.themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : this.themeMode;
+      const resolved = prefersDark ? 'dark' : 'light';
       this.root.dataset.theme = resolved;
     });
   };

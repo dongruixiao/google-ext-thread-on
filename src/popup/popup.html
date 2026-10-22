@@ -7,24 +7,26 @@
     <style>
       :root {
         color-scheme: light dark;
-        --fg: #0f172a;
-        --muted: rgba(15, 23, 42, 0.58);
-        --bg: #ffffff;
-        --card: rgba(15, 23, 42, 0.035);
-        --border: rgba(15, 23, 42, 0.12);
-        --accent: #4f46e5;
-        --accent-soft: rgba(79, 70, 229, 0.12);
+        --fg: #28261f;
+        --muted: rgb(40 38 31 / 58%);
+        --bg: #faf8f2;
+        --card: rgb(40 38 31 / 5%);
+        --recess: #202126;
+        --border: rgb(40 38 31 / 14%);
+        --accent: #6c4df6;
+        --accent-soft: rgb(108 77 246 / 10%);
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
-          --fg: #e9eaf3;
-          --muted: rgba(233, 234, 243, 0.6);
-          --bg: #14161d;
-          --card: rgba(255, 255, 255, 0.05);
-          --border: rgba(255, 255, 255, 0.14);
-          --accent: #8b8cf9;
-          --accent-soft: rgba(139, 140, 249, 0.16);
+          --fg: #f0ece4;
+          --muted: rgb(240 236 228 / 58%);
+          --bg: #1c1d22;
+          --card: rgb(255 255 255 / 6%);
+          --recess: #101114;
+          --border: rgb(255 255 255 / 14%);
+          --accent: #b1a1ff;
+          --accent-soft: rgb(177 161 255 / 12%);
         }
       }
 
@@ -33,8 +35,8 @@
       }
 
       body {
-        margin: 0;
         width: 304px;
+        margin: 0;
         padding: 14px;
         background: var(--bg);
         color: var(--fg);
@@ -50,58 +52,50 @@
       }
 
       .logo {
-        display: grid;
-        place-items: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 10px;
-        background: linear-gradient(140deg, #4f46e5, #7c3aed);
-        color: #fff;
+        width: 34px;
+        height: 34px;
         flex: none;
+        border-radius: 10px;
       }
 
       h1 {
         margin: 0;
-        font-size: 13px;
-        font-weight: 600;
+        font-size: 14px;
+        line-height: 1.2;
       }
 
       header p {
-        margin: 0;
-        font-size: 11px;
+        margin: 2px 0 0;
         color: var(--muted);
+        font-size: 11px;
       }
 
       .status {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        margin-bottom: 10px;
-        padding: 7px 10px;
+        margin-bottom: 9px;
+        padding: 8px 10px;
         border-radius: 9px;
-        background: var(--card);
-        color: var(--muted);
+        background: var(--recess);
+        color: rgb(242 238 229 / 68%);
         font-size: 11.5px;
         line-height: 1.45;
       }
 
       .status strong {
-        color: var(--fg);
+        color: #f6f2e9;
         font-weight: 600;
       }
 
       .status[data-stale='true'] {
-        color: #b45309;
-        background: color-mix(in srgb, #f59e0b 12%, transparent);
+        color: #f0c98a;
       }
 
       .status .current {
         display: block;
-        max-width: 260px;
+        max-width: 250px;
         overflow: hidden;
+        color: #f6f2e9;
         text-overflow: ellipsis;
         white-space: nowrap;
-        color: var(--fg);
       }
 
       .row {
@@ -109,10 +103,10 @@
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        padding: 8px 10px;
-        border-radius: 10px;
-        background: var(--card);
         margin-bottom: 8px;
+        padding: 9px 10px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
       }
 
       .row > span {
@@ -123,30 +117,29 @@
 
       .row small {
         color: var(--muted);
-        font-size: 11px;
+        font-size: 10.5px;
       }
 
       select {
-        font: inherit;
-        color: inherit;
-        background: var(--bg);
+        max-width: 116px;
+        padding: 5px 7px;
         border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 4px 6px;
-        max-width: 150px;
+        background: var(--bg);
+        color: inherit;
+        font: inherit;
       }
 
       .switch input {
         appearance: none;
+        position: relative;
         width: 36px;
         height: 20px;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: var(--card);
-        position: relative;
-        cursor: pointer;
-        transition: background-color 0.15s ease;
         flex: none;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--card);
+        cursor: pointer;
       }
 
       .switch input::after {
@@ -162,8 +155,8 @@
       }
 
       .switch input:checked {
-        background: var(--accent-soft);
         border-color: var(--accent);
+        background: var(--accent-soft);
       }
 
       .switch input:checked::after {
@@ -172,61 +165,34 @@
       }
 
       button {
-        font: inherit;
-        padding: 7px 10px;
-        border-radius: 9px;
+        width: 100%;
+        padding: 8px 10px;
         border: 1px solid var(--border);
-        background: transparent;
+        border-radius: 9px;
+        background: var(--card);
         color: var(--fg);
+        font: inherit;
         cursor: pointer;
-        transition: background-color 0.15s ease, filter 0.15s ease;
       }
 
       button:hover {
-        background: var(--card);
-      }
-
-      button:disabled {
-        opacity: 0.45;
-        cursor: default;
-      }
-
-      .actions {
-        display: flex;
-        gap: 8px;
-        margin-top: 2px;
-      }
-
-      .actions button {
-        flex: 1;
-        padding-inline: 5px;
-        font-size: 11px;
-        white-space: nowrap;
-      }
-
-      .primary {
-        background: var(--accent);
         border-color: var(--accent);
-        color: #fff;
-      }
-
-      .primary:hover {
-        filter: brightness(1.08);
-        background: var(--accent);
       }
 
       footer {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-top: 12px;
+        margin-top: 11px;
         color: var(--muted);
         font-size: 10.5px;
       }
 
       .link {
+        width: auto;
+        padding: 0;
         border: 0;
-        padding: 2px 4px;
+        background: transparent;
         color: var(--accent);
         font-size: 11px;
       }
@@ -234,17 +200,7 @@
   </head>
   <body>
     <header>
-      <div class="logo">
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-          <path
-            d="M2.75 4h10.5M2.75 8h7.5M2.75 12h4.5"
-            stroke="currentColor"
-            stroke-width="1.7"
-            stroke-linecap="round"
-            fill="none"
-          />
-        </svg>
-      </div>
+      <img class="logo" src="../../icons/icon48.png" alt="" width="34" height="34" />
       <div>
         <h1>TopClip</h1>
         <p>读长文，不掉线</p>
@@ -254,13 +210,16 @@
     <div class="status" id="status">正在检测当前页面…</div>
 
     <label class="row switch">
-      <span>启用拟物章节胶囊</span>
+      <span>
+        开启 TopClip
+        <small>关闭后所有页面都不显示</small>
+      </span>
       <input id="enabled" type="checkbox" />
     </label>
 
     <label class="row">
       <span>
-        显示策略
+        显示方式
         <small id="policyHint">向下滚动浮现，向上滚动让位</small>
       </span>
       <select id="displayPolicy">
@@ -269,15 +228,11 @@
       </select>
     </label>
 
-    <div class="actions">
-      <button id="site" type="button">在此站点禁用</button>
-      <button id="rescan" type="button">重新扫描</button>
-      <button id="copy" type="button" title="在本地复制诊断信息，不会发送网络请求">复制诊断</button>
-    </div>
+    <button id="site" type="button">在此站点禁用</button>
 
     <footer>
-      <button class="link" id="options" type="button">更多设置</button>
-      <span id="version">v0.13.3</span>
+      <button class="link" id="options" type="button">设置</button>
+      <span id="version"></span>
     </footer>
 
     <script type="module" src="./popup.ts"></script>

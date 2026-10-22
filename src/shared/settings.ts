@@ -1,10 +1,6 @@
-export type PillPosition = 'top-center' | 'top-right';
-export type ThemeMode = 'auto' | 'light' | 'dark';
 /** 显示策略：smart 智能浮现 / always 常驻 */
 export type DisplayPolicy = 'smart' | 'always';
-/** 原站已有可见目录时的行为：adapt 退让为极简指示器 / full 保持完整功能 */
-export type PageTocMode = 'adapt' | 'full';
-export type SiteAccess = 'all' | 'blocklist' | 'allowlist';
+
 export interface FloatingPosition {
   /** 可移动区域内相对横坐标，0..100 */
   x: number;
@@ -16,56 +12,26 @@ export interface WssSettings {
   version: number;
   /** 总开关：关闭后不再注入任何 UI */
   enabled: boolean;
-  /** 胶囊悬浮位置 */
-  position: PillPosition;
-  /** 外观主题 */
-  theme: ThemeMode;
-  /** 垂直微调：在自动避让固定导航栏的基础上再下移若干像素 */
-  offsetY: number;
-  /** 面包屑中不显示文章大标题（h1 根级） */
-  hideArticleTitle: boolean;
-  /** 面包屑最多显示几级（超出部分折叠为 …） */
-  maxCrumbs: number;
   /** 显示策略 */
   displayPolicy: DisplayPolicy;
-  /** 原站目录适配策略 */
-  pageTocMode: PageTocMode;
-  /** 站点访问策略 */
-  siteAccess: SiteAccess;
-  /** 站点规则列表（黑名单 / 白名单） */
-  sites: string[];
+  /** 用户主动停用 TopClip 的站点 */
+  disabledSites: string[];
   /** 按站点保存的拟物胶囊位置 */
   floatingPositions: Record<string, FloatingPosition>;
 }
 
-export const SETTINGS_VERSION = 5;
+export const SETTINGS_VERSION = 6;
 export const SETTINGS_KEY = 'wss:settings';
 
 export const DEFAULT_SETTINGS: WssSettings = {
   version: SETTINGS_VERSION,
   enabled: true,
-  position: 'top-center',
-  theme: 'auto',
-  offsetY: 0,
-  hideArticleTitle: true,
-  maxCrumbs: 3,
   displayPolicy: 'always',
-  pageTocMode: 'adapt',
-  siteAccess: 'all',
-  sites: [],
+  disabledSites: [],
   floatingPositions: {},
 };
 
-const POSITIONS: readonly PillPosition[] = ['top-center', 'top-right'];
-const THEMES: readonly ThemeMode[] = ['auto', 'light', 'dark'];
 const POLICIES: readonly DisplayPolicy[] = ['smart', 'always'];
-const TOC_MODES: readonly PageTocMode[] = ['adapt', 'full'];
-const SITE_ACCESS: readonly SiteAccess[] = ['all', 'blocklist', 'allowlist'];
-const MIN_OFFSET = -20;
-const MAX_OFFSET = 400;
-const MIN_CRUMBS = 1;
-const MAX_CRUMBS = 6;
-
 const LS_KEY = 'wss:settings:fallback';
 
 function clamp(value: number, min: number, max: number): number {
@@ -76,7 +42,7 @@ function pick<T extends string>(value: unknown, allowed: readonly T[], fallback:
   return allowed.includes(value as T) ? (value as T) : fallback;
 }
 
-/** 域名归一化：去掉协议/路径/端口与前置的 *. */
+/** 域名归一化：去掉协议、路径、端口与前置的 *. */
 export function normalizeHost(input: string): string {
   let host = input.trim().toLowerCase();
   const schemeIndex = host.indexOf('://');
@@ -94,7 +60,6 @@ function normalizeSites(raw: unknown): string[] {
   for (const entry of raw) {
     if (typeof entry !== 'string') continue;
     const host = normalizeHost(entry);
-    // 允许 localhost 这类单标签主机（本地开发常用）
     if (!host || /\s/.test(host)) continue;
     if (!result.includes(host)) result.push(host);
   }
@@ -125,44 +90,32 @@ function normalizeFloatingPositions(raw: unknown): Record<string, FloatingPositi
   return result;
 }
 
-/** 兼容旧版本（v1 没有 version / 层级 / 站点字段）并做全量校验 */
+/** 兼容旧版本并做全量校验。 */
 export function normalizeSettings(raw: unknown): WssSettings {
-  const input = (raw ?? {}) as Partial<Record<keyof WssSettings, unknown>>;
-  const offsetY =
-    typeof input.offsetY === 'number' && Number.isFinite(input.offsetY)
-      ? clamp(input.offsetY, MIN_OFFSET, MAX_OFFSET)
-      : DEFAULT_SETTINGS.offsetY;
-  const maxCrumbs =
-    typeof input.maxCrumbs === 'number' && Number.isFinite(input.maxCrumbs)
-      ? clamp(Math.round(input.maxCrumbs), MIN_CRUMBS, MAX_CRUMBS)
-      : DEFAULT_SETTINGS.maxCrumbs;
-
+  const input = (raw ?? {}) as Record<string, unknown>;
   const displayPolicy =
     input.displayPolicy === 'peek'
       ? 'smart'
       : pick(input.displayPolicy, POLICIES, DEFAULT_SETTINGS.displayPolicy);
+
+  // v5 只支持黑名单式站点禁用；旧的白名单不做反向迁移，避免升级后整网失效。
+  const disabledSites =
+    input.disabledSites !== undefined
+      ? normalizeSites(input.disabledSites)
+      : input.siteAccess === 'blocklist'
+        ? normalizeSites(input.sites)
+        : [];
+
   return {
     version: SETTINGS_VERSION,
     enabled: typeof input.enabled === 'boolean' ? input.enabled : DEFAULT_SETTINGS.enabled,
-    position: pick(input.position, POSITIONS, DEFAULT_SETTINGS.position),
-    theme: pick(input.theme, THEMES, DEFAULT_SETTINGS.theme),
-    offsetY,
-    hideArticleTitle:
-      typeof input.hideArticleTitle === 'boolean'
-        ? input.hideArticleTitle
-        : DEFAULT_SETTINGS.hideArticleTitle,
-    maxCrumbs,
     displayPolicy,
-    pageTocMode: pick(input.pageTocMode, TOC_MODES, DEFAULT_SETTINGS.pageTocMode),
-    siteAccess: pick(input.siteAccess, SITE_ACCESS, DEFAULT_SETTINGS.siteAccess),
-    sites: normalizeSites(input.sites),
+    disabledSites,
     floatingPositions: normalizeFloatingPositions(input.floatingPositions),
   };
 }
 
-// ── 站点规则 ──────────────────────────────────────────
-
-/** 命中的站点规则（支持 example.com 覆盖其子域），未命中返回 undefined */
+/** 命中站点规则（支持 example.com 覆盖其子域），未命中返回 undefined */
 export function matchSite(sites: string[], hostname: string): string | undefined {
   const host = normalizeHost(hostname);
   if (!host) return undefined;
@@ -171,32 +124,18 @@ export function matchSite(sites: string[], hostname: string): string | undefined
 
 export function isSiteEnabled(settings: WssSettings, hostname: string): boolean {
   if (!settings.enabled) return false;
-  const matched = matchSite(settings.sites, hostname);
-  if (settings.siteAccess === 'blocklist') return matched === undefined;
-  if (settings.siteAccess === 'allowlist') return matched !== undefined;
-  return true;
+  return matchSite(settings.disabledSites, hostname) === undefined;
 }
 
-/**
- * 在当前站点上切换启用状态：
- * 默认（全部站点）状态下第一次禁用会切换到黑名单模式。
- */
+/** 在当前站点上切换启用状态。 */
 export function toggleSite(settings: WssSettings, hostname: string): WssSettings {
   const host = normalizeHost(hostname);
   if (!host) return settings;
-  const sites = settings.sites;
-  const access = settings.siteAccess;
-
-  if (access === 'all') {
-    return { ...settings, siteAccess: 'blocklist', sites: [...sites, host] };
-  }
-  const matched = matchSite(sites, host);
-  if (access === 'blocklist') {
-    const next = matched ? sites.filter((entry) => entry !== matched) : [...sites, host];
-    return { ...settings, sites: next };
-  }
-  const next = matched ? sites.filter((entry) => entry !== matched) : [...sites, host];
-  return { ...settings, sites: next };
+  const matched = matchSite(settings.disabledSites, host);
+  const disabledSites = matched
+    ? settings.disabledSites.filter((entry) => entry !== matched)
+    : [...settings.disabledSites, host];
+  return { ...settings, disabledSites };
 }
 
 // ── 读写 ─────────────────────────────────────────────
@@ -239,11 +178,6 @@ export async function saveSettings(next: WssSettings): Promise<void> {
   }
 }
 
-/**
- * 订阅设置变化。
- * - 扩展环境：chrome.storage.onChanged（popup / options / 其它标签页的改动都会触发）
- * - demo 环境：window storage 事件
- */
 export function subscribeSettings(callback: (settings: WssSettings) => void): () => void {
   if (!hasChromeStorage()) {
     const onStorage = (event: StorageEvent): void => {

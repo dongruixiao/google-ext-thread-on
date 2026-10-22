@@ -1,7 +1,7 @@
 {
   "name": "web-sticky-scroll",
   "private": true,
-  "version": "0.13.3",
+  "version": "0.14.0",
   "type": "module",
   "description": "TopClip —— 读长文，不掉线（可拖动的拟物章节胶囊与整篇阅读进度）",
   "scripts": {

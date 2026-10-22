@@ -823,10 +823,20 @@ try {
   await page.bringToFront();
   const optionsState = await options.evaluate(() => ({
     sections: document.querySelectorAll('section h2').length,
-    hideTitle: document.querySelector('#hideArticleTitle')?.checked,
     policy: document.querySelector('#displayPolicy')?.value,
+    hasReset: !!document.querySelector('#reset'),
+    hasRemovedAdvancedSettings: !!document.querySelector(
+      '#position, #theme, #offsetY, #hideArticleTitle, #maxCrumbs, #pageTocMode, #siteAccess, #data',
+    ),
   }));
-  check('options 正常渲染', optionsState.sections >= 4 && optionsState.policy === 'always', optionsState);
+  check(
+    '设置页只保留基础阅读设置',
+    optionsState.sections === 1 &&
+      optionsState.policy === 'always' &&
+      optionsState.hasReset &&
+      !optionsState.hasRemovedAdvancedSettings,
+    optionsState,
+  );
 
   await options.selectOption('#displayPolicy', 'smart');
   await options.waitForTimeout(700);
@@ -968,11 +978,16 @@ try {
     title: document.querySelector('h1')?.textContent ?? '',
     policy: document.querySelector('#displayPolicy')?.value ?? '',
     siteButtonDisabled: document.querySelector('#site')?.disabled ?? true,
-    hasDiagnostics: !!document.querySelector('#copy'),
+    hasOptions: !!document.querySelector('#options'),
+    hasRemovedDiagnostics: !!document.querySelector('#copy, #rescan'),
   }));
   check('popup 正常渲染', popupState.title.includes('TopClip'), popupState);
   check('popup 能读到当前站点', popupState.siteButtonDisabled === false, popupState);
-  check('popup 提供本地诊断复制入口', popupState.hasDiagnostics, popupState);
+  check(
+    'popup 只保留高频操作',
+    popupState.hasOptions && !popupState.hasRemovedDiagnostics,
+    popupState,
+  );
 
   await popup.evaluate(() => document.querySelector('#site').click());
   await popup.waitForTimeout(900);

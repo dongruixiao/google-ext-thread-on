@@ -120,7 +120,7 @@ class StickyScrollApp {
   // ── 生命周期 ────────────────────────────────────────
 
   private applySettings(next: WssSettings): void {
-    const previous = this.settings;
+    const previousPolicy = this.settings.displayPolicy;
     this.settings = next;
     this.siteAllowed = isSiteEnabled(next, location.hostname);
 
@@ -133,21 +133,13 @@ class StickyScrollApp {
       return;
     }
 
-    const tocStrategyChanged = previous.pageTocMode !== next.pageTocMode;
-    const policyChanged = previous.displayPolicy !== next.displayPolicy;
-    if (tocStrategyChanged) {
-      this.tocCandidates = this.collectTocCandidates();
-      this.tocVisible = this.evaluateToc();
-    }
+    const policyChanged = previousPolicy !== next.displayPolicy;
     if (policyChanged) {
       this.shown = true;
       this.dimmed = false;
       this.lastActivityAt = Date.now();
     }
-    this.ui?.setPathOptions({
-      hideArticleTitle: next.hideArticleTitle,
-      maxCrumbs: next.maxCrumbs,
-    });
+    this.ui?.setPathOptions({ hideArticleTitle: true, maxCrumbs: 3 });
     this.ui?.setFloatingPosition(next.floatingPositions[location.hostname] ?? null);
     this.refreshLayout();
   }
@@ -273,8 +265,8 @@ class StickyScrollApp {
       (position) => this.saveFloatingPosition(position),
     );
     ui.setPathOptions({
-      hideArticleTitle: this.settings.hideArticleTitle,
-      maxCrumbs: this.settings.maxCrumbs,
+      hideArticleTitle: true,
+      maxCrumbs: 3,
     });
     ui.mount(index.headings);
     ui.setFloatingPosition(this.settings.floatingPositions[location.hostname] ?? null);
@@ -404,7 +396,7 @@ class StickyScrollApp {
     const current = this.snapshot?.index ?? -1;
     let next = current + direction;
     if (current < 0 && direction === 1) {
-      next = this.settings.hideArticleTitle && headings.some((node) => node.level > 1)
+      next = headings.some((node) => node.level > 1)
         ? headings.findIndex((node) => node.level > 1)
         : 0;
     }
@@ -461,8 +453,6 @@ class StickyScrollApp {
     this.updateLayoutMetrics();
     this.ui?.setTop(this.pillTop());
     this.ui?.setZIndex(this.layerZIndex());
-    this.ui?.setPosition(this.settings.position);
-    this.ui?.setTheme(this.settings.theme);
     this.tracker?.refresh();
     this.probeToc();
     this.applyPresentation();
@@ -476,8 +466,8 @@ class StickyScrollApp {
   }
 
   private pillTop(): number {
-    // 玻璃胶囊自动避让站点固定导航栏，并允许用户垂直微调。
-    return this.overlayHeight + PILL_GAP + this.settings.offsetY;
+    // 默认位置自动避让站点固定导航栏；拖动后使用站点级自定义位置。
+    return this.overlayHeight + PILL_GAP;
   }
 
   /**
@@ -622,7 +612,7 @@ class StickyScrollApp {
       // 顶部被遮罩层盖住时不显示，免得浮在对话框上面
       visible: this.shown && !this.overlayBlocked && !this.findMode,
       dim: this.dimmed,
-      compact: this.settings.pageTocMode === 'adapt' && this.tocVisible,
+      compact: this.tocVisible,
     });
   }
 
@@ -644,12 +634,11 @@ class StickyScrollApp {
   // ── 原站目录适配 ────────────────────────────────────
 
   private collectTocCandidates(): HTMLElement[] {
-    if (this.settings.pageTocMode !== 'adapt' || !this.index) return [];
+    if (!this.index) return [];
     return findTocCandidates(this.index.headings);
   }
 
   private evaluateToc(): boolean {
-    if (this.settings.pageTocMode !== 'adapt') return false;
     return isAnyTocVisible(this.tocCandidates);
   }
 

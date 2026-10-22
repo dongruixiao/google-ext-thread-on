@@ -1,7 +1,6 @@
 // 生成扩展图标（16/48/128）：手写 PNG 编码，避免为一个图标引入图像处理依赖。
 //
-// 图形：圆角方形渐变底 + 一枚「曲别针」（TopClip 的 clip），
-// 16px 版本只保留外圈（放大线宽），否则缩到 16px 会糊成一团。
+// 图形：深色圆角底座 + 拉丝金属胶囊 + 紫色阅读进度环。
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -68,6 +67,12 @@ function insideRect(px, py, x, y, width, height, radius) {
   return dx * dx + dy * dy <= r * r;
 }
 
+function insideCircle(px, py, cx, cy, radius) {
+  const dx = px - cx;
+  const dy = py - cy;
+  return dx * dx + dy * dy <= radius * radius;
+}
+
 /** 圆角矩形描边：外圈内、内圈外 */
 function inStroke(px, py, x, y, width, height, stroke, radius) {
   if (!insideRect(px, py, x, y, width, height, radius)) return false;
@@ -103,26 +108,32 @@ function drawIcon(size) {
   const buffer = Buffer.alloc(size * size * 4);
   const cardRadius = w * 0.235;
 
-  // 图形：一枚「夹子」（Π，两条腿一长一短，亮白）夹住一条半透明标题线，下面再跟一条更淡的短标题
   const simple = size <= 16;
-  const stroke = w * (simple ? 0.105 : 0.085);
-  const clipLeft = w * 0.33;
-  const clipRight = w * 0.67;
-  const clipTop = h * 0.18;
-  const longLegBottom = h * 0.64;
-  const shortLegBottom = h * (simple ? 0.52 : 0.48);
-  const bar = {
-    x: w * 0.13,
-    y: h * 0.38,
-    width: w * 0.74,
-    height: h * (simple ? 0.17 : 0.15),
+  const pill = {
+    x: w * 0.1,
+    y: h * 0.3,
+    width: w * 0.8,
+    height: h * 0.4,
+  };
+  const pillInset = Math.max(1, w * 0.022);
+  const badgeX = w * 0.29;
+  const badgeY = h * 0.5;
+  const badgeRadius = h * 0.23;
+  const ringRadius = badgeRadius + w * 0.028;
+  const ringWidth = Math.max(scale, w * 0.04);
+  const titleBar = {
+    x: w * 0.47,
+    y: h * 0.43,
+    width: w * (simple ? 0.31 : 0.34),
+    height: h * 0.09,
   };
   const secondBar = {
-    x: w * 0.13,
-    y: h * 0.72,
-    width: w * 0.44,
-    height: h * (simple ? 0.14 : 0.12),
+    x: w * 0.47,
+    y: h * 0.57,
+    width: w * (simple ? 0.2 : 0.25),
+    height: h * 0.07,
   };
+  const progressEnd = Math.PI * 2 * 0.68;
 
   const accum = new Float64Array(size * size * 4);
   for (let y = 0; y < h; y += 1) {
@@ -131,33 +142,56 @@ function drawIcon(size) {
       const py = y + 0.5;
       if (!insideRect(px, py, 0, 0, w, h, cardRadius)) continue;
 
-      const t = (x * 0.25 + y * 0.75) / h;
-      let color = [mix(79, 139, t), mix(70, 92, t), mix(229, 246, t)];
+      const bgT = (x * 0.22 + y * 0.78) / h;
+      let color = [mix(55, 27, bgT), mix(56, 28, bgT), mix(62, 32, bgT)];
 
-      const inClip =
-        // 左腿（长）
-        inStroke(px, py, clipLeft, clipTop, stroke, longLegBottom - clipTop, stroke, stroke / 2) ||
-        // 右腿（短）
-        inStroke(
-          px,
-          py,
-          clipRight - stroke,
-          clipTop,
-          stroke,
-          shortLegBottom - clipTop,
-          stroke,
-          stroke / 2,
-        ) ||
-        // 顶部横梁
-        inStroke(px, py, clipLeft, clipTop, clipRight - clipLeft, stroke, stroke, stroke / 2);
+      if (!insideRect(px, py, w * 0.025, h * 0.025, w * 0.95, h * 0.95, cardRadius * 0.9)) {
+        color = blend(color, WHITE, 0.26);
+      }
 
-      if (inClip) color = blend(color, WHITE, 0.98);
-      else if (insideRect(px, py, bar.x, bar.y, bar.width, bar.height, bar.height / 2)) {
-        color = blend(color, WHITE, 0.62);
+      if (insideRect(px, py, pill.x, pill.y, pill.width, pill.height, pill.height / 2)) {
+        const metalT = (py - pill.y) / pill.height;
+        color = [
+          mix(248, 155, metalT),
+          mix(246, 153, metalT),
+          mix(238, 149, metalT),
+        ];
+        if (
+          !insideRect(
+            px,
+            py,
+            pill.x + pillInset,
+            pill.y + pillInset,
+            pill.width - pillInset * 2,
+            pill.height - pillInset * 2,
+            pill.height / 2 - pillInset,
+          )
+        ) {
+          color = blend(color, metalT < 0.5 ? WHITE : [46, 45, 42], 0.56);
+        }
+      }
+
+      const dist = Math.hypot(px - badgeX, py - badgeY);
+      if (dist <= badgeRadius) {
+        const highlight = Math.max(0, 1 - dist / (badgeRadius * 1.7)) * 0.24;
+        color = blend([20, 21, 24], WHITE, highlight);
+      }
+
+      if (dist <= ringRadius && dist >= ringRadius - ringWidth) {
+        const angle = (Math.atan2(py - badgeY, px - badgeX) + Math.PI / 2 + Math.PI * 2) %
+          (Math.PI * 2);
+        color =
+          angle <= progressEnd
+            ? [128, 99, 255]
+            : blend(color, WHITE, 0.18);
+      }
+
+      if (insideRect(px, py, titleBar.x, titleBar.y, titleBar.width, titleBar.height, titleBar.height / 2)) {
+        color = [38, 38, 42];
       } else if (
         insideRect(px, py, secondBar.x, secondBar.y, secondBar.width, secondBar.height, secondBar.height / 2)
       ) {
-        color = blend(color, WHITE, 0.34);
+        color = blend([38, 38, 42], [190, 188, 180], 0.46);
       }
 
       const target = (Math.floor(y / scale) * size + Math.floor(x / scale)) * 4;
