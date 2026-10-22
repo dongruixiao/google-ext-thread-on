@@ -202,7 +202,7 @@ describe('buildHeadingIndex', () => {
     expect(index?.diagnostics).toContain('conv=1');
   });
 
-  it('渐变背景页面即使正文结构完整也保持静默', () => {
+  it('渐变背景页面使用中性玻璃标题，不依赖网页背景色', () => {
     document.body.innerHTML = `
       <article style="background-image: linear-gradient(red, blue)">
         <h1 style="color: white; font-size: 40px">文章标题</h1>
@@ -217,7 +217,7 @@ describe('buildHeadingIndex', () => {
     expect(index?.isVisualSafe).toBe(false);
     expect(index?.visualReason).toBe('background-complex');
     expect(index?.isReadingCandidate).toBe(true);
-    expect(index?.isArticle).toBe(false);
+    expect(index?.isArticle).toBe(true);
   });
 
   it('侧栏导航标题没有正文，不进入大纲', () => {

@@ -111,6 +111,19 @@
   align-items: flex-end;
 }
 
+.wss-root[data-appearance='pill'][data-position='custom'] {
+  top: 0;
+  left: 0;
+  right: auto;
+  transform: none;
+  align-items: flex-start;
+}
+
+.wss-root[data-dragging='true'] .wss-pill {
+  cursor: grabbing;
+  scale: 1.02;
+}
+
 .wss-root[data-appearance='pill'] .wss-bar {
   display: none;
 }
@@ -150,15 +163,20 @@
   right: 0;
   bottom: auto;
   left: 0;
-  height: calc(var(--wss-bar-height) + 4px);
+  height: var(--wss-bar-height);
   pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    var(--wss-page-bg) 0%,
-    var(--wss-page-bg) 72%,
-    color-mix(in srgb, var(--wss-page-bg) 94%, transparent) 86%,
-    transparent 100%
-  );
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--wss-surface) 58%, transparent),
+      color-mix(in srgb, var(--wss-surface) 34%, transparent)
+    );
+  border-bottom: 1px solid color-mix(in srgb, var(--wss-fg) 10%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 72%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--wss-fg) 7%, transparent);
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
 }
 
 .wss-bar {
@@ -206,6 +224,16 @@
   z-index: 1;
   min-width: 0;
   max-width: 100%;
+}
+
+/* 中性玻璃表面不依赖网页背景色；标题保持原字号与字重，改用可读主题色。 */
+.wss-bar-heading [data-wss-clone],
+.wss-bar-heading [data-wss-clone] * {
+  color: var(--wss-fg) !important;
+  -webkit-text-fill-color: var(--wss-fg) !important;
+  background: transparent !important;
+  mix-blend-mode: normal !important;
+  filter: none !important;
 }
 
 .wss-bar-heading[data-wss-role='heading'] {
@@ -289,7 +317,7 @@
   -webkit-backdrop-filter: blur(18px) saturate(165%);
   max-width: min(calc(100vw - 32px), 460px);
   pointer-events: auto;
-  cursor: default;
+  cursor: grab;
   user-select: none;
   color: var(--wss-fg);
 }
@@ -332,6 +360,7 @@
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: grab;
 }
 
 .wss-glass-title:focus-visible {

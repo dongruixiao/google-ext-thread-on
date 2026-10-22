@@ -2,7 +2,13 @@ import styleText from './style.css?inline';
 import type { HeadingNode } from './extractor';
 import { buildVisiblePath, type PathOptions } from './path';
 import { cloneHeading, estimateHeadingHeight } from './heading-clone';
-import type { Appearance, BarWidth, PillPosition, ThemeMode } from '../shared/settings';
+import type {
+  Appearance,
+  BarWidth,
+  FloatingPosition,
+  PillPosition,
+  ThemeMode,
+} from '../shared/settings';
 import { HOST_ID, Z_INDEX } from '../shared/constants';
 
 import type { PageStyle } from './palette';
@@ -44,6 +50,7 @@ const HOVER_TARGET = '.wss-pill, .wss-bar-inner, .wss-drawer';
 export class StickyUI {
   private host: HTMLDivElement | null = null;
   private root: HTMLDivElement | null = null;
+  private pill: HTMLDivElement | null = null;
   private headingSlot: HTMLElement | null = null;
   private glassTitle: HTMLElement | null = null;
   private progressLayer: HTMLDivElement | null = null;
@@ -72,10 +79,27 @@ export class StickyUI {
   private cloneIndex = -2;
   private currentIndex = -2;
   private progressLabel = '';
+  private floatingPosition: FloatingPosition | null = null;
+  private drag:
+    | {
+        pointerId: number;
+        startX: number;
+        startY: number;
+        offsetX: number;
+        offsetY: number;
+        width: number;
+        height: number;
+        moved: boolean;
+      }
+    | null = null;
+  private suppressClickUntil = 0;
 
   constructor(
     private readonly onJump: (index: number) => void,
     private readonly onError?: (action: string, error: unknown) => void,
+    private readonly onFloatingPositionChange?: (
+      position: FloatingPosition | null,
+    ) => void,
   ) {}
 
   mount(headings: HeadingNode[]): void {
@@ -103,6 +127,7 @@ export class StickyUI {
     root.dataset.appearance = this.appearance;
     root.dataset.barWidth = this.barWidth;
     root.dataset.pinned = 'false';
+    root.dataset.dragging = 'false';
     root.dataset.wssActive = 'true';
     root.style.setProperty('--wss-z-index', String(Z_INDEX));
     root.setAttribute('role', 'navigation');
@@ -138,6 +163,7 @@ export class StickyUI {
 
     this.host = host;
     this.root = root;
+    this.pill = root.querySelector<HTMLDivElement>('.wss-pill');
     this.headingSlot = root.querySelector<HTMLElement>('.wss-bar-heading');
     this.glassTitle = root.querySelector<HTMLElement>('.wss-glass-title');
     this.progressLayer = progressLayer;
@@ -156,8 +182,13 @@ export class StickyUI {
     root.addEventListener('focusin', this.handleEnter, true);
     root.addEventListener('focusout', this.handleLeave, true);
     root.addEventListener('keydown', this.handleKeyDown);
+    this.pill?.addEventListener('pointerdown', this.handleDragStart);
+    this.pill?.addEventListener('dblclick', this.handlePillDoubleClick);
     window.addEventListener('keydown', this.handleWindowKeyDown, true);
     window.addEventListener('pointerdown', this.handleOutsidePointerDown, true);
+    window.addEventListener('pointermove', this.handleDragMove, { passive: false });
+    window.addEventListener('pointerup', this.handleDragEnd);
+    window.addEventListener('pointercancel', this.handleDragEnd);
 
     if (typeof window.matchMedia === 'function') {
       this.mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -179,13 +210,19 @@ export class StickyUI {
       this.root.removeEventListener('focusout', this.handleLeave, true);
       this.root.removeEventListener('keydown', this.handleKeyDown);
     }
+    this.pill?.removeEventListener('pointerdown', this.handleDragStart);
+    this.pill?.removeEventListener('dblclick', this.handlePillDoubleClick);
     window.removeEventListener('keydown', this.handleWindowKeyDown, true);
     window.removeEventListener('pointerdown', this.handleOutsidePointerDown, true);
+    window.removeEventListener('pointermove', this.handleDragMove);
+    window.removeEventListener('pointerup', this.handleDragEnd);
+    window.removeEventListener('pointercancel', this.handleDragEnd);
     this.mediaQuery?.removeEventListener('change', this.applyTheme);
     this.mediaQuery = null;
     this.host?.remove();
     this.host = null;
     this.root = null;
+    this.pill = null;
     this.headingSlot = null;
     this.glassTitle = null;
     this.progressLayer = null;
@@ -200,6 +237,8 @@ export class StickyUI {
     this.drawerOpen = false;
     this.pinned = false;
     this.progressLabel = '';
+    this.floatingPosition = null;
+    this.drag = null;
     this.snapshot = { ...EMPTY_SNAPSHOT };
     this.presentation = { ...DEFAULT_PRESENTATION };
   }
@@ -222,7 +261,13 @@ export class StickyUI {
 
   setPosition(position: PillPosition): void {
     this.position = position;
-    if (this.root) this.root.dataset.position = position;
+    if (!this.floatingPosition && this.root) this.root.dataset.position = position;
+    if (this.floatingPosition) this.applyFloatingPosition();
+  }
+
+  setFloatingPosition(position: FloatingPosition | null): void {
+    this.floatingPosition = position;
+    this.applyFloatingPosition();
   }
 
   setTheme(mode: ThemeMode): void {
@@ -237,6 +282,7 @@ export class StickyUI {
     this.cloneIndex = -2; // 形态切换后需要重新克隆并重新量高度
     if (this.root) this.root.dataset.appearance = appearance;
     this.render();
+    this.applyFloatingPosition();
   }
 
   setBarWidth(width: BarWidth): void {
@@ -570,8 +616,133 @@ export class StickyUI {
     }
   }
 
+  private applyFloatingPosition(): void {
+    const root = this.root;
+    const pill = this.pill;
+    if (!root || !pill) return;
+    if (this.appearance !== 'pill' || !this.floatingPosition) {
+      root.dataset.position = this.position;
+      root.style.removeProperty('left');
+      root.style.removeProperty('top');
+      return;
+    }
+
+    const rect = pill.getBoundingClientRect();
+    const width = rect.width || 280;
+    const height = rect.height || 38;
+    const maxX = Math.max(0, window.innerWidth - width - 16);
+    const maxY = Math.max(0, window.innerHeight - height - 16);
+    const left = 8 + (this.floatingPosition.x / 100) * maxX;
+    const top = 8 + (this.floatingPosition.y / 100) * maxY;
+    this.applyPixelPosition(left, top);
+  }
+
+  private applyPixelPosition(left: number, top: number): void {
+    const root = this.root;
+    if (!root) return;
+    root.dataset.position = 'custom';
+    root.style.left = `${Math.round(left)}px`;
+    root.style.top = `${Math.round(top)}px`;
+  }
+
+  private normalizedPosition(
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+  ): FloatingPosition {
+    const maxX = Math.max(1, window.innerWidth - width - 16);
+    const maxY = Math.max(1, window.innerHeight - height - 16);
+    return {
+      x: Math.round(Math.max(0, Math.min(100, ((left - 8) / maxX) * 100)) * 10) / 10,
+      y: Math.round(Math.max(0, Math.min(100, ((top - 8) / maxY) * 100)) * 10) / 10,
+    };
+  }
+
+  private handleDragStart = (event: PointerEvent): void => {
+    this.safely('ui:drag-start', () => {
+      if (this.appearance !== 'pill' || !this.pill || event.button !== 0) return;
+      const rect = this.pill.getBoundingClientRect();
+      this.drag = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+        width: rect.width,
+        height: rect.height,
+        moved: false,
+      };
+      this.closeDrawer();
+      try {
+        this.pill.setPointerCapture(event.pointerId);
+      } catch {
+        /* pointer capture 不可用时仍可用 window 监听完成拖动 */
+      }
+    });
+  };
+
+  private handleDragMove = (event: PointerEvent): void => {
+    this.safely('ui:drag-move', () => {
+      const drag = this.drag;
+      const root = this.root;
+      if (!drag || !root || drag.pointerId !== event.pointerId) return;
+      if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 4) {
+        return;
+      }
+      drag.moved = true;
+      event.preventDefault();
+      root.dataset.dragging = 'true';
+      const maxX = Math.max(8, window.innerWidth - drag.width - 8);
+      const maxY = Math.max(8, window.innerHeight - drag.height - 8);
+      const left = Math.max(8, Math.min(maxX, event.clientX - drag.offsetX));
+      const top = Math.max(8, Math.min(maxY, event.clientY - drag.offsetY));
+      this.applyPixelPosition(left, top);
+    });
+  };
+
+  private handleDragEnd = (event: PointerEvent): void => {
+    this.safely('ui:drag-end', () => {
+      const drag = this.drag;
+      const root = this.root;
+      const pill = this.pill;
+      if (!drag || !root || drag.pointerId !== event.pointerId) return;
+      this.drag = null;
+      root.dataset.dragging = 'false';
+      try {
+        pill?.releasePointerCapture(event.pointerId);
+      } catch {
+        /* ignore */
+      }
+      if (!drag.moved || !pill) return;
+
+      const rect = pill.getBoundingClientRect();
+      this.suppressClickUntil = Date.now() + 350;
+      this.floatingPosition = this.normalizedPosition(rect.left, rect.top, rect.width, rect.height);
+      this.onFloatingPositionChange?.(this.floatingPosition);
+    });
+  };
+
+  private handlePillDoubleClick = (event: MouseEvent): void => {
+    this.safely('ui:drag-reset', () => {
+      if (this.appearance !== 'pill') return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.suppressClickUntil = Date.now() + 350;
+      this.floatingPosition = null;
+      this.onFloatingPositionChange?.(null);
+      this.applyFloatingPosition();
+      this.closeDrawer();
+    });
+  };
+
   private handleClick = (event: MouseEvent): void => {
     this.safely('ui:click', () => {
+      if (Date.now() < this.suppressClickUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       const target = event.target as HTMLElement | null;
       const trigger = target?.closest<HTMLElement>('[data-wss-index], [data-wss-role="heading"]');
       if (!trigger) return;
@@ -588,6 +759,7 @@ export class StickyUI {
 
   private handleEnter = (event: Event): void => {
     this.safely('ui:enter', () => {
+      if (this.drag) return;
       const target = event.target as HTMLElement | null;
       if (!target?.closest(HOVER_TARGET)) return;
       this.clearCloseTimer();

@@ -10,6 +10,13 @@ export type Appearance = 'bar' | 'pill';
 /** 吸顶条宽度：full 满宽 / column 与正文列对齐 */
 export type BarWidth = 'full' | 'column';
 
+export interface FloatingPosition {
+  /** 可移动区域内相对横坐标，0..100 */
+  x: number;
+  /** 可移动区域内相对纵坐标，0..100 */
+  y: number;
+}
+
 export interface WssSettings {
   version: number;
   /** 总开关：关闭后不再注入任何 UI */
@@ -36,9 +43,11 @@ export interface WssSettings {
   siteAccess: SiteAccess;
   /** 站点规则列表（黑名单 / 白名单） */
   sites: string[];
+  /** 按站点保存的液态玻璃位置 */
+  floatingPositions: Record<string, FloatingPosition>;
 }
 
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
 export const SETTINGS_KEY = 'wss:settings';
 
 export const DEFAULT_SETTINGS: WssSettings = {
@@ -55,6 +64,7 @@ export const DEFAULT_SETTINGS: WssSettings = {
   barWidth: 'full',
   siteAccess: 'all',
   sites: [],
+  floatingPositions: {},
 };
 
 const POSITIONS: readonly PillPosition[] = ['top-center', 'top-right'];
@@ -105,6 +115,30 @@ function normalizeSites(raw: unknown): string[] {
   return result.slice(0, 500);
 }
 
+function normalizeFloatingPositions(raw: unknown): Record<string, FloatingPosition> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const result: Record<string, FloatingPosition> = {};
+  for (const [rawHost, rawPosition] of Object.entries(raw).slice(0, 100)) {
+    const host = normalizeHost(rawHost);
+    if (!host || /\s/.test(host)) continue;
+    if (!rawPosition || typeof rawPosition !== 'object' || Array.isArray(rawPosition)) continue;
+    const value = rawPosition as Partial<FloatingPosition>;
+    if (
+      typeof value.x !== 'number' ||
+      typeof value.y !== 'number' ||
+      !Number.isFinite(value.x) ||
+      !Number.isFinite(value.y)
+    ) {
+      continue;
+    }
+    result[host] = {
+      x: Math.round(clamp(value.x, 0, 100) * 10) / 10,
+      y: Math.round(clamp(value.y, 0, 100) * 10) / 10,
+    };
+  }
+  return result;
+}
+
 /** 兼容旧版本（v1 没有 version / 层级 / 站点字段）并做全量校验 */
 export function normalizeSettings(raw: unknown): WssSettings {
   const input = (raw ?? {}) as Partial<Record<keyof WssSettings, unknown>>;
@@ -134,6 +168,7 @@ export function normalizeSettings(raw: unknown): WssSettings {
     barWidth: pick(input.barWidth, BAR_WIDTHS, DEFAULT_SETTINGS.barWidth),
     siteAccess: pick(input.siteAccess, SITE_ACCESS, DEFAULT_SETTINGS.siteAccess),
     sites: normalizeSites(input.sites),
+    floatingPositions: normalizeFloatingPositions(input.floatingPositions),
   };
 }
 

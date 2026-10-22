@@ -42,7 +42,7 @@ const POLICY_HINTS: Record<DisplayPolicy, string> = {
 
 const APPEARANCE_HINTS: Record<Appearance, string> = {
   bar: '无痕阅读：全宽页面渐隐，最自然',
-  pill: '液态玻璃：紧凑胶囊，独立显示',
+  pill: '液态玻璃：可拖动定位，双击恢复',
 };
 
 function getElement<T extends HTMLElement>(selector: string): T {

@@ -90,6 +90,10 @@ const probe = (page) =>
       host: !!host,
       attachedToHtml: host?.parentElement?.tagName === 'HTML',
       appearance: root?.dataset.appearance ?? null,
+      position: root?.dataset.position ?? null,
+      dragging: root?.dataset.dragging ?? null,
+      floatingLeft: root ? Math.round(Number.parseFloat(root.style.left) || 0) : null,
+      floatingTop: root ? Math.round(Number.parseFloat(root.style.top) || 0) : null,
       visible: root?.dataset.visible ?? null,
       compact: root?.dataset.compact ?? null,
       top: Number.parseFloat(root?.style.getPropertyValue('--wss-top') ?? 'NaN'),
@@ -100,6 +104,7 @@ const probe = (page) =>
       titleMaskBackground: titleMaskStyle?.backgroundImage ?? null,
       titleMaskFilter: titleMaskStyle?.filter ?? null,
       titleMaskHeight: titleMaskStyle ? Math.round(Number.parseFloat(titleMaskStyle.height)) : null,
+      titleMaskWidth: titleMaskStyle ? Math.round(Number.parseFloat(titleMaskStyle.width)) : null,
       drawerBackground: drawerStyle?.backgroundColor ?? null,
       drawerShadow: drawerStyle?.boxShadow ?? null,
       drawerBackdrop: drawerStyle?.backdropFilter ?? null,
@@ -166,8 +171,8 @@ try {
     host: !!document.getElementById('__web_sticky_scroll_host__'),
   }));
   check(
-    '渐变和图片背景页面保持静默',
-    unsafeColor.headings >= 3 && !unsafeColor.host,
+    '渐变和图片背景页面可使用中性玻璃标题',
+    unsafeColor.headings >= 3 && unsafeColor.host,
     unsafeColor,
   );
   const modeOptions = await context.newPage();
@@ -217,14 +222,14 @@ try {
   check('向下滚动后浮现', scrolled.visible === 'true', scrolled);
   check('吸顶条贴在固定顶栏下方', Math.abs(scrolled.top - TOPBAR_HEIGHT) <= 1, scrolled.top);
   check(
-    '标题背后没有图板、边框或阴影',
+    '无痕模式使用与标题同高的全宽液态玻璃',
     !scrolled.hasBarSheet &&
       scrolled.barBackground === 'rgba(0, 0, 0, 0)' &&
       scrolled.barShadow === 'none' &&
       scrolled.barBorderWidth === '0px' &&
-      scrolled.titleMaskFilter === 'none' &&
       !!scrolled.titleMaskBackground?.includes('linear-gradient') &&
-      scrolled.titleMaskHeight === scrolled.barHeight + 4,
+      scrolled.titleMaskHeight === scrolled.barHeight &&
+      scrolled.titleMaskWidth === 1280,
     scrolled,
   );
   const transparentArea = await page.evaluate(() => {
@@ -280,11 +285,11 @@ try {
     );
     const snapshot = (element) => {
       const style = getComputedStyle(element);
-      return [style.fontSize, style.fontWeight, style.lineHeight, style.color, style.fontFamily].join(' | ');
+      return [style.fontSize, style.fontWeight, style.lineHeight, style.fontFamily].join(' | ');
     };
     return { clone: snapshot(clone), source: snapshot(source), match: snapshot(clone) === snapshot(source) };
   });
-  check('吸顶条标题与页面同款样式', fidelity.match, fidelity);
+  check('吸顶条标题保持页面同款字体与字号', fidelity.match, fidelity);
 
   // 吸顶时机不变式：条里显示的标题，必须已经滑到条的后面
   // （向下滚不会提前显示还露在下面的标题；回滚时上级标题一露头就会交接）
@@ -667,7 +672,7 @@ try {
     { ...foreignLayer, restored: foreignLayerGone },
   );
 
-  // 运行中背景突然变得复杂：视觉安全巡检应主动收起，恢复实色后再回来
+  // 中性玻璃自带表面，网页背景变化不应让标题消失
   await page.evaluate(() => {
     document.querySelector('article').style.backgroundImage =
       'linear-gradient(135deg, #ff006e, #3a86ff)';
@@ -680,9 +685,9 @@ try {
   await page.waitForTimeout(1400);
   const dynamicSafe = await probe(page);
   check(
-    '背景动态变化时自动收起并恢复',
-    dynamicUnsafe.visible === 'false' && dynamicSafe.visible === 'true',
-    { unsafe: dynamicUnsafe.visible, restored: dynamicSafe.visible },
+    '网页背景变化不影响中性玻璃标题',
+    dynamicUnsafe.visible === 'true' && dynamicSafe.visible === 'true',
+    { changed: dynamicUnsafe.visible, restored: dynamicSafe.visible },
   );
 
   // 失败即静默：连续 3 次测量异常后彻底移除自身，异常不能泄漏到宿主页面
@@ -804,6 +809,32 @@ try {
       !!switched.pillBackground?.includes('linear-gradient') &&
       switched.pillShadow !== 'none',
     switched,
+  );
+  const pillRect = await page.evaluate(() => {
+    const rect = document
+      .getElementById('__web_sticky_scroll_host__')
+      .shadowRoot.querySelector('.wss-pill')
+      .getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  });
+  await page.mouse.move(pillRect.x, pillRect.y);
+  await page.mouse.down();
+  await page.mouse.move(240, 520, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(700);
+  const dragged = await probe(page);
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(1000);
+  const draggedPersisted = await probe(page);
+  check(
+    '液态玻璃可自由拖动并记住位置',
+    dragged.position === 'custom' &&
+      dragged.floatingLeft > 100 &&
+      dragged.floatingTop > 400 &&
+      draggedPersisted.position === 'custom' &&
+      Math.abs(draggedPersisted.floatingLeft - dragged.floatingLeft) <= 2 &&
+      Math.abs(draggedPersisted.floatingTop - dragged.floatingTop) <= 2,
+    { dragged, persisted: draggedPersisted },
   );
 
   // 智能策略：向上滚动让位

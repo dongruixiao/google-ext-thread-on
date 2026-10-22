@@ -590,7 +590,7 @@ export function buildHeadingIndex(): HeadingIndex | null {
       !conversation.detected &&
       geometry.reliable &&
       decideArticle(stats, attempt.semantic);
-    const isArticle = isReadingCandidate && visualSafety.safe;
+    const isArticle = isReadingCandidate;
     if (isArticle) ensureIds(headings, attempt.scope);
     // 判定依据挂在 DOM 上，便于排查“为什么这个页面激活/没激活”
     const diagnostics = [

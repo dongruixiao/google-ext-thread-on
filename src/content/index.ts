@@ -15,7 +15,9 @@ import {
   isSiteEnabled,
   loadSettings,
   normalizeSettings,
+  saveSettings,
   subscribeSettings,
+  type FloatingPosition,
   type WssSettings,
 } from '../shared/settings';
 import {
@@ -40,10 +42,7 @@ import { samplePageStyle } from './palette';
 import { findTocCandidates, isAnyTocVisible } from './page-toc';
 import { ScrollTracker, type TrackerSnapshot } from './tracker';
 import { StickyUI } from './ui';
-import {
-  assessVisualSafety,
-  type VisualSafetyReason,
-} from './visual-safety';
+import type { VisualSafetyReason } from './visual-safety';
 
 declare const __WSS_VERSION__: string;
 
@@ -67,7 +66,6 @@ class StickyScrollApp {
   private foreignZIndex = 0;
   private visualSafe = true;
   private visualReason: VisualSafetyReason = 'safe';
-  private visualBackground = '';
   /** 顶部被遮罩层挡住（对话框 / cookie 墙），此时收起 UI */
   private overlayBlocked = false;
   /** 用户正在用浏览器的页面查找（Ctrl/⌘+F）：收起 UI，别挡住查找条与命中的文字 */
@@ -163,6 +161,7 @@ class StickyScrollApp {
       hideArticleTitle: next.hideArticleTitle,
       maxCrumbs: next.maxCrumbs,
     });
+    this.ui?.setFloatingPosition(next.floatingPositions[location.hostname] ?? null);
     this.refreshLayout();
   }
 
@@ -276,7 +275,6 @@ class StickyScrollApp {
     this.signature = signature;
     this.visualSafe = index?.isVisualSafe ?? false;
     this.visualReason = index?.visualReason ?? 'background-complex';
-    this.visualBackground = index?.visualBackground ?? '';
 
     if (!index || !this.canActivate(index)) {
       // 非文章页（列表页 / 搜索页 / 应用页）：保持静默，不注入任何 UI
@@ -287,12 +285,14 @@ class StickyScrollApp {
     const ui = new StickyUI(
       (headingIndex) => this.jumpTo(headingIndex),
       (action, error) => this.guard.report(action, error),
+      (position) => this.saveFloatingPosition(position),
     );
     ui.setPathOptions({
       hideArticleTitle: this.settings.hideArticleTitle,
       maxCrumbs: this.settings.maxCrumbs,
     });
     ui.mount(index.headings);
+    ui.setFloatingPosition(this.settings.floatingPositions[location.hostname] ?? null);
     ui.setDiagnostics(
       `${index.scope.tagName.toLowerCase()}${index.scope.classList[0] ? `.${index.scope.classList[0]}` : ''}`,
       index.diagnostics,
@@ -491,7 +491,6 @@ class StickyScrollApp {
   private refreshLayout(): void {
     if (!this.index) return;
     this.updateLayoutMetrics();
-    this.refreshVisualSafety();
     this.ui?.setAppearance(this.settings.appearance);
     this.ui?.setBarWidth(this.settings.barWidth);
     this.ui?.setTop(this.pillTop());
@@ -700,7 +699,6 @@ class StickyScrollApp {
     // 站点导航栏可能随滚动出现/隐藏（隐藏式顶栏很常见），定期重新校准吸附位置
     this.ticks += 1;
     if (this.ticks % 2 === 0) {
-      this.refreshVisualSafety();
       this.recalibrateOverlay();
     }
 
@@ -740,35 +738,10 @@ class StickyScrollApp {
     this.applyPresentation();
   }
 
-  private refreshVisualSafety(): void {
-    const index = this.index;
-    if (!index) return;
-    const safety = assessVisualSafety(
-      index.scope,
-      index.headings.map((heading) => heading.element),
-    );
-    const backgroundChanged =
-      safety.safe &&
-      this.visualBackground !== '' &&
-      safety.background !== this.visualBackground;
-    const nextSafe = safety.safe && !backgroundChanged;
-    const nextReason: VisualSafetyReason = backgroundChanged
-      ? 'background-unstable'
-      : safety.reason;
-    if (nextSafe === this.visualSafe && nextReason === this.visualReason) return;
-    this.visualSafe = nextSafe;
-    this.visualReason = nextReason;
-    this.applyPresentation();
-  }
-
   private applyPresentation(): void {
     this.ui?.setPresentation({
       // 顶部被遮罩层盖住时不显示，免得浮在对话框上面
-      visible:
-        (this.visualSafe || this.settings.appearance === 'pill') &&
-        this.shown &&
-        !this.overlayBlocked &&
-        !this.findMode,
+      visible: this.shown && !this.overlayBlocked && !this.findMode,
       dim: this.dimmed,
       compact: this.settings.pageTocMode === 'adapt' && this.tocVisible,
     });
@@ -779,7 +752,17 @@ class StickyScrollApp {
     if (this.settings.appearance === 'pill') {
       return index.isReadingCandidate || this.forced;
     }
-    return index.isArticle || (this.forced && index.isVisualSafe);
+    return index.isArticle || this.forced;
+  }
+
+  private saveFloatingPosition(position: FloatingPosition | null): void {
+    const host = location.hostname;
+    const floatingPositions = { ...this.settings.floatingPositions };
+    if (position) floatingPositions[host] = position;
+    else delete floatingPositions[host];
+    this.settings = { ...this.settings, floatingPositions };
+    this.ui?.setFloatingPosition(position);
+    void saveSettings(this.settings);
   }
 
   // ── 原站目录适配 ────────────────────────────────────
@@ -952,9 +935,6 @@ class StickyScrollApp {
     if (!this.siteAllowed) return 'site-disabled';
     if (!index) return 'no-heading-index';
     if (index.isConversation) return 'conversation-surface';
-    if (this.settings.appearance === 'bar' && (!index.isVisualSafe || !this.visualSafe)) {
-      return 'visual-unreliable';
-    }
     if (!index.isReadingCandidate && !this.forced) {
       return index.stats.geometryReliable ? 'content-not-article' : 'heading-geometry-unreliable';
     }

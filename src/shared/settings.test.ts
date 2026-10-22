@@ -26,6 +26,10 @@ describe('normalizeSettings', () => {
       maxCrumbs: 42,
       siteAccess: 'nope',
       sites: ['Example.com', 'https://news.example.com/path', 42, 'localhost'],
+      floatingPositions: {
+        'https://Example.com/path': { x: 72.34, y: -4 },
+        bad: { x: 'nope', y: 20 },
+      },
     });
     expect(result.position).toBe(DEFAULT_SETTINGS.position);
     expect(result.theme).toBe(DEFAULT_SETTINGS.theme);
@@ -37,6 +41,7 @@ describe('normalizeSettings', () => {
     expect(result.maxCrumbs).toBe(6);
     expect(result.siteAccess).toBe('all');
     expect(result.sites).toEqual(['example.com', 'news.example.com', 'localhost']);
+    expect(result.floatingPositions).toEqual({ 'example.com': { x: 72.3, y: 0 } });
   });
 
   it('v1 配置可以无损升级到 v2', () => {
