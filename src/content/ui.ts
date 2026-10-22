@@ -64,6 +64,7 @@ export class StickyUI {
   private currentIndex = -2;
   private progressLabel = '';
   private floatingPosition: FloatingPosition | null = null;
+  private pillRect: { left: number; top: number; width: number; height: number } | null = null;
   private drag:
     | {
         pointerId: number;
@@ -156,6 +157,7 @@ export class StickyUI {
     root.addEventListener('focusout', this.handleLeave, true);
     root.addEventListener('keydown', this.handleKeyDown);
     this.pill?.addEventListener('pointerdown', this.handleDragStart);
+    this.pill?.addEventListener('pointermove', this.handleGlassPointerMove);
     this.pill?.addEventListener('dblclick', this.handlePillDoubleClick);
     window.addEventListener('keydown', this.handleWindowKeyDown, true);
     window.addEventListener('pointerdown', this.handleOutsidePointerDown, true);
@@ -185,6 +187,7 @@ export class StickyUI {
       this.root.removeEventListener('keydown', this.handleKeyDown);
     }
     this.pill?.removeEventListener('pointerdown', this.handleDragStart);
+    this.pill?.removeEventListener('pointermove', this.handleGlassPointerMove);
     this.pill?.removeEventListener('dblclick', this.handlePillDoubleClick);
     window.removeEventListener('keydown', this.handleWindowKeyDown, true);
     window.removeEventListener('pointerdown', this.handleOutsidePointerDown, true);
@@ -212,6 +215,7 @@ export class StickyUI {
     this.pinned = false;
     this.progressLabel = '';
     this.floatingPosition = null;
+    this.pillRect = null;
     this.drag = null;
     this.snapshot = { ...EMPTY_SNAPSHOT };
     this.presentation = { ...DEFAULT_PRESENTATION };
@@ -219,6 +223,7 @@ export class StickyUI {
 
   setTop(px: number): void {
     this.root?.style.setProperty('--wss-top', `${Math.round(px)}px`);
+    this.pillRect = null;
     this.layoutDrawer();
   }
 
@@ -336,8 +341,11 @@ export class StickyUI {
     title.textContent = text;
     title.title = `${node.text}（点击固定目录）`;
     title.dataset.wssIndex = String(index);
-    if (changed && this.floatingPosition) {
-      requestAnimationFrame(() => this.applyFloatingPosition());
+    if (changed) {
+      requestAnimationFrame(() => {
+        if (this.floatingPosition) this.applyFloatingPosition();
+        else this.capturePillRect();
+      });
     }
   }
 
@@ -512,6 +520,7 @@ export class StickyUI {
       root.dataset.position = this.position;
       root.style.removeProperty('left');
       root.style.removeProperty('top');
+      this.capturePillRect();
       this.layoutDrawer();
       return;
     }
@@ -532,6 +541,10 @@ export class StickyUI {
     root.dataset.position = 'custom';
     root.style.left = `${Math.round(left)}px`;
     root.style.top = `${Math.round(top)}px`;
+    if (this.pillRect) {
+      this.pillRect.left = Math.round(left);
+      this.pillRect.top = Math.round(top);
+    }
     this.layoutDrawer();
   }
 
@@ -594,6 +607,12 @@ export class StickyUI {
     this.safely('ui:drag-start', () => {
       if (!this.pill || event.button !== 0) return;
       const rect = this.pill.getBoundingClientRect();
+      this.pillRect = {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      };
       this.drag = {
         pointerId: event.pointerId,
         startX: event.clientX,
@@ -612,6 +631,41 @@ export class StickyUI {
       }
     });
   };
+
+  private handleGlassPointerMove = (event: PointerEvent): void => {
+    this.safely('ui:glass-pointer', () => {
+      const pill = this.pill;
+      if (!pill) return;
+      const rect = this.pillRect ?? this.capturePillRect();
+      if (!rect) return;
+      if (rect.width <= 0 || rect.height <= 0) return;
+      pill.style.setProperty(
+        '--wss-pointer-x',
+        `${Math.round(((event.clientX - rect.left) / rect.width) * 100)}%`,
+      );
+      pill.style.setProperty(
+        '--wss-pointer-y',
+        `${Math.round(((event.clientY - rect.top) / rect.height) * 100)}%`,
+      );
+    });
+  };
+
+  private capturePillRect(): {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null {
+    const rect = this.pill?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    this.pillRect = {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+    };
+    return this.pillRect;
+  }
 
   private handleDragMove = (event: PointerEvent): void => {
     this.safely('ui:drag-move', () => {
@@ -648,6 +702,12 @@ export class StickyUI {
       if (!drag.moved || !pill) return;
 
       const rect = pill.getBoundingClientRect();
+      this.pillRect = {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      };
       this.suppressClickUntil = Date.now() + 350;
       this.floatingPosition = this.normalizedPosition(rect.left, rect.top, rect.width, rect.height);
       this.onFloatingPositionChange?.(this.floatingPosition);
@@ -692,6 +752,7 @@ export class StickyUI {
       if (this.drag) return;
       const target = event.target as HTMLElement | null;
       if (!target?.closest(HOVER_TARGET)) return;
+      this.capturePillRect();
       this.clearCloseTimer();
       this.openDrawer();
     });

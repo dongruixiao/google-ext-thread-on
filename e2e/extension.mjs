@@ -72,6 +72,7 @@ const probe = (page) =>
     const active = shadow?.querySelector('.wss-pill');
     const glassTitle = shadow?.querySelector('.wss-glass-title');
     const drawer = shadow?.querySelector('.wss-drawer');
+    const rootStyle = root ? getComputedStyle(root) : null;
     const drawerStyle = drawer ? getComputedStyle(drawer) : null;
     const pill = shadow?.querySelector('.wss-pill');
     const pillStyle = pill ? getComputedStyle(pill) : null;
@@ -86,11 +87,15 @@ const probe = (page) =>
       floatingLeft: root ? Math.round(Number.parseFloat(root.style.left) || 0) : null,
       floatingTop: root ? Math.round(Number.parseFloat(root.style.top) || 0) : null,
       visible: root?.dataset.visible ?? null,
+      opacity: rootStyle?.opacity ?? null,
       compact: root?.dataset.compact ?? null,
       top: Number.parseFloat(root?.style.getPropertyValue('--wss-top') ?? 'NaN'),
       drawerBackground: drawerStyle?.backgroundColor ?? null,
+      drawerOpacity: drawerStyle?.opacity ?? null,
+      drawerBackgroundImage: drawerStyle?.backgroundImage ?? null,
       drawerShadow: drawerStyle?.boxShadow ?? null,
       drawerBackdrop: drawerStyle?.backdropFilter ?? null,
+      drawerScrollbar: drawerStyle?.scrollbarWidth ?? null,
       pillBackdrop: pillStyle?.backdropFilter ?? null,
       pillBackground: pillStyle?.backgroundImage ?? null,
       pillShadow: pillStyle?.boxShadow ?? null,
@@ -429,10 +434,12 @@ try {
       outlinePanel.nestedLevels >= 1 &&
       outlinePanel.rows === EXPECTED_HEADINGS &&
       /%$/.test(outlinePanel.progress) &&
-      withToc.drawerShadow === 'none' &&
-      withToc.drawerBackdrop === 'none' &&
-      (!!withToc.drawerBackground?.startsWith('rgb(') ||
-        !!withToc.drawerBackground?.startsWith('color(srgb')),
+      withToc.drawerShadow !== 'none' &&
+      withToc.drawerScrollbar === 'none' &&
+      !!withToc.drawerBackgroundImage?.includes('linear-gradient') &&
+      !!withToc.drawerBackgroundImage?.includes('radial-gradient') &&
+      !!withToc.pillBackground?.includes('linear-gradient') &&
+      withToc.drawerBackground !== null,
     outlinePanel,
   );
 
@@ -452,7 +459,11 @@ try {
   const restored = await probe(page);
   check(
     '原站目录消失后恢复完整功能',
-    restored.compact === 'false' && restored.drawerOpen === true && restored.drawerPath.length >= 1,
+    restored.compact === 'false' &&
+      restored.drawerOpen === true &&
+      restored.drawerPath.length >= 1 &&
+      restored.opacity === '1' &&
+      restored.drawerOpacity === '1',
     restored,
   );
 

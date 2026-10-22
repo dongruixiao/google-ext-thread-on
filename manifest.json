@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TopClip — 读长文，不掉线",
   "description": "读长文不掉线：用可拖动的液态玻璃胶囊提醒当前章节，悬停展开目录，并显示整篇阅读进度。",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon16.png",
