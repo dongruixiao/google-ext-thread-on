@@ -45,6 +45,8 @@ import {
   type VisualSafetyReason,
 } from './visual-safety';
 
+declare const __WSS_VERSION__: string;
+
 /** 探测点：网页顶部附近，用于识别原站自带的固定导航栏 */
 const OVERLAY_PROBES = [0.5, 0.08, 0.92];
 const FAIL_SAFE_PREFIX = 'wss:failsafe:';
@@ -910,6 +912,7 @@ class StickyScrollApp {
     pageTocVisible: boolean;
     dockTop: number;
     layerZIndex: number;
+    contentVersion: string;
     displayPolicy: string;
     currentSection: string | null;
   } {
@@ -935,6 +938,7 @@ class StickyScrollApp {
       pageTocVisible: this.tocVisible,
       dockTop: this.pillTop(),
       layerZIndex: this.layerZIndex(),
+      contentVersion: __WSS_VERSION__,
       displayPolicy: this.settings.displayPolicy,
       currentSection:
         this.snapshot && this.snapshot.index >= 0

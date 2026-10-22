@@ -29,6 +29,7 @@ interface PageStatus {
   pageTocVisible: boolean;
   dockTop: number;
   layerZIndex: number;
+  contentVersion?: string;
   displayPolicy: DisplayPolicy;
   currentSection: string | null;
 }
@@ -92,8 +93,18 @@ function escapeHtml(value: string): string {
 
 function renderStatus(): void {
   const status = pageStatus;
+  statusBox.dataset.stale = 'false';
   if (!status) {
     statusBox.textContent = '当前页面无法注入内容脚本（如 Chrome 内置页、应用商店）。';
+    return;
+  }
+  const currentVersion = chrome.runtime.getManifest().version;
+  const staleContentScript = status.contentVersion !== currentVersion;
+  statusBox.dataset.stale = String(staleContentScript);
+  if (staleContentScript) {
+    statusBox.innerHTML =
+      `<strong>页面脚本需要刷新</strong><br>当前：v${escapeHtml(status.contentVersion ?? '未知')}，` +
+      `扩展：v${escapeHtml(currentVersion)}。刷新网页后再测试。`;
     return;
   }
   if (!status.enabled) {
@@ -188,6 +199,7 @@ function diagnosticText(): string {
           `pageTocVisible=${status.pageTocVisible}`,
           `dockTop=${status.dockTop}`,
           `layerZIndex=${status.layerZIndex}`,
+          `contentVersion=${status.contentVersion ?? 'unknown'}`,
           `currentSection=${status.currentSection ?? '-'}`,
           `stats=${status.stats ?? '-'}`,
         ].join('\n')

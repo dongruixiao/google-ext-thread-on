@@ -4,6 +4,9 @@ import manifest from './manifest.json' with { type: 'json' };
 
 export default defineConfig({
   plugins: [crx({ manifest })],
+  define: {
+    __WSS_VERSION__: JSON.stringify(manifest.version),
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

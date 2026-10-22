@@ -90,6 +90,11 @@
         font-weight: 600;
       }
 
+      .status[data-stale='true'] {
+        color: #b45309;
+        background: color-mix(in srgb, #f59e0b 12%, transparent);
+      }
+
       .status .current {
         display: block;
         max-width: 260px;
@@ -284,7 +289,7 @@
 
     <footer>
       <button class="link" id="options" type="button">更多设置</button>
-      <span id="version">v0.10.1</span>
+      <span id="version">v0.10.2</span>
     </footer>
 
     <script type="module" src="./popup.ts"></script>
