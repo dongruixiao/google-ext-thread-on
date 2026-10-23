@@ -130,7 +130,6 @@ web-sticky-scroll/
 │   │   ├── ui.ts             # Shadow DOM 胶囊、拖动与目录
 │   │   └── style.css         # 拟物胶囊与内嵌仪表屏样式
 │   ├── popup/                # 全部设置与当前页面状态
-│   ├── background/           # service worker
 │   └── shared/               # Settings, protocol, i18n, and constants
 ├── e2e/                      # 浏览器端到端与真实站点检查
 ├── demo/                     # 本地演示页

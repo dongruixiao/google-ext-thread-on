@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { findExtensionRuntime } from './extension-runtime.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const EXTENSION_DIR = join(HERE, '..', 'dist');
@@ -139,9 +140,14 @@ const pillPoint = (page) =>
   });
 
 try {
-  let worker = context.serviceWorkers()[0];
-  if (!worker) worker = await context.waitForEvent('serviceworker', { timeout: 15000 });
-  const extensionId = new URL(worker.url()).host;
+  const runtimePage = await context.newPage();
+  await runtimePage.goto(url, { waitUntil: 'load' });
+  await runtimePage.waitForTimeout(1000);
+  const runtime = await findExtensionRuntime(runtimePage);
+  if (!runtime) throw new Error('Could not locate the extension content-script world.');
+  const extensionId = runtime.extensionId;
+  await runtime.cdp.detach();
+  await runtimePage.close();
 
   // Start with a real legacy settings payload to verify upgrade migration.
   const setup = await context.newPage();
@@ -738,24 +744,9 @@ try {
 
   // Content scripts run in an isolated world. Use CDP to force a layout API
   // failure in that world rather than modifying the page's prototypes.
-  const cdp = await context.newCDPSession(faultPage);
-  const executionContexts = new Map();
-  cdp.on('Runtime.executionContextCreated', (event) => {
-    executionContexts.set(event.context.id, event.context);
-  });
-  await cdp.send('Runtime.enable');
-  let extensionContextId = null;
-  for (const contextInfo of executionContexts.values()) {
-    const probe = await cdp.send('Runtime.evaluate', {
-      expression: `typeof chrome !== 'undefined' && chrome.runtime?.id === ${JSON.stringify(extensionId)}`,
-      contextId: contextInfo.id,
-      returnByValue: true,
-    });
-    if (probe.result.value === true) {
-      extensionContextId = contextInfo.id;
-      break;
-    }
-  }
+  const faultRuntime = await findExtensionRuntime(faultPage, extensionId);
+  const cdp = faultRuntime?.cdp ?? (await context.newCDPSession(faultPage));
+  const extensionContextId = faultRuntime?.contextId ?? null;
   check('finds the content-script isolated world', extensionContextId !== null, extensionContextId);
 
   const faultHadHost = await faultPage.evaluate(

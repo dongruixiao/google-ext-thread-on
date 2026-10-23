@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { findExtensionRuntime } from '../e2e/extension-runtime.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -27,9 +28,14 @@ const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir()
   args: [`--disable-extensions-except=${EXTENSION_DIR}`, `--load-extension=${EXTENSION_DIR}`],
 });
 
-let worker = context.serviceWorkers()[0];
-if (!worker) worker = await context.waitForEvent('serviceworker', { timeout: 15000 });
-const extensionId = new URL(worker.url()).host;
+const runtimePage = await context.newPage();
+await runtimePage.goto(url, { waitUntil: 'load' });
+await runtimePage.waitForTimeout(1000);
+const runtime = await findExtensionRuntime(runtimePage);
+if (!runtime) throw new Error('Could not locate the extension content-script world.');
+const extensionId = runtime.extensionId;
+await runtime.cdp.detach();
+await runtimePage.close();
 
 /** Write settings through an extension page, matching the popup flow. */
 const applySettings = async (patch) => {

@@ -10,6 +10,9 @@ There are no extension-level keyboard commands. Browser find-in-page is still
 detected so the capsule can yield to it, but the extension defines no shortcut
 of its own.
 
+The extension has no background worker. Settings are loaded lazily with
+normalized defaults, so a persistent background process has no responsibility.
+
 ## Runtime flow
 
 ```text

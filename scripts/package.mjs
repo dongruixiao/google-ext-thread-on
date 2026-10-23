@@ -23,6 +23,10 @@ if (manifest.version !== packageJson.version) {
   problems.push(`manifest.version(${manifest.version}) 与 package.json(${packageJson.version}) 不一致`);
 }
 
+if (existsSync(join(DIST, 'service-worker-loader.js'))) {
+  problems.push('stale CRXJS service-worker-loader.js is present');
+}
+
 for (const locale of ['en', 'zh_CN']) {
   const file = join(DIST, '_locales', locale, 'messages.json');
   if (!existsSync(file)) problems.push(`missing locale catalog: ${locale}`);
@@ -32,7 +36,6 @@ const referenced = [
   ...Object.values(manifest.icons ?? {}),
   ...Object.values(manifest.action?.default_icon ?? {}),
   manifest.action?.default_popup,
-  manifest.background?.service_worker,
   ...(manifest.content_scripts ?? []).flatMap((entry) => entry.js ?? []),
 ].filter((value) => typeof value === 'string');
 for (const file of referenced) {
