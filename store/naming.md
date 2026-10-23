@@ -2,7 +2,7 @@
 
 **Final brand name:** `Thread On`
 
-- English descriptor: **Keep your reading thread visible.**
+- English descriptor: **Read long. Stay on thread.**
 - Chinese descriptor: **读长文，不掉线。**
 
 The repository remains `web-sticky-scroll` because the public privacy-policy URL
