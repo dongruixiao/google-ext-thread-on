@@ -2,8 +2,8 @@
  * Field check against real websites using the packaged extension.
  *
  *   npm run build
- *   WSS_CHROME_PATH=... npm run field-check
- *   WSS_CHROME_PATH=... npm run field-check https://...
+ *   THREAD_ON_CHROME_PATH=... npm run field-check
+ *   THREAD_ON_CHROME_PATH=... npm run field-check https://...
  *
  * Reports injection, article scope, heading count, capsule state, native
  * contents coexistence, performance observations, and page errors.
@@ -57,7 +57,7 @@ const targets = process.argv.slice(2).length
   ? process.argv.slice(2).map((url) => ({ name: url, url, expect: 'active' }))
   : DEFAULT_TARGETS;
 
-const executablePath = process.env.WSS_CHROME_PATH;
+const executablePath = process.env.THREAD_ON_CHROME_PATH;
 const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), 'wss-field-')), {
   ...(executablePath ? { executablePath } : { channel: 'chromium' }),
   headless: true,

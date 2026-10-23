@@ -65,7 +65,7 @@ if (problems.length > 0) {
 }
 
 mkdirSync(RELEASE, { recursive: true });
-const zipPath = join(RELEASE, `web-sticky-scroll-${manifest.version}.zip`);
+const zipPath = join(RELEASE, `thread-on-${manifest.version}.zip`);
 execFileSync('zip', ['-r', '-q', '-FS', zipPath, '.'], { cwd: DIST });
 
 const size = (statSync(zipPath).size / 1024).toFixed(0);

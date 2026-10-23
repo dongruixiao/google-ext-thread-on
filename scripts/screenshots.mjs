@@ -21,7 +21,9 @@ await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const url = `http://127.0.0.1:${server.address().port}/`;
 
 const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), 'wss-shot-')), {
-  ...(process.env.WSS_CHROME_PATH ? { executablePath: process.env.WSS_CHROME_PATH } : { channel: 'chromium' }),
+  ...(process.env.THREAD_ON_CHROME_PATH
+    ? { executablePath: process.env.THREAD_ON_CHROME_PATH }
+    : { channel: 'chromium' }),
   headless: true,
   viewport: { width: 1280, height: 800 },
   deviceScaleFactor: 1,

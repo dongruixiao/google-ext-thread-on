@@ -8,7 +8,7 @@ export interface FloatingPosition {
   y: number;
 }
 
-export interface WssSettings {
+export interface ThreadOnSettings {
   version: number;
   /** Global switch. No UI is mounted while disabled. */
   enabled: boolean;
@@ -22,7 +22,7 @@ export interface WssSettings {
 export const SETTINGS_VERSION = 6;
 export const SETTINGS_KEY = 'wss:settings';
 
-export const DEFAULT_SETTINGS: WssSettings = {
+export const DEFAULT_SETTINGS: ThreadOnSettings = {
   version: SETTINGS_VERSION,
   enabled: true,
   displayPolicy: 'always',
@@ -90,7 +90,7 @@ function normalizeFloatingPositions(raw: unknown): Record<string, FloatingPositi
 }
 
 /** Migrate supported legacy fields and validate all persisted values. */
-export function normalizeSettings(raw: unknown): WssSettings {
+export function normalizeSettings(raw: unknown): ThreadOnSettings {
   const input = (raw ?? {}) as Record<string, unknown>;
   const displayPolicy =
     input.displayPolicy === 'peek'
@@ -122,12 +122,15 @@ export function matchSite(sites: string[], hostname: string): string | undefined
   return sites.find((entry) => host === entry || host.endsWith(`.${entry}`));
 }
 
-export function isSiteEnabled(settings: WssSettings, hostname: string): boolean {
+export function isSiteEnabled(settings: ThreadOnSettings, hostname: string): boolean {
   if (!settings.enabled) return false;
   return matchSite(settings.disabledSites, hostname) === undefined;
 }
 
-export function toggleSite(settings: WssSettings, hostname: string): WssSettings {
+export function toggleSite(
+  settings: ThreadOnSettings,
+  hostname: string,
+): ThreadOnSettings {
   const host = normalizeHost(hostname);
   if (!host) return settings;
   const matched = matchSite(settings.disabledSites, host);
@@ -143,7 +146,7 @@ function hasChromeStorage(): boolean {
   return typeof chrome !== 'undefined' && !!chrome?.storage?.sync;
 }
 
-export async function loadSettings(): Promise<WssSettings> {
+export async function loadSettings(): Promise<ThreadOnSettings> {
   if (!hasChromeStorage()) {
     try {
       const raw = window.localStorage.getItem(LS_KEY);
@@ -160,7 +163,7 @@ export async function loadSettings(): Promise<WssSettings> {
   }
 }
 
-export async function saveSettings(next: WssSettings): Promise<void> {
+export async function saveSettings(next: ThreadOnSettings): Promise<void> {
   const normalized = normalizeSettings(next);
   if (!hasChromeStorage()) {
     try {
@@ -177,7 +180,9 @@ export async function saveSettings(next: WssSettings): Promise<void> {
   }
 }
 
-export function subscribeSettings(callback: (settings: WssSettings) => void): () => void {
+export function subscribeSettings(
+  callback: (settings: ThreadOnSettings) => void,
+): () => void {
   if (!hasChromeStorage()) {
     const onStorage = (event: StorageEvent): void => {
       if (event.key !== LS_KEY) return;

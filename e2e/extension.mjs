@@ -53,7 +53,7 @@ function startFixtureServer() {
 
 const { server, url } = await startFixtureServer();
 const userDataDir = mkdtempSync(join(tmpdir(), 'wss-e2e-'));
-const executablePath = process.env.WSS_CHROME_PATH;
+const executablePath = process.env.THREAD_ON_CHROME_PATH;
 
 const context = await chromium.launchPersistentContext(userDataDir, {
   ...(executablePath ? { executablePath } : { channel: 'chromium' }),
@@ -1016,7 +1016,7 @@ try {
       !!document.querySelector('#enabled') &&
       document.querySelectorAll('input[name="displayPolicy"]').length === 2,
   }));
-  check('popup renders', popupState.title.includes('TopClip'), popupState);
+  check('popup renders', popupState.title.includes('Thread On'), popupState);
   check('popup reads the active host', popupState.siteButtonDisabled === false, popupState);
   check(
     'popup 只保留高频操作',

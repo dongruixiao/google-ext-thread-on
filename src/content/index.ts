@@ -16,7 +16,7 @@ import {
   saveSettings,
   subscribeSettings,
   type FloatingPosition,
-  type WssSettings,
+  type ThreadOnSettings,
 } from '../shared/settings';
 import { STATUS_MESSAGE, type ContentStatus } from '../shared/protocol';
 import {
@@ -31,13 +31,13 @@ import { ScrollTracker, type TrackerSnapshot } from './tracker';
 import { detectTopChrome } from './top-chrome';
 import { CapsuleUI } from './ui';
 
-declare const __WSS_VERSION__: string;
+declare const __THREAD_ON_VERSION__: string;
 
 class ReadingContextApp {
   private readonly guard = new FailureGuard({
     onFailSafe: (reason) => this.failSafe(reason),
   });
-  private settings: WssSettings = { ...DEFAULT_SETTINGS };
+  private settings: ThreadOnSettings = { ...DEFAULT_SETTINGS };
   private index: HeadingIndex | null = null;
   private tracker: ScrollTracker | null = null;
   private ui: CapsuleUI | null = null;
@@ -102,7 +102,7 @@ class ReadingContextApp {
     this.applySettings(this.settings);
   }
 
-  private applySettings(next: WssSettings): void {
+  private applySettings(next: ThreadOnSettings): void {
     const previousPolicy = this.settings.displayPolicy;
     this.settings = next;
     this.siteAllowed = isSiteEnabled(next, location.hostname);
@@ -601,7 +601,7 @@ class ReadingContextApp {
       pageTocVisible: this.tocVisible,
       dockTop: this.pillTop(),
       layerZIndex: this.layerZIndex(),
-      contentVersion: __WSS_VERSION__,
+      contentVersion: __THREAD_ON_VERSION__,
       displayPolicy: this.settings.displayPolicy,
       currentSection:
         this.snapshot && this.snapshot.index >= 0

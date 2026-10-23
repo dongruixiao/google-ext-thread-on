@@ -1,9 +1,9 @@
 {
-  "name": "web-sticky-scroll",
+  "name": "thread-on",
   "private": true,
-  "version": "0.16.4",
+  "version": "0.17.0",
   "type": "module",
-  "description": "TopClip —— 读长文，不掉线（可拖动的拟物章节胶囊与整篇阅读进度）",
+  "description": "Thread On —— 读长文，不掉线（可拖动的拟物章节胶囊与整篇阅读进度）",
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build",

@@ -2,7 +2,7 @@
 
 ## Product boundary
 
-TopClip is a read-only layer over an existing page. It does not rewrite article
+Thread On is a read-only layer over an existing page. It does not rewrite article
 markup, reserve layout space, or replace native navigation. When page structure
 cannot be trusted, the correct behavior is to render nothing.
 

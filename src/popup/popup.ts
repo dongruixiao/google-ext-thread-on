@@ -5,7 +5,7 @@ import {
   saveSettings,
   toggleSite,
   type DisplayPolicy,
-  type WssSettings,
+  type ThreadOnSettings,
 } from '../shared/settings';
 import { localizeDocument, t, type MessageKey } from '../shared/i18n';
 import { STATUS_MESSAGE, type ContentStatus } from '../shared/protocol';
@@ -31,7 +31,7 @@ const policyInputs = [
   ...document.querySelectorAll<HTMLInputElement>('input[name="displayPolicy"]'),
 ];
 
-let settings: WssSettings = { ...DEFAULT_SETTINGS };
+let settings: ThreadOnSettings = { ...DEFAULT_SETTINGS };
 let pageStatus: ContentStatus | null = null;
 
 function renderStatusMessage(message: string, currentSection?: string | null): void {

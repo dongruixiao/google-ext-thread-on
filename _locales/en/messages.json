@@ -1,15 +1,18 @@
 {
   "extensionName": {
-    "message": "TopClip"
+    "message": "Thread On — Keep your reading thread visible"
   },
   "extensionDescription": {
     "message": "Keep the current chapter in view while reading long articles and documentation."
   },
+  "brandName": {
+    "message": "Thread On"
+  },
   "popupTitle": {
-    "message": "TopClip"
+    "message": "Thread On"
   },
   "settingsAria": {
-    "message": "TopClip settings"
+    "message": "Thread On settings"
   },
   "tagline": {
     "message": "Read long. Stay on thread."
@@ -21,16 +24,16 @@
     "message": "Inspecting this page…"
   },
   "pageUnavailable": {
-    "message": "TopClip cannot run on this page."
+    "message": "Thread On cannot run on this page."
   },
   "refreshToApply": {
     "message": "Reload the page to finish updating."
   },
   "extensionUpdated": {
-    "message": "TopClip has been updated."
+    "message": "Thread On has been updated."
   },
   "disabledGlobally": {
-    "message": "TopClip is turned off."
+    "message": "Thread On is turned off."
   },
   "siteDisabled": {
     "message": "Disabled on $HOST$.",
@@ -56,7 +59,7 @@
     "message": "No usable section headings were found."
   },
   "enableLabel": {
-    "message": "Enable TopClip"
+    "message": "Enable Thread On"
   },
   "enableHint": {
     "message": "Keep every page quiet when off"

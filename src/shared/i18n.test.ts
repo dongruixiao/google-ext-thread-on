@@ -14,6 +14,8 @@ describe('i18n', () => {
   });
 
   it('falls back to the English catalog', () => {
+    expect(t('brandName')).toBe('Thread On');
+    expect(t('enableLabel')).toBe('Enable Thread On');
     expect(t('policyAlways')).toBe('Always');
   });
 
@@ -26,6 +28,7 @@ describe('i18n', () => {
     });
 
     expect(t('policyAlways')).toBe('常驻');
+    expect(t('enableLabel')).toBe('启用 Thread On');
     expect(t('siteDisabled', ['example.com'])).toBe('已在 example.com 上停用。');
   });
 

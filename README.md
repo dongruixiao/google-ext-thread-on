@@ -1,16 +1,16 @@
-# TopClip
+# Thread On
 
 [![CI](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml/badge.svg)](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml)
 
-> **TopClip — 读长文，不掉线**
-> 仓库名 `web-sticky-scroll` 是技术标识；面向用户的产品名是 TopClip。
+> **Thread On — 读长文，不掉线**
+> 仓库名 `web-sticky-scroll` 是技术标识；面向用户的产品名是 Thread On。
 
 阅读长文时，真正容易丢失的往往不是导航，而是**当前这一节在讲什么**。往下滚动几屏后，眼睛还在正文里，
-上下文却已经断了。TopClip 用一枚始终显示当前章节的拟物胶囊，帮你保持内容记忆；目录和进度是顺带的辅助。
+上下文却已经断了。Thread On 用一枚始终显示当前章节的拟物胶囊，帮你保持内容记忆；目录和进度是顺带的辅助。
 
 ## 产品形态
 
-TopClip 现在只有一种稳定形态：**可自由拖动的拟物章节胶囊**。
+Thread On 现在只有一种稳定形态：**可自由拖动的拟物章节胶囊**。
 
 - 胶囊显示当前章节标题，不复制网页标题、不伪造页面结构。
 - 胶囊可拖到视口内任何位置，位置按站点记忆，双击恢复默认位置。
@@ -69,7 +69,7 @@ TopClip 现在只有一种稳定形态：**可自由拖动的拟物章节胶囊*
 | 正文容器与侧栏过滤 | 避免把页脚、导航和评论区标题当作文章章节 |
 
 原则是：**宁可漏掉一个边缘页面，也不在错误场景里展示。** 如果页面结构无法可靠理解，
-TopClip 保持静默，不在页面上留下空胶囊或异常 DOM。
+Thread On 保持静默，不在页面上留下空胶囊或异常 DOM。
 
 ## 适用场景
 
@@ -99,7 +99,7 @@ TopClip 保持静默，不在页面上留下空胶囊或异常 DOM。
 
 | 选项 | 默认 |
 | --- | --- |
-| 开启 / 关闭 TopClip | 开启 |
+| 开启 / 关闭 Thread On | 开启 |
 | 智能 / 常驻 | 常驻 |
 | 当前站点停用 / 启用 | 跟随用户操作 |
 
@@ -151,7 +151,7 @@ npm run field-check
 加载开发版：`chrome://extensions` → 开启开发者模式 →「加载已解压的扩展程序」→ 选择 `dist/`。
 
 `npm run e2e` 需要支持 `--load-extension` 的 Chromium / Chrome for Testing。也可以通过
-`WSS_CHROME_PATH=/path/to/chrome npm run e2e` 指定浏览器；Chrome 137+ 正式版不能再用命令行加载未打包扩展。
+`THREAD_ON_CHROME_PATH=/path/to/chrome npm run e2e` 指定浏览器；Chrome 137+ 正式版不能再用命令行加载未打包扩展。
 
 完整发布前验证：
 
@@ -159,15 +159,15 @@ npm run field-check
 npm run typecheck
 npx vitest run
 npm run build
-WSS_CHROME_PATH="/path/to/chrome" npm run e2e
-WSS_CHROME_PATH="/path/to/chrome" npm run field-check
+THREAD_ON_CHROME_PATH="/path/to/chrome" npm run e2e
+THREAD_ON_CHROME_PATH="/path/to/chrome" npm run field-check
 npm run package
 ```
 
 ## 发布到 Chrome 应用商店
 
 商店文案、权限说明、截图和隐私政策在 [`store/`](store/) 目录。`npm run package` 会生成
-`release/web-sticky-scroll-<version>.zip`，zip 根目录就是 `manifest.json`，可直接上传开发者信息中心。
+`release/thread-on-<version>.zip`，zip 根目录就是 `manifest.json`，可直接上传开发者信息中心。
 
 发布前请确认：
 
