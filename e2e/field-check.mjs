@@ -60,7 +60,7 @@ const targets = process.argv.slice(2).length
 const executablePath = process.env.THREAD_ON_CHROME_PATH;
 const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), 'wss-field-')), {
   ...(executablePath ? { executablePath } : { channel: 'chromium' }),
-  headless: true,
+  headless: false,
   viewport: { width: 1280, height: 800 },
   args: [
     `--disable-extensions-except=${EXTENSION_DIR}`,

@@ -47,4 +47,9 @@ describe('floating capsule geometry', () => {
     expect(resolveJumpMarginTop(57, { top: 600, height: 40 })).toBe(57);
     expect(resolveJumpMarginTop(57, null)).toBe(57);
   });
+
+  it('uses scroll-container coordinates for nested readers', () => {
+    expect(resolveJumpMarginTop(57, { top: 57, height: 40 }, 200)).toBe(0);
+    expect(resolveJumpMarginTop(57, { top: 57, height: 40 }, 50)).toBe(49);
+  });
 });

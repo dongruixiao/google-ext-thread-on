@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { HeadingNode } from './extractor';
-import { ScrollTracker, type TrackerSnapshot } from './tracker';
+import { ScrollTracker, isScrollRelevant, type TrackerSnapshot } from './tracker';
 
 /** Return a setter that simulates scrolling by changing heading positions. */
 function stubRect(element: HTMLElement, top: number, height = 40): (nextTop: number) => void {
@@ -190,9 +190,23 @@ describe('heading activation timing', () => {
   });
 
   it('uses article geometry for nested scroll containers', () => {
+    const scrollContainer = document.createElement('div');
+    scrollContainer.style.overflowY = 'auto';
     const scope = document.createElement('article');
-    document.body.appendChild(scope);
-    const setScopeTop = stubRect(scope, 100, 3000);
+    scrollContainer.appendChild(scope);
+    document.body.appendChild(scrollContainer);
+    let scrollTop = 0;
+    Object.defineProperties(scrollContainer, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 600 },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value;
+        },
+      },
+    });
     const rig = createRig([50, 40, 40], 60, scope);
     rig.setTop(0, 66);
     rig.setTop(1, 180);
@@ -200,9 +214,58 @@ describe('heading activation timing', () => {
     rig.flush();
     expect(rig.last()?.index).toBe(0);
 
-    setScopeTop(window.innerHeight - 3000);
+    scrollContainer.scrollTop = 400;
     rig.flush();
     expect(rig.last()?.index).toBe(2);
+  });
+
+  it('does not promote the final heading on an article that fits on screen', () => {
+    const scrollHeight = Object.getOwnPropertyDescriptor(
+      document.documentElement,
+      'scrollHeight',
+    );
+    Object.defineProperty(document.documentElement, 'scrollHeight', {
+      configurable: true,
+      value: 300,
+    });
+    try {
+      const scope = document.createElement('article');
+      document.body.appendChild(scope);
+      stubRect(scope, 100, 300);
+      const rig = createRig([50, 40, 40], 60, scope);
+      rig.setTop(0, 66);
+      rig.setTop(1, 180);
+      rig.setTop(2, 260);
+      rig.flush();
+
+      expect(rig.last()?.index).toBe(0);
+    } finally {
+      if (scrollHeight) {
+        Object.defineProperty(document.documentElement, 'scrollHeight', scrollHeight);
+      }
+    }
+  });
+});
+
+describe('scroll relevance', () => {
+  it('accepts window scrolling and ancestors of the article', () => {
+    const outer = document.createElement('div');
+    const scope = document.createElement('article');
+    outer.appendChild(scope);
+
+    expect(isScrollRelevant(document, scope)).toBe(true);
+    expect(isScrollRelevant(window, scope)).toBe(true);
+    expect(isScrollRelevant(outer, scope)).toBe(true);
+    expect(isScrollRelevant(scope, scope)).toBe(true);
+  });
+
+  it('ignores unrelated nested scrollers', () => {
+    const scope = document.createElement('article');
+    const codeBlock = document.createElement('pre');
+    scope.appendChild(codeBlock);
+
+    expect(isScrollRelevant(codeBlock, scope)).toBe(false);
+    expect(isScrollRelevant(document.createElement('aside'), scope)).toBe(false);
   });
 });
 

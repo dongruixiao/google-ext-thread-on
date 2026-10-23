@@ -58,6 +58,9 @@
   "noHeadings": {
     "message": "No usable section headings were found."
   },
+  "settingsSaveFailed": {
+    "message": "Settings could not be saved."
+  },
   "enableLabel": {
     "message": "Enable Thread On"
   },

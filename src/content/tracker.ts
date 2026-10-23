@@ -35,6 +35,13 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
+export function isScrollRelevant(target: EventTarget | null, scope: HTMLElement | null): boolean {
+  if (target === document || target === window) return true;
+  if (!(target instanceof Element)) return false;
+  if (!scope) return true;
+  return target === scope || target.contains(scope);
+}
+
 /**
  * Heading transitions are derived from geometry alone: a heading becomes
  * active only after crossing the docking line. This keeps fast scrolling,
@@ -118,7 +125,8 @@ export class ScrollTracker {
     this.onUpdate(next);
   }
 
-  private schedule = (): void => {
+  private schedule = (event: Event): void => {
+    if (event.type === 'scroll' && !isScrollRelevant(event.target, this.scope)) return;
     if (this.rafId !== 0) return;
     this.rafId = requestAnimationFrame(() => {
       this.rafId = 0;
@@ -143,15 +151,39 @@ export class ScrollTracker {
   }
 
   private atPageBottom(): boolean {
-    const scope = this.scope;
-    if (scope?.isConnected) {
-      const rect = scope.getBoundingClientRect();
-      if (Number.isFinite(rect.bottom)) {
-        return rect.bottom <= window.innerHeight + 4;
-      }
+    const scrollContainer = this.findScrollContainer();
+    if (scrollContainer) {
+      return (
+        scrollContainer.scrollHeight > scrollContainer.clientHeight + 4 &&
+        scrollContainer.scrollTop + scrollContainer.clientHeight >=
+          scrollContainer.scrollHeight - 4
+      );
     }
     const doc = document.documentElement;
-    return window.scrollY + window.innerHeight >= doc.scrollHeight - 4;
+    return (
+      doc.scrollHeight > window.innerHeight + 4 &&
+      window.scrollY + window.innerHeight >= doc.scrollHeight - 4
+    );
+  }
+
+  private findScrollContainer(): HTMLElement | null {
+    let node = this.scope;
+    while (node && node !== document.body && node !== document.documentElement) {
+      let style: CSSStyleDeclaration;
+      try {
+        style = getComputedStyle(node);
+      } catch {
+        return null;
+      }
+      const scrollsVertically =
+        (style.overflowY === 'auto' ||
+          style.overflowY === 'scroll' ||
+          style.overflowY === 'overlay') &&
+        node.scrollHeight > node.clientHeight + 1;
+      if (scrollsVertically) return node;
+      node = node.parentElement;
+    }
+    return null;
   }
 
   /** Top edge of a heading once it crosses the docking line. */

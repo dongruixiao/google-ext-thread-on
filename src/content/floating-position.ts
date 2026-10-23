@@ -90,8 +90,13 @@ export function normalizeFloatingPosition(
 export function resolveJumpMarginTop(
   dockTop: number,
   capsule: CapsuleRect | null,
+  scrollContainerTop = 0,
 ): number {
-  if (!capsule || capsule.height <= 0) return dockTop;
-  const overlapsDock = capsule.top < dockTop + capsule.height + 2;
-  return overlapsDock ? dockTop + capsule.height + 2 : dockTop;
+  const localDockTop = Math.max(0, dockTop - scrollContainerTop);
+  if (!capsule || capsule.height <= 0) return localDockTop;
+  const landingTop = scrollContainerTop + localDockTop;
+  const overlapsDock =
+    capsule.top < landingTop + capsule.height &&
+    capsule.top + capsule.height > landingTop;
+  return overlapsDock ? localDockTop + capsule.height + 2 : localDockTop;
 }

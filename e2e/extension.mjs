@@ -57,7 +57,7 @@ const executablePath = process.env.THREAD_ON_CHROME_PATH;
 
 const context = await chromium.launchPersistentContext(userDataDir, {
   ...(executablePath ? { executablePath } : { channel: 'chromium' }),
-  headless: true,
+  headless: false,
   args: [
     `--disable-extensions-except=${EXTENSION_DIR}`,
     `--load-extension=${EXTENSION_DIR}`,
@@ -108,6 +108,8 @@ const probe = (page) =>
       surfaceLeft: active ? Math.round(active.getBoundingClientRect().left) : null,
       surfaceWidth: active ? Math.round(active.getBoundingClientRect().width) : null,
       title: chapterTitle?.textContent?.trim() ?? null,
+      titleAriaLabel: chapterTitle?.getAttribute('aria-label') ?? null,
+      titleTooltip: chapterTitle?.getAttribute('title') ?? null,
       pillHeight: active ? Math.round(active.getBoundingClientRect().height) : null,
       drawerPath: [...(shadow?.querySelectorAll('.wss-drawer-path .wss-crumb') ?? [])].map(
         (node) => node.textContent,
@@ -258,6 +260,17 @@ try {
     '拟物胶囊保持紧凑单行',
     !!scrolled.title && scrolled.pillHeight === 40,
     scrolled,
+  );
+  check(
+    '章节标题具备完整的无障碍名称和提示',
+    !!scrolled.title &&
+      scrolled.titleAriaLabel?.includes(scrolled.title) &&
+      scrolled.titleTooltip === scrolled.title,
+    {
+      title: scrolled.title,
+      ariaLabel: scrolled.titleAriaLabel,
+      tooltip: scrolled.titleTooltip,
+    },
   );
   check(
     '胶囊里只显示当前小节标题',
@@ -1025,6 +1038,27 @@ try {
       popupState.hasMergedControls,
     popupState,
   );
+
+  const popupStatusBeforeToggle = await popup.locator('#statusText').innerText();
+  await popup.locator('.switch-track').click();
+  await popup.waitForTimeout(300);
+  const popupToggleState = await popup.evaluate(async () => {
+    const stored = await chrome.storage.sync.get('wss:settings');
+    return {
+      enabled: document.querySelector('#enabled')?.checked ?? true,
+      status: document.querySelector('#statusText')?.textContent ?? '',
+      stored: stored['wss:settings']?.enabled ?? null,
+    };
+  });
+  check(
+    '关闭总开关后状态立即更新',
+    popupToggleState.enabled === false &&
+      popupToggleState.stored === false &&
+      popupToggleState.status !== popupStatusBeforeToggle,
+    { before: popupStatusBeforeToggle, after: popupToggleState },
+  );
+  await popup.locator('.switch-track').click();
+  await popup.waitForTimeout(300);
 
   await popup.evaluate(() => document.querySelector('#site').click());
   await popup.waitForTimeout(900);

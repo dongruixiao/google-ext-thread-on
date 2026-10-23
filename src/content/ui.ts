@@ -233,11 +233,12 @@ export class CapsuleUI {
     this.applyFloatingPosition();
   }
 
-  getJumpMarginTop(dockTop: number): number {
+  getJumpMarginTop(dockTop: number, scrollContainerTop = 0): number {
     const rect = this.pill?.getBoundingClientRect();
     return resolveJumpMarginTop(
       dockTop,
       rect ? { top: rect.top, height: rect.height } : null,
+      scrollContainerTop,
     );
   }
 
@@ -304,7 +305,8 @@ export class CapsuleUI {
     const text = node.text || t('untitled');
     const changed = title.textContent !== text;
     title.textContent = text;
-    title.title = t('outlineToggleAria');
+    title.title = node.text;
+    title.setAttribute('aria-label', `${text}. ${t('outlineToggleAria')}`);
     title.dataset.wssIndex = String(index);
     if (changed) {
       requestAnimationFrame(() => this.syncPillWidthLimit());

@@ -18,5 +18,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: xvfb-run -a npm run e2e
       # Validate manifest references, version consistency, and remote-code usage.
       - run: node scripts/package.mjs

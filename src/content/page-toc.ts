@@ -38,7 +38,13 @@ function countHeadingLinks(root: HTMLElement, targets: Set<string>): number {
     const href = anchor.getAttribute('href') ?? '';
     const hashIndex = href.indexOf('#');
     if (hashIndex < 0) continue;
-    const id = decodeURIComponent(href.slice(hashIndex + 1));
+    let id: string;
+    try {
+      id = decodeURIComponent(href.slice(hashIndex + 1));
+    } catch {
+      // Ignore malformed fragments without invalidating the whole page.
+      continue;
+    }
     if (targets.has(id)) count += 1;
   }
   return count;

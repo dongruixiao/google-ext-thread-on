@@ -152,6 +152,8 @@ npm run field-check
 
 `npm run e2e` 需要支持 `--load-extension` 的 Chromium / Chrome for Testing。也可以通过
 `THREAD_ON_CHROME_PATH=/path/to/chrome npm run e2e` 指定浏览器；Chrome 137+ 正式版不能再用命令行加载未打包扩展。
+扩展模式的 E2E 以有界面 Chromium 运行；无桌面的 Linux CI 使用 `xvfb-run`。
+GitHub Actions 会安装 Chromium、运行完整扩展 E2E，然后执行打包自检。
 
 完整发布前验证：
 

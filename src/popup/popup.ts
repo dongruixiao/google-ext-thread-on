@@ -58,9 +58,14 @@ function render(): void {
 }
 
 function renderStatus(): void {
-  const status = pageStatus;
   statusBox.dataset.stale = 'false';
   statusBox.dataset.state = 'neutral';
+  if (!settings.enabled) {
+    renderStatusMessage(t('disabledGlobally'));
+    return;
+  }
+
+  const status = pageStatus;
   if (!status) {
     statusBox.dataset.state = 'attention';
     renderStatusMessage(t('pageUnavailable'));
@@ -72,11 +77,7 @@ function renderStatus(): void {
     renderStatusMessage(`${t('refreshToApply')} ${t('extensionUpdated')}`);
     return;
   }
-  if (!status.enabled) {
-    renderStatusMessage(t('disabledGlobally'));
-    return;
-  }
-  if (!status.siteEnabled) {
+  if (!isSiteEnabled(settings, status.host)) {
     renderStatusMessage(t('siteDisabled', [status.host]));
     return;
   }
@@ -130,8 +131,10 @@ async function refreshStatus(): Promise<void> {
   render();
 }
 
-function persist(): void {
-  void saveSettings(settings);
+async function persist(): Promise<void> {
+  if (await saveSettings(settings)) return;
+  statusBox.dataset.state = 'attention';
+  renderStatusMessage(t('settingsSaveFailed'));
 }
 
 async function main(): Promise<void> {
@@ -149,7 +152,8 @@ async function main(): Promise<void> {
   enabledInput.addEventListener('change', () => {
     settings = { ...settings, enabled: enabledInput.checked };
     render();
-    persist();
+    renderStatus();
+    void persist();
   });
 
   for (const input of policyInputs) {
@@ -165,7 +169,9 @@ async function main(): Promise<void> {
     const host = pageStatus?.host;
     if (!host) return;
     settings = toggleSite(settings, host);
-    persist();
+    render();
+    renderStatus();
+    void persist();
     void refreshStatus();
   });
 }

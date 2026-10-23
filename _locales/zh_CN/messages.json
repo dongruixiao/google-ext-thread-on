@@ -58,6 +58,9 @@
   "noHeadings": {
     "message": "当前页面没有可用章节标题。"
   },
+  "settingsSaveFailed": {
+    "message": "设置保存失败。"
+  },
   "enableLabel": {
     "message": "启用 Thread On"
   },

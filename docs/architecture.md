@@ -29,6 +29,8 @@ coalesced through `requestAnimationFrame`.
 
 Settings use one propagation path: `chrome.storage.onChanged` is consumed
 directly by the content script.
+Settings writes return success or failure so the popup can report quota and
+storage failures instead of silently claiming success.
 
 ## Modules
 
@@ -59,7 +61,9 @@ directly by the content script.
 6. A failed extraction or geometry check produces no extension UI.
 7. Repeated runtime failures leave no listeners, timers, markers, or host nodes.
 8. Hidden pages never run layout calibration or native-contents probes.
-9. Article-end detection uses article geometry so nested scrollers work.
+9. Article-end detection uses the actual scroll container and never promotes
+   the final heading on a document that already fits on screen.
+10. Unrelated nested scroll regions do not trigger heading recomputation.
 
 ## Localization
 

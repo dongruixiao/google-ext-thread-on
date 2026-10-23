@@ -24,7 +24,7 @@ const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir()
   ...(process.env.THREAD_ON_CHROME_PATH
     ? { executablePath: process.env.THREAD_ON_CHROME_PATH }
     : { channel: 'chromium' }),
-  headless: true,
+  headless: false,
   viewport: { width: 1280, height: 800 },
   deviceScaleFactor: 1,
   args: [`--disable-extensions-except=${EXTENSION_DIR}`, `--load-extension=${EXTENSION_DIR}`],

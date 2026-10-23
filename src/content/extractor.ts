@@ -311,6 +311,7 @@ function sectionTexts(
   };
   for (const block of scope.querySelectorAll<HTMLElement>(SECTION_BLOCK_SELECTOR)) {
     if (block.closest(SITE_CHROME_SELECTOR)) continue;
+    if (block.parentElement?.closest(SECTION_BLOCK_SELECTOR)) continue;
     let section = 0;
     let low = 0;
     let high = headings.length - 1;
@@ -381,7 +382,10 @@ function computeRatios(scope: HTMLElement, measure: Measure): {
   let linkText = 0;
   for (const anchor of scope.querySelectorAll('a')) linkText += measure(anchor);
   let paragraphText = 0;
-  for (const block of scope.querySelectorAll(CONTENT_BLOCK_SELECTOR)) paragraphText += measure(block);
+  for (const block of scope.querySelectorAll(CONTENT_BLOCK_SELECTOR)) {
+    if (block.parentElement?.closest(CONTENT_BLOCK_SELECTOR)) continue;
+    paragraphText += measure(block);
+  }
   return {
     linkRatio: Math.min(1, linkText / total),
     paragraphRatio: Math.min(1, paragraphText / total),

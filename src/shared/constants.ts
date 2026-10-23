@@ -22,4 +22,4 @@ export const IDLE_DIM_DELAY = 2600;
 
 export const IDLE_TICK_INTERVAL = 400;
 
-export const TOC_PROBE_INTERVAL = 1200;
+export const TOC_PROBE_INTERVAL = 2000;

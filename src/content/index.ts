@@ -135,14 +135,6 @@ class ReadingContextApp {
     this.lastActivityAt = Date.now();
     this.rebuild();
     this.observe();
-    this.idleTimer = window.setInterval(
-      () => this.guard.run('idle-tick', this.idleTick),
-      IDLE_TICK_INTERVAL,
-    );
-    this.tocTimer = window.setInterval(
-      () => this.guard.run('toc-probe', this.probeToc),
-      TOC_PROBE_INTERVAL,
-    );
     this.urlTimer = window.setInterval(() => {
       this.guard.run('url-poll', () => {
         if (location.href === this.lastUrl) return;
@@ -234,6 +226,7 @@ class ReadingContextApp {
     if (!index || !this.canActivate(index)) {
       // Unsupported pages remain completely silent.
       this.snapshot = null;
+      this.stopUiTimers();
       return;
     }
 
@@ -255,6 +248,7 @@ class ReadingContextApp {
     this.snapshot = null;
     this.refreshLayout();
     this.applyPresentation();
+    this.startUiTimers();
 
     const tracker = new ScrollTracker(
       index.headings,
@@ -424,14 +418,40 @@ class ReadingContextApp {
     this.applyPresentation();
     this.tracker?.focusIndex(headingIndex);
     const element = heading.element;
+    const scrollContainerTop = this.scrollContainerTop(element);
     const previousMargin = element.style.scrollMarginTop;
     // Temporarily offset native smooth scrolling by the capsule height.
-    element.style.scrollMarginTop = `${this.ui?.getJumpMarginTop(this.pillTop()) ?? this.pillTop()}px`;
+    element.style.scrollMarginTop = `${
+      this.ui?.getJumpMarginTop(this.pillTop(), scrollContainerTop) ??
+      Math.max(0, this.pillTop() - scrollContainerTop)
+    }px`;
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     element.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     window.setTimeout(() => {
       element.style.scrollMarginTop = previousMargin;
     }, 1000);
+  }
+
+  private scrollContainerTop(element: HTMLElement): number {
+    let node = element.parentElement;
+    while (node && node !== document.body && node !== document.documentElement) {
+      let style: CSSStyleDeclaration;
+      try {
+        style = getComputedStyle(node);
+      } catch {
+        break;
+      }
+      const scrollsVertically =
+        (style.overflowY === 'auto' ||
+          style.overflowY === 'scroll' ||
+          style.overflowY === 'overlay') &&
+        node.scrollHeight > node.clientHeight + 1;
+      if (scrollsVertically) {
+        return Math.max(0, node.getBoundingClientRect().top);
+      }
+      node = node.parentElement;
+    }
+    return 0;
   }
 
   private handleScrollActivity = (direction: 1 | -1): void => {
@@ -454,7 +474,7 @@ class ReadingContextApp {
     if (!this.running || !this.ui || document.visibilityState !== 'visible') return;
     // Auto-hiding headers change the useful docking line during scroll.
     this.ticks += 1;
-    if (this.ticks % 2 === 0) {
+    if (this.ticks % 2 === 0 && Date.now() - this.lastActivityAt < 2000) {
       this.recalibrateOverlay();
     }
 
@@ -527,6 +547,33 @@ class ReadingContextApp {
     this.tocVisible = next;
     this.applyPresentation();
   };
+
+  private startUiTimers(): void {
+    if (this.idleTimer === 0) {
+      this.idleTimer = window.setInterval(
+        () => this.guard.run('idle-tick', this.idleTick),
+        IDLE_TICK_INTERVAL,
+      );
+    }
+    if (this.tocTimer === 0) {
+      this.tocTimer = window.setInterval(
+        () => this.guard.run('toc-probe', this.probeToc),
+        TOC_PROBE_INTERVAL,
+      );
+    }
+  }
+
+  private stopUiTimers(): void {
+    if (this.idleTimer !== 0) {
+      window.clearInterval(this.idleTimer);
+      this.idleTimer = 0;
+    }
+    if (this.tocTimer !== 0) {
+      window.clearInterval(this.tocTimer);
+      this.tocTimer = 0;
+    }
+    this.ticks = 0;
+  }
 
   private listenForMessages(): void {
     if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;

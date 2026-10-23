@@ -163,20 +163,23 @@ export async function loadSettings(): Promise<ThreadOnSettings> {
   }
 }
 
-export async function saveSettings(next: ThreadOnSettings): Promise<void> {
+export async function saveSettings(next: ThreadOnSettings): Promise<boolean> {
   const normalized = normalizeSettings(next);
   if (!hasChromeStorage()) {
     try {
       window.localStorage.setItem(LS_KEY, JSON.stringify(normalized));
+      return true;
     } catch {
       /* Private-mode storage may be unavailable. */
+      return false;
     }
-    return;
   }
   try {
     await chrome.storage.sync.set({ [SETTINGS_KEY]: normalized });
+    return true;
   } catch {
     /* Settings failures must not break page rendering. */
+    return false;
   }
 }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_SETTINGS,
   SETTINGS_VERSION,
@@ -6,8 +6,13 @@ import {
   matchSite,
   normalizeHost,
   normalizeSettings,
+  saveSettings,
   toggleSite,
 } from './settings';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('normalizeSettings', () => {
   it('falls back to defaults for empty input', () => {
@@ -89,5 +94,17 @@ describe('site rules', () => {
 
     expect(enabled.disabledSites).toEqual([]);
     expect(isSiteEnabled(enabled, 'sub.example.com')).toBe(true);
+  });
+
+  it('reports when Chrome storage rejects a settings write', async () => {
+    vi.stubGlobal('chrome', {
+      storage: {
+        sync: {
+          set: vi.fn().mockRejectedValue(new Error('quota exceeded')),
+        },
+      },
+    });
+
+    await expect(saveSettings(DEFAULT_SETTINGS)).resolves.toBe(false);
   });
 });
