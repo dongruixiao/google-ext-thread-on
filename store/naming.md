@@ -117,7 +117,7 @@
 ## 定了之后要改哪些地方
 
 1. `manifest.json` 的 `name` / `description`
-2. `src/popup/popup.html`、`src/options/options.html` 的标题
+2. `src/popup/popup.html` 的标题与品牌文案
 3. `store/listing.md` 的名称与简短说明（**简短说明里保留 Sticky / 吸顶 / 目录等关键词**，不影响搜索）
 4. `README.md` 顶部那行"对外名称"
 5. 重新 `npm run package` 并出 release（仓库名**不动**）

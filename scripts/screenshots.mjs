@@ -37,10 +37,10 @@ let worker = context.serviceWorkers()[0];
 if (!worker) worker = await context.waitForEvent('serviceworker', { timeout: 15000 });
 const extensionId = new URL(worker.url()).host;
 
-/** 通过设置页写 storage，等价于用户在设置里改 */
+/** 通过弹窗页面写 storage，等价于用户在弹窗里改 */
 const applySettings = async (patch) => {
   const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/src/options/options.html`);
+  await page.goto(`chrome-extension://${extensionId}/src/popup/popup.html`);
   await page.evaluate(async (next) => {
     const current = (await chrome.storage.sync.get('wss:settings'))['wss:settings'] ?? {};
     await chrome.storage.sync.set({ 'wss:settings': { ...current, ...next } });
@@ -70,9 +70,7 @@ mkdirSync(OUT_DIR, { recursive: true });
 
 // 1) 浅色：默认拟物胶囊 + 正文
 await applySettings({
-  theme: 'auto',
   displayPolicy: 'always',
-  position: 'top-center',
   enabled: true,
   floatingPositions: {},
 });
@@ -95,7 +93,7 @@ await shoot(dark, '03-dark-site.png', 1000);
 await dark.close();
 
 // 4) 自由拖动到文章右下角，目录自动向上展开
-await applySettings({ pageTocMode: 'full' });
+await applySettings({ floatingPositions: {} });
 const pill = await context.newPage();
 await pill.goto(url, { waitUntil: 'load' });
 await pill.mouse.move(640, 400);
@@ -130,7 +128,7 @@ console.log('✓', '04-draggable-pill.png');
 await pill.close();
 
 // 恢复默认
-await applySettings({ position: 'top-center', floatingPositions: {} });
+await applySettings({ floatingPositions: {} });
 
 await context.close();
 server.close();

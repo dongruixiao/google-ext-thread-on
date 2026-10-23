@@ -7,26 +7,38 @@
     <style>
       :root {
         color-scheme: light dark;
-        --fg: #28261f;
+        --paper: #e8e4da;
+        --panel-top: #f7f4ec;
+        --panel-bottom: #d8d4ca;
+        --ink: #28261f;
         --muted: rgb(40 38 31 / 58%);
-        --bg: #faf8f2;
-        --card: rgb(40 38 31 / 5%);
-        --recess: #202126;
-        --border: rgb(40 38 31 / 14%);
+        --hairline: rgb(40 38 31 / 16%);
+        --recess-a: #34353b;
+        --recess-b: #17181c;
+        --recess-ink: #f2eee5;
+        --recess-muted: rgb(242 238 229 / 62%);
         --accent: #6c4df6;
-        --accent-soft: rgb(108 77 246 / 10%);
+        --accent-bright: #b8a9ff;
+        --accent-soft: rgb(108 77 246 / 13%);
+        --shadow: rgb(38 32 23 / 26%);
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
-          --fg: #f0ece4;
-          --muted: rgb(240 236 228 / 58%);
-          --bg: #1c1d22;
-          --card: rgb(255 255 255 / 6%);
-          --recess: #101114;
-          --border: rgb(255 255 255 / 14%);
+          --paper: #191a1e;
+          --panel-top: #4b4c52;
+          --panel-bottom: #25262b;
+          --ink: #f3efe7;
+          --muted: rgb(243 239 231 / 58%);
+          --hairline: rgb(255 255 255 / 13%);
+          --recess-a: #292a30;
+          --recess-b: #0f1013;
+          --recess-ink: #f4f0e8;
+          --recess-muted: rgb(244 240 232 / 62%);
           --accent: #b1a1ff;
-          --accent-soft: rgb(177 161 255 / 12%);
+          --accent-bright: #d8d0ff;
+          --accent-soft: rgb(177 161 255 / 13%);
+          --shadow: rgb(0 0 0 / 48%);
         }
       }
 
@@ -34,206 +46,461 @@
         box-sizing: border-box;
       }
 
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      html,
       body {
-        width: 304px;
         margin: 0;
-        padding: 14px;
-        background: var(--bg);
-        color: var(--fg);
-        font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+        background: var(--paper);
+      }
+
+      body {
+        position: relative;
+        width: 336px;
+        overflow: hidden;
+        color: var(--ink);
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
           'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      body::before,
+      body::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      body::before {
+        background:
+          repeating-linear-gradient(
+            105deg,
+            rgb(255 255 255 / 15%) 0 1px,
+            transparent 1px 4px
+          ),
+          radial-gradient(80% 55% at 82% 4%, rgb(210 194 158 / 34%), transparent 72%),
+          radial-gradient(65% 48% at 8% 100%, rgb(121 96 216 / 12%), transparent 72%);
+      }
+
+      body::after {
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.14'/%3E%3C/svg%3E");
+        mix-blend-mode: soft-light;
+        opacity: 0.55;
+      }
+
+      .shell {
+        position: relative;
+        z-index: 1;
+        margin: 10px;
+        overflow: hidden;
+        border: 1px solid color-mix(in srgb, var(--panel-top) 52%, var(--hairline));
+        border-radius: 21px;
+        background:
+          repeating-linear-gradient(
+            90deg,
+            rgb(255 255 255 / 5%) 0 1px,
+            rgb(30 28 24 / 2%) 1px 3px
+          ),
+          linear-gradient(155deg, var(--panel-top), var(--panel-bottom));
+        box-shadow:
+          inset 0 1px 0 rgb(255 255 255 / 52%),
+          inset 0 -1px 0 rgb(0 0 0 / 12%),
+          0 1px 0 rgb(255 255 255 / 24%),
+          0 20px 44px -24px var(--shadow);
       }
 
       header {
         display: flex;
         align-items: center;
-        gap: 10px;
-        margin-bottom: 12px;
+        gap: 11px;
+        padding: 16px 16px 13px;
       }
 
       .logo {
-        width: 34px;
-        height: 34px;
+        width: 42px;
+        height: 42px;
         flex: none;
-        border-radius: 10px;
+        border-radius: 12px;
+        box-shadow:
+          0 1px 0 rgb(255 255 255 / 36%),
+          0 7px 15px -10px var(--shadow);
+      }
+
+      .brand {
+        min-width: 0;
       }
 
       h1 {
         margin: 0;
-        font-size: 14px;
-        line-height: 1.2;
+        font-size: 16px;
+        line-height: 1.15;
+        letter-spacing: -0.015em;
       }
 
-      header p {
-        margin: 2px 0 0;
+      .brand p {
+        margin: 3px 0 0;
         color: var(--muted);
-        font-size: 11px;
+        font-size: 11.5px;
+      }
+
+      .version {
+        margin-left: auto;
+        align-self: flex-start;
+        padding-top: 3px;
+        color: var(--muted);
+        font-size: 9.5px;
+        font-variant-numeric: tabular-nums;
       }
 
       .status {
-        margin-bottom: 9px;
-        padding: 8px 10px;
-        border-radius: 9px;
-        background: var(--recess);
-        color: rgb(242 238 229 / 68%);
-        font-size: 11.5px;
-        line-height: 1.45;
+        display: grid;
+        grid-template-columns: 8px minmax(0, 1fr);
+        gap: 10px;
+        margin: 0 12px;
+        padding: 12px 13px;
+        border: 1px solid rgb(255 255 255 / 12%);
+        border-radius: 14px;
+        background:
+          linear-gradient(180deg, rgb(255 255 255 / 7%), transparent 24%),
+          linear-gradient(160deg, var(--recess-a), var(--recess-b));
+        box-shadow:
+          inset 0 1px 0 rgb(255 255 255 / 11%),
+          inset 0 -2px 2px rgb(0 0 0 / 44%),
+          0 1px 0 rgb(255 255 255 / 30%);
+        color: var(--recess-ink);
       }
 
-      .status strong {
-        color: #f6f2e9;
+      .lamp {
+        width: 7px;
+        height: 7px;
+        margin-top: 5px;
+        border: 1px solid rgb(255 255 255 / 25%);
+        border-radius: 50%;
+        background: #8f8572;
+        box-shadow: 0 0 0 2px rgb(0 0 0 / 22%);
+      }
+
+      .status[data-state='active'] .lamp {
+        background: var(--accent-bright);
+        box-shadow:
+          0 0 0 2px rgb(0 0 0 / 22%),
+          0 0 9px color-mix(in srgb, var(--accent-bright) 78%, transparent);
+      }
+
+      .status[data-state='attention'] .lamp {
+        background: #e7b96d;
+        box-shadow:
+          0 0 0 2px rgb(0 0 0 / 22%),
+          0 0 8px rgb(231 185 109 / 52%);
+      }
+
+      .status-kicker {
+        display: block;
+        margin-bottom: 2px;
+        color: var(--recess-muted);
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .status-copy {
+        min-width: 0;
+        color: rgb(242 238 229 / 82%);
+        font-size: 11.5px;
+        line-height: 1.5;
+      }
+
+      .status-copy strong {
+        color: #fffdf8;
         font-weight: 600;
       }
 
-      .status[data-stale='true'] {
-        color: #f0c98a;
-      }
-
-      .status .current {
+      .status-copy .current {
         display: block;
-        max-width: 250px;
+        margin-top: 2px;
         overflow: hidden;
-        color: #f6f2e9;
+        color: var(--accent-bright);
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .controls {
+        margin: 12px;
+        overflow: hidden;
+        border: 1px solid var(--hairline);
+        border-radius: 14px;
+        background: color-mix(in srgb, var(--panel-top) 46%, transparent);
+        box-shadow:
+          inset 0 1px 0 rgb(255 255 255 / 34%),
+          0 1px 0 rgb(255 255 255 / 18%);
       }
 
       .row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 10px;
-        margin-bottom: 8px;
-        padding: 9px 10px;
-        border: 1px solid var(--border);
-        border-radius: 10px;
+        gap: 14px;
+        min-height: 58px;
+        padding: 11px 12px;
       }
 
-      .row > span {
+      .row + .row {
+        border-top: 1px solid var(--hairline);
+      }
+
+      .row-label {
         display: flex;
         flex-direction: column;
         min-width: 0;
       }
 
-      .row small {
-        color: var(--muted);
-        font-size: 10.5px;
+      .row-label strong {
+        font-size: 12.5px;
+        font-weight: 600;
       }
 
-      select {
-        max-width: 116px;
-        padding: 5px 7px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--bg);
-        color: inherit;
-        font: inherit;
+      .row-label small {
+        margin-top: 1px;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 10.5px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .switch {
+        position: relative;
+        display: block;
+        width: 42px;
+        height: 24px;
+        flex: none;
+        cursor: pointer;
       }
 
       .switch input {
-        appearance: none;
-        position: relative;
-        width: 36px;
-        height: 20px;
-        flex: none;
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        background: var(--card);
-        cursor: pointer;
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
       }
 
-      .switch input::after {
+      .switch-track {
+        position: absolute;
+        inset: 0;
+        border: 1px solid color-mix(in srgb, var(--hairline) 82%, #000);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--panel-bottom) 68%, #a51c1c 2%);
+        box-shadow:
+          inset 0 2px 4px rgb(0 0 0 / 24%),
+          0 1px 0 rgb(255 255 255 / 34%);
+        transition: background-color 0.16s ease, border-color 0.16s ease;
+      }
+
+      .switch-track::after {
         content: '';
         position: absolute;
-        top: 1px;
-        left: 1px;
-        width: 16px;
-        height: 16px;
+        top: 2px;
+        left: 2px;
+        width: 18px;
+        height: 18px;
+        border: 1px solid rgb(0 0 0 / 16%);
         border-radius: 50%;
-        background: var(--muted);
-        transition: translate 0.15s ease, background-color 0.15s ease;
+        background:
+          radial-gradient(circle at 38% 28%, rgb(255 255 255 / 72%), transparent 34%),
+          linear-gradient(180deg, #faf8f2, #bab6ad);
+        box-shadow:
+          0 2px 4px rgb(0 0 0 / 28%),
+          inset 0 1px 0 rgb(255 255 255 / 80%);
+        transition: translate 0.16s ease;
       }
 
-      .switch input:checked {
-        border-color: var(--accent);
-        background: var(--accent-soft);
+      .switch input:checked + .switch-track {
+        border-color: color-mix(in srgb, var(--accent) 72%, #1a1725);
+        background: color-mix(in srgb, var(--accent) 26%, var(--recess-b));
       }
 
-      .switch input:checked::after {
-        translate: 16px 0;
-        background: var(--accent);
+      .switch input:checked + .switch-track::after {
+        translate: 18px 0;
+        background:
+          radial-gradient(circle at 38% 28%, rgb(255 255 255 / 72%), transparent 34%),
+          linear-gradient(180deg, var(--accent-bright), var(--accent));
       }
 
-      button {
-        width: 100%;
-        padding: 8px 10px;
-        border: 1px solid var(--border);
-        border-radius: 9px;
-        background: var(--card);
-        color: var(--fg);
-        font: inherit;
+      .switch input:focus-visible + .switch-track {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .segments {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 130px;
+        flex: none;
+        padding: 2px;
+        border: 1px solid var(--hairline);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--panel-bottom) 66%, transparent);
+        box-shadow: inset 0 1px 3px rgb(0 0 0 / 16%);
+      }
+
+      .segments label {
+        position: relative;
         cursor: pointer;
       }
 
-      button:hover {
-        border-color: var(--accent);
+      .segments input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+      }
+
+      .segments span {
+        display: grid;
+        place-items: center;
+        height: 25px;
+        border-radius: 7px;
+        color: var(--muted);
+        font-size: 10.5px;
+        transition:
+          color 0.16s ease,
+          background-color 0.16s ease,
+          box-shadow 0.16s ease;
+      }
+
+      .segments input:checked + span {
+        background:
+          linear-gradient(180deg, rgb(255 255 255 / 30%), transparent 48%),
+          color-mix(in srgb, var(--accent) 22%, var(--panel-top));
+        color: color-mix(in srgb, var(--accent) 72%, var(--ink));
+        box-shadow:
+          0 1px 2px rgb(0 0 0 / 18%),
+          inset 0 1px 0 rgb(255 255 255 / 44%);
+      }
+
+      .segments input:focus-visible + span {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+
+      .site-action {
+        width: calc(100% - 24px);
+        margin: 0 12px;
+        padding: 10px 13px;
+        border: 1px solid var(--hairline);
+        border-radius: 11px;
+        background:
+          linear-gradient(180deg, rgb(255 255 255 / 24%), transparent 48%),
+          color-mix(in srgb, var(--panel-top) 72%, var(--panel-bottom));
+        box-shadow:
+          inset 0 1px 0 rgb(255 255 255 / 46%),
+          0 2px 5px -3px var(--shadow);
+        color: var(--ink);
+        font: 600 11.5px/1.3 inherit;
+        cursor: pointer;
+        transition:
+          border-color 0.16s ease,
+          transform 0.12s ease;
+      }
+
+      .site-action:hover {
+        border-color: color-mix(in srgb, var(--accent) 54%, var(--hairline));
+      }
+
+      .site-action:active {
+        transform: translateY(1px);
+        box-shadow: inset 0 2px 3px rgb(0 0 0 / 16%);
+      }
+
+      .site-action:disabled {
+        opacity: 0.46;
+        cursor: default;
       }
 
       footer {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-top: 11px;
+        gap: 12px;
+        padding: 11px 15px 13px;
         color: var(--muted);
-        font-size: 10.5px;
+        font-size: 9.5px;
       }
 
-      .link {
-        width: auto;
-        padding: 0;
-        border: 0;
-        background: transparent;
-        color: var(--accent);
-        font-size: 11px;
+      .hint {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     </style>
   </head>
   <body>
-    <header>
-      <img class="logo" src="../../icons/icon48.png" alt="" width="34" height="34" />
-      <div>
-        <h1>TopClip</h1>
-        <p>读长文，不掉线</p>
-      </div>
-    </header>
+    <main class="shell">
+      <header>
+        <img class="logo" src="../../icons/icon48.png" alt="" width="42" height="42" />
+        <div class="brand">
+          <h1>TopClip</h1>
+          <p>读长文，不掉线</p>
+        </div>
+        <span class="version" id="version"></span>
+      </header>
 
-    <div class="status" id="status">正在检测当前页面…</div>
+      <section class="status" id="status" data-state="neutral" aria-live="polite">
+        <span class="lamp" aria-hidden="true"></span>
+        <div class="status-copy">
+          <span class="status-kicker">当前页面</span>
+          <div id="statusText">正在检测页面结构…</div>
+        </div>
+      </section>
 
-    <label class="row switch">
-      <span>
-        开启 TopClip
-        <small>关闭后所有页面都不显示</small>
-      </span>
-      <input id="enabled" type="checkbox" />
-    </label>
+      <section class="controls" aria-label="TopClip 设置">
+        <label class="row">
+          <span class="row-label">
+            <strong>启用 TopClip</strong>
+            <small>关闭后所有网页保持静默</small>
+          </span>
+          <span class="switch">
+            <input id="enabled" type="checkbox" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
 
-    <label class="row">
-      <span>
-        显示方式
-        <small id="policyHint">向下滚动浮现，向上滚动让位</small>
-      </span>
-      <select id="displayPolicy">
-        <option value="smart">智能</option>
-        <option value="always">常驻</option>
-      </select>
-    </label>
+        <div class="row">
+          <span class="row-label">
+            <strong>显示方式</strong>
+            <small id="policyHint">阅读时浮现，回看让位</small>
+          </span>
+          <fieldset class="segments">
+            <legend class="sr-only">显示方式</legend>
+            <label>
+              <input type="radio" name="displayPolicy" value="smart" />
+              <span>智能</span>
+            </label>
+            <label>
+              <input type="radio" name="displayPolicy" value="always" />
+              <span>常驻</span>
+            </label>
+          </fieldset>
+        </div>
+      </section>
 
-    <button id="site" type="button">在此站点禁用</button>
+      <button class="site-action" id="site" type="button">在此站点禁用</button>
 
-    <footer>
-      <button class="link" id="options" type="button">设置</button>
-      <span id="version"></span>
-    </footer>
+      <footer>
+        <span class="hint">悬停标题看目录</span>
+        <span>双击复位</span>
+      </footer>
+    </main>
 
     <script type="module" src="./popup.ts"></script>
   </body>

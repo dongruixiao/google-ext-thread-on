@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TopClip — 读长文，不掉线",
   "description": "读长文不掉线：用可拖动的拟物章节胶囊提醒当前章节，悬停展开目录，并显示整篇阅读进度。",
-  "version": "0.14.3",
+  "version": "0.15.0",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon16.png",
@@ -21,10 +21,6 @@
   "background": {
     "service_worker": "src/background/service-worker.ts",
     "type": "module"
-  },
-  "options_ui": {
-    "page": "src/options/options.html",
-    "open_in_tab": true
   },
   "commands": {
     "toggle-site": {

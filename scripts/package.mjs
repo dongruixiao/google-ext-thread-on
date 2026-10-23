@@ -31,7 +31,6 @@ const referenced = [
   ...Object.values(manifest.icons ?? {}),
   ...Object.values(manifest.action?.default_icon ?? {}),
   manifest.action?.default_popup,
-  manifest.options_ui?.page,
   manifest.background?.service_worker,
   ...(manifest.content_scripts ?? []).flatMap((entry) => entry.js ?? []),
 ].filter((value) => typeof value === 'string');

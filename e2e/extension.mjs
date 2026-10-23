@@ -148,7 +148,7 @@ try {
 
   // 用上一版的真实配置启动，验证用户升级后不会因为设置迁移而整页失效。
   const setup = await context.newPage();
-  await setup.goto(`chrome-extension://${extensionId}/src/options/options.html`);
+  await setup.goto(`chrome-extension://${extensionId}/src/popup/popup.html`);
   await setup.evaluate(async () => {
     await chrome.storage.sync.set({
       'wss:settings': {
@@ -851,30 +851,32 @@ try {
     { ...faultResult, recoveredAfterReload, pageErrors: faultPageErrors },
   );
 
-  // options：只保留智能 / 常驻；切换到智能后页面实时响应
-  const options = await context.newPage();
-  await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);
-  await options.waitForTimeout(500);
-  await page.bringToFront();
-  const optionsState = await options.evaluate(() => ({
-    sections: document.querySelectorAll('section h2').length,
-    policy: document.querySelector('#displayPolicy')?.value,
-    hasReset: !!document.querySelector('#reset'),
-    hasRemovedAdvancedSettings: !!document.querySelector(
-      '#position, #theme, #offsetY, #hideArticleTitle, #maxCrumbs, #pageTocMode, #siteAccess, #data',
-    ),
+  // 设置已经合并进弹窗：不再存在独立设置页或二次跳转入口。
+  const control = await context.newPage();
+  await control.goto(`chrome-extension://${extensionId}/src/popup/popup.html`);
+  await control.waitForTimeout(500);
+  const controlState = await control.evaluate(() => ({
+    policy:
+      document.querySelector('input[name="displayPolicy"]:checked')?.value ?? '',
+    hasOptionsPage: !!chrome.runtime.getManifest().options_ui,
+    hasOptionsButton: !!document.querySelector('#options'),
+    hasCoreControls:
+      !!document.querySelector('#enabled') &&
+      document.querySelectorAll('input[name="displayPolicy"]').length === 2 &&
+      !!document.querySelector('#site'),
   }));
   check(
-    '设置页只保留基础阅读设置',
-    optionsState.sections === 1 &&
-      optionsState.policy === 'always' &&
-      optionsState.hasReset &&
-      !optionsState.hasRemovedAdvancedSettings,
-    optionsState,
+    '所有设置已合并进弹窗且没有重复入口',
+    controlState.policy === 'always' &&
+      !controlState.hasOptionsPage &&
+      !controlState.hasOptionsButton &&
+      controlState.hasCoreControls,
+    controlState,
   );
 
-  await options.selectOption('#displayPolicy', 'smart');
-  await options.waitForTimeout(700);
+  await control.locator('input[name="displayPolicy"][value="smart"]').check();
+  await page.bringToFront();
+  await page.waitForTimeout(700);
   const switched = await probe(page);
   check(
     '智能策略下拟物胶囊保持稳定',
@@ -976,7 +978,7 @@ try {
   await page.setViewportSize({ width: 1280, height: 720 });
   // 旧版把 x=100 解释为“胶囊左边缘贴近视口右边缘”。新版改为左边缘锚定后，
   // 必须把这类历史位置夹回视口，否则升级后只会露出几像素，看起来像没有显示。
-  await options.evaluate(async () => {
+  await control.evaluate(async () => {
     await chrome.storage.sync.set({
       'wss:settings': {
         version: 5,
@@ -1038,16 +1040,22 @@ try {
   await popup.waitForTimeout(700);
   const popupState = await popup.evaluate(() => ({
     title: document.querySelector('h1')?.textContent ?? '',
-    policy: document.querySelector('#displayPolicy')?.value ?? '',
+    policy:
+      document.querySelector('input[name="displayPolicy"]:checked')?.value ?? '',
     siteButtonDisabled: document.querySelector('#site')?.disabled ?? true,
     hasOptions: !!document.querySelector('#options'),
     hasRemovedDiagnostics: !!document.querySelector('#copy, #rescan'),
+    hasMergedControls:
+      !!document.querySelector('#enabled') &&
+      document.querySelectorAll('input[name="displayPolicy"]').length === 2,
   }));
   check('popup 正常渲染', popupState.title.includes('TopClip'), popupState);
   check('popup 能读到当前站点', popupState.siteButtonDisabled === false, popupState);
   check(
     'popup 只保留高频操作',
-    popupState.hasOptions && !popupState.hasRemovedDiagnostics,
+    !popupState.hasOptions &&
+      !popupState.hasRemovedDiagnostics &&
+      popupState.hasMergedControls,
     popupState,
   );
 
