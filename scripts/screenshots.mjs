@@ -1,10 +1,4 @@
-/**
- * 生成商店截图（1280×800，符合 Chrome 应用商店要求）：
- *   npm run screenshots
- *
- * 用 store/demo-page.html 这个中性文章页，配真正的打包产物（dist/）截图，
- * 保证截图里看到的就是用户装上后得到的东西。
- */
+/** Generate 1280x800 Chrome Web Store screenshots from the packaged build. */
 import { createServer } from 'node:http';
 import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,7 +31,7 @@ let worker = context.serviceWorkers()[0];
 if (!worker) worker = await context.waitForEvent('serviceworker', { timeout: 15000 });
 const extensionId = new URL(worker.url()).host;
 
-/** 通过弹窗页面写 storage，等价于用户在弹窗里改 */
+/** Write settings through an extension page, matching the popup flow. */
 const applySettings = async (patch) => {
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/src/popup/popup.html`);
@@ -68,7 +62,7 @@ const shoot = async (page, file, scrollY, options = {}) => {
 
 mkdirSync(OUT_DIR, { recursive: true });
 
-// 1) 浅色：默认拟物胶囊 + 正文
+// Light theme: default capsule over article content.
 await applySettings({
   displayPolicy: 'always',
   enabled: true,
@@ -80,11 +74,11 @@ await light.mouse.move(640, 400);
 await light.waitForTimeout(1200);
 await shoot(light, '01-sticky-heading.png', 1000);
 
-// 2) 浅色：悬停展开目录
+// Light theme: expanded outline.
 await shoot(light, '02-outline.png', 1500, { hover: true });
 await light.close();
 
-// 3) 深色站点：界面自动跟随页面配色
+// Dark site: the capsule follows the system color scheme.
 const dark = await context.newPage();
 await dark.goto(`${url}?dark=1`, { waitUntil: 'load' });
 await dark.mouse.move(640, 400);
@@ -92,7 +86,7 @@ await dark.waitForTimeout(1200);
 await shoot(dark, '03-dark-site.png', 1000);
 await dark.close();
 
-// 4) 自由拖动到文章右下角，目录自动向上展开
+// Dragged capsule near the lower-right edge; the outline opens upward.
 await applySettings({ floatingPositions: {} });
 const pill = await context.newPage();
 await pill.goto(url, { waitUntil: 'load' });
@@ -127,7 +121,7 @@ await pill.screenshot({ path: join(OUT_DIR, '04-draggable-pill.png') });
 console.log('✓', '04-draggable-pill.png');
 await pill.close();
 
-// 恢复默认
+// Restore the default position.
 await applySettings({ floatingPositions: {} });
 
 await context.close();

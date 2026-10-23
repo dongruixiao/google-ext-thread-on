@@ -1,0 +1,109 @@
+{
+  "extensionName": {
+    "message": "TopClip"
+  },
+  "extensionDescription": {
+    "message": "Keep the current chapter in view while reading long articles and documentation."
+  },
+  "commandToggleSite": {
+    "message": "Enable or disable TopClip on the current site"
+  },
+  "commandToggleGlobal": {
+    "message": "Enable or disable TopClip everywhere"
+  },
+  "popupTitle": {
+    "message": "TopClip"
+  },
+  "settingsAria": {
+    "message": "TopClip settings"
+  },
+  "tagline": {
+    "message": "Read long. Stay on thread."
+  },
+  "statusLabel": {
+    "message": "Current page"
+  },
+  "detectingPage": {
+    "message": "Inspecting this page…"
+  },
+  "pageUnavailable": {
+    "message": "TopClip cannot run on this page."
+  },
+  "refreshToApply": {
+    "message": "Reload the page to finish updating."
+  },
+  "extensionUpdated": {
+    "message": "TopClip has been updated."
+  },
+  "disabledGlobally": {
+    "message": "TopClip is turned off."
+  },
+  "siteDisabled": {
+    "message": "Disabled on $HOST$.",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "remindingChapter": {
+    "message": "Showing the current section"
+  },
+  "originalTocVisible": {
+    "message": "Built-in contents detected · compact mode"
+  },
+  "conversationPage": {
+    "message": "Conversation pages stay quiet."
+  },
+  "unsupportedStructure": {
+    "message": "This page does not have a reliable long-form structure."
+  },
+  "noHeadings": {
+    "message": "No usable section headings were found."
+  },
+  "enableLabel": {
+    "message": "Enable TopClip"
+  },
+  "enableHint": {
+    "message": "Keep every page quiet when off"
+  },
+  "displayModeLabel": {
+    "message": "Visibility"
+  },
+  "policySmart": {
+    "message": "Smart"
+  },
+  "policyAlways": {
+    "message": "Always"
+  },
+  "policySmartHint": {
+    "message": "Appears while reading, yields on scroll-back"
+  },
+  "policyAlwaysHint": {
+    "message": "Always visible and freely movable"
+  },
+  "enableSite": {
+    "message": "Enable on this site"
+  },
+  "disableSite": {
+    "message": "Disable on this site"
+  },
+  "hoverHint": {
+    "message": "Hover the title for contents"
+  },
+  "doubleClickHint": {
+    "message": "Double-click to reset"
+  },
+  "untitled": {
+    "message": "(Untitled)"
+  },
+  "currentChapterAria": {
+    "message": "Current chapter position"
+  },
+  "readingProgressAria": {
+    "message": "Article reading progress"
+  },
+  "outlineToggleAria": {
+    "message": "Open or pin the article outline"
+  }
+}

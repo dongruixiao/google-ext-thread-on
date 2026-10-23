@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "TopClip — 读长文，不掉线",
-  "description": "读长文不掉线：用可拖动的拟物章节胶囊提醒当前章节，悬停展开目录，并显示整篇阅读进度。",
-  "version": "0.15.0",
+  "default_locale": "en",
+  "name": "__MSG_extensionName__",
+  "description": "__MSG_extensionDescription__",
+  "version": "0.16.0",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon16.png",
@@ -10,7 +11,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "TopClip",
+    "default_title": "__MSG_extensionName__",
     "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -27,13 +28,13 @@
       "suggested_key": {
         "default": "Alt+Shift+S"
       },
-      "description": "在当前站点启用 / 禁用章节胶囊"
+      "description": "__MSG_commandToggleSite__"
     },
     "toggle-global": {
       "suggested_key": {
         "default": "Alt+Shift+W"
       },
-      "description": "全局启用 / 禁用章节胶囊"
+      "description": "__MSG_commandToggleGlobal__"
     }
   },
   "content_scripts": [

@@ -1,11 +1,10 @@
 /**
- * jsdom 不实现布局：给“可见性判定”提供最小可用的矩形信息，
- * 这样单元测试才能覆盖与 DOM 结构相关的启发式逻辑。
- * 需要隐藏某个元素时，测试里用 style="display:none"（jsdom 会正确计算样式）。
+ * jsdom has no layout engine. Provide enough geometry for visibility and
+ * heuristic tests; use style="display:none" when a test needs hidden nodes.
  */
 function layoutRect(element: Element): DOMRect {
-  // 让不同 DOM 节点拥有不同的纵向位置，避免几何可靠性门禁把所有测试标题
-  // 误认为“完全叠在一起”。真实浏览器里这些值来自页面布局。
+  // Spread synthetic nodes vertically so the overlap gate does not reject
+  // every fixture. Real browsers obtain these values from layout.
   const nodes = [...document.querySelectorAll('*')];
   const top = Math.max(0, nodes.indexOf(element)) * 40;
   return {
@@ -32,8 +31,7 @@ if (typeof Element !== 'undefined') {
   };
 }
 
-// jsdom 的 scrollHeight 恒为 0，会让“滚动到底部”的兜底逻辑永远成立；
-// 给它一个足够大的值，测试才能验证真实的滚动行为。
+// jsdom reports scrollHeight as 0, which would always satisfy the bottom gate.
 if (typeof document !== 'undefined') {
   Object.defineProperty(document.documentElement, 'scrollHeight', {
     configurable: true,

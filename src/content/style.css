@@ -1,4 +1,4 @@
-/* 通过 ?inline 注入 Shadow DOM，与宿主页面样式完全隔离 */
+/* Loaded with ?inline so host-page styles never enter the shadow tree. */
 
 :host {
   all: initial;
@@ -25,7 +25,7 @@
   translate: 0 0;
   transition: opacity 0.18s ease, translate 0.18s ease, visibility 0s;
 
-  /* 拉丝金属机身 */
+  /* Brushed-metal shell */
   --wss-case-top: #f7f5ef;
   --wss-case-mid: #d8d5cc;
   --wss-case-bottom: #aaa79e;
@@ -34,7 +34,7 @@
   --wss-case-ink: #27251f;
   --wss-case-ink-soft: #5d594f;
 
-  /* 深色内嵌仪表屏 */
+  /* Recessed dark instrument panel */
   --wss-panel-a: #37383e;
   --wss-panel-b: #17181c;
   --wss-panel-c: #23242a;
@@ -85,13 +85,7 @@
   opacity: 1;
 }
 
-/* ── 胶囊位置 ───────────────────────────────────────── */
-
-.wss-root[data-position='top-right'] {
-  left: auto;
-  right: 16px;
-  transform: none;
-}
+/* Capsule placement */
 
 .wss-root[data-position='custom'] {
   top: 0;
@@ -105,7 +99,7 @@
   cursor: grabbing;
 }
 
-/* ── 拉丝金属胶囊 ───────────────────────────────────── */
+/* Brushed-metal capsule */
 
 .wss-pill {
   position: relative;
@@ -261,7 +255,7 @@
   border-radius: 5px;
 }
 
-/* ── 深色内嵌目录面板 ───────────────────────────────── */
+/* Recessed outline panel */
 
 .wss-below {
   position: absolute;
@@ -419,7 +413,7 @@
   color: var(--wss-panel-fg);
 }
 
-/* ── 大纲 ───────────────────────────────────────────── */
+/* Outline */
 
 .wss-outline {
   padding-bottom: 2px;

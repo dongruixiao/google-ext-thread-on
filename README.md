@@ -112,12 +112,16 @@ TopClip 保持静默，不在页面上留下空胶囊或异常 DOM。
 显示策略只保留“智能”和“常驻”。旧版本保存的轻提示选择会自动迁移到“智能”，不会让用户丢失设置。
 拖动位置按站点记忆；主题跟随系统，原站目录退让、文章大标题隐藏和大纲裁剪都使用固定规则，不再暴露为深层设置。
 所有设置都收在点击工具栏图标后的弹窗里，不再维护内容重复的独立设置页。
+弹窗与无障碍文案跟随 Chrome 界面语言：英文环境显示英文，中文环境显示中文。
 
 ## 项目结构
+
+模块边界、运行链路和核心不变量见 [`docs/architecture.md`](docs/architecture.md)。
 
 ```text
 web-sticky-scroll/
 ├── manifest.json
+├── _locales/                 # English and Simplified Chinese UI catalogs
 ├── src/
 │   ├── content/
 │   │   ├── index.ts          # 生命周期、显示策略、站点门控、消息响应
@@ -130,7 +134,7 @@ web-sticky-scroll/
 │   │   └── style.css         # 拟物胶囊与内嵌仪表屏样式
 │   ├── popup/                # 全部设置与当前页面状态
 │   ├── background/           # service worker
-│   └── shared/               # 设置、常量和版本约束
+│   └── shared/               # Settings, protocol, i18n, and constants
 ├── e2e/                      # 浏览器端到端与真实站点检查
 ├── demo/                     # 本地演示页
 ├── store/                    # 商店文案、隐私政策、截图素材

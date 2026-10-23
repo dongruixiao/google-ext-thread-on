@@ -1,27 +1,30 @@
 import styleText from './style.css?inline';
 import type { HeadingNode } from './extractor';
 import { buildVisiblePath, type PathOptions } from './path';
-import type {
-  FloatingPosition,
-} from '../shared/settings';
+import type { FloatingPosition } from '../shared/settings';
 import { HOST_ID, Z_INDEX } from '../shared/constants';
 
 import type { TrackerSnapshot } from './tracker';
+import { t } from '../shared/i18n';
+import {
+  normalizeFloatingPosition,
+  resolveFloatingLayout,
+} from './floating-position';
 
 const ICON_SVG = `<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.75 4h10.5M2.75 8h7.5M2.75 12h4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/></svg>`;
 
-/** 悬浮胶囊与抽屉之间的“穿越”缓冲：鼠标经过空隙时不至于闪烁收起 */
+/** Delay before closing so the pointer can cross the gap into the drawer. */
 const CLOSE_DELAY = 260;
 
 const EMPTY_SNAPSHOT: TrackerSnapshot = { index: -1, path: [], progress: 0 };
 const PROGRESS_RING_CIRCUMFERENCE = 88;
 
 export interface Presentation {
-  /** 当前策略是否允许显示（路径存在 + 显示策略判定） */
+  /** Whether visibility policy and page state allow rendering. */
   visible: boolean;
-  /** 淡出状态：静止一段时间后降低存在感 */
+  /** Reduce prominence after a period of inactivity. */
   dim: boolean;
-  /** 原站目录可见时的极简模式（只显示当前小节、不弹抽屉） */
+  /** Native contents are visible; suppress the custom drawer. */
   compact: boolean;
 }
 
@@ -30,9 +33,7 @@ const DEFAULT_PATH_OPTIONS: PathOptions = { hideArticleTitle: true, maxCrumbs: 3
 
 const HOVER_TARGET = '.wss-pill, .wss-drawer';
 
-/**
- * Shadow DOM 渲染层：可拖动的拟物章节胶囊、悬停大纲和全局阅读进度。
- */
+/** Isolated view for the floating chapter capsule and outline. */
 export class StickyUI {
   private host: HTMLDivElement | null = null;
   private root: HTMLDivElement | null = null;
@@ -43,12 +44,12 @@ export class StickyUI {
   private below: HTMLDivElement | null = null;
   private drawer: HTMLDivElement | null = null;
   private drawerPath: HTMLDivElement | null = null;
-  /** 大纲行：标题下标 → 行按钮 */
+  /** Heading index to outline row. */
   private rows = new Map<number, HTMLButtonElement>();
 
   private headings: HeadingNode[] = [];
   private levels: number[] = [];
-  private pathOptions: PathOptions = { ...DEFAULT_PATH_OPTIONS };
+  private readonly pathOptions: PathOptions = DEFAULT_PATH_OPTIONS;
   private snapshot: TrackerSnapshot = { ...EMPTY_SNAPSHOT };
   private presentation: Presentation = { ...DEFAULT_PRESENTATION };
 
@@ -105,10 +106,10 @@ export class StickyUI {
     root.dataset.wssActive = 'true';
     root.style.setProperty('--wss-z-index', String(Z_INDEX));
     root.setAttribute('role', 'navigation');
-    root.setAttribute('aria-label', '当前章节位置');
+    root.setAttribute('aria-label', t('currentChapterAria'));
     root.innerHTML = `
       <div class="wss-pill" part="pill">
-        <span class="wss-icon-badge" role="progressbar" aria-label="整篇阅读进度"
+        <span class="wss-icon-badge" role="progressbar" aria-label="${t('readingProgressAria')}"
               aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <svg class="wss-progress-svg" viewBox="0 0 34 34" aria-hidden="true">
             <circle class="wss-progress-track" cx="17" cy="17" r="14"></circle>
@@ -117,7 +118,7 @@ export class StickyUI {
           <span class="wss-icon">${ICON_SVG}</span>
         </span>
         <div class="wss-title" data-wss-role="heading" role="button" tabindex="0"
-             aria-label="展开或固定文章目录"></div>
+             aria-label="${t('outlineToggleAria')}"></div>
       </div>
       <div class="wss-below">
         <div class="wss-drawer" part="drawer">
@@ -163,7 +164,7 @@ export class StickyUI {
     }
     this.applyTheme();
 
-    // 挂到 documentElement 而不是 body：body 上的 transform/filter 不会影响 fixed 定位
+    // Attach to <html>: transforms or filters on <body> can break fixed positioning.
     document.documentElement.appendChild(host);
   }
 
@@ -233,11 +234,6 @@ export class StickyUI {
     this.applyFloatingPosition();
   }
 
-  setPathOptions(options: Partial<PathOptions>): void {
-    this.pathOptions = { ...this.pathOptions, ...options };
-    this.pathKey = '';
-  }
-
   update(snapshot: TrackerSnapshot): void {
     this.snapshot = snapshot;
     this.render();
@@ -248,19 +244,13 @@ export class StickyUI {
     this.render();
   }
 
-  isDrawerOpen(): boolean {
-    return this.drawerOpen;
-  }
-
-  // ── 渲染 ────────────────────────────────────────────
-
   private render(): void {
     const root = this.root;
     if (!root) return;
 
     const { snapshot, presentation } = this;
     const current = snapshot.index >= 0 ? this.headings[snapshot.index] : undefined;
-    // 文章大标题不作为“章节”吸顶：还停在引言时保持静默
+    // Keep the article-level h1 out of the chapter capsule.
     const suppressed =
       !!current &&
       this.pathOptions.hideArticleTitle &&
@@ -310,17 +300,17 @@ export class StickyUI {
     const title = this.chapterTitle;
     const node = this.headings[index];
     if (!title || !node) return;
-    const text = node.text || '(无标题)';
+    const text = node.text || t('untitled');
     const changed = title.textContent !== text;
     title.textContent = text;
-    title.title = `${node.text}（点击固定目录）`;
+    title.title = t('outlineToggleAria');
     title.dataset.wssIndex = String(index);
     if (changed) {
       requestAnimationFrame(() => this.syncPillWidthLimit());
     }
   }
 
-  /** 大纲按标题树渲染成嵌套列表：层级关系一眼能看出来 */
+  /** Render the article heading tree as nested lists. */
   private buildOutline(): HTMLOListElement {
     const children = this.headings.map(() => [] as number[]);
     const roots: number[] = [];
@@ -357,7 +347,7 @@ export class StickyUI {
     return build(roots, 0);
   }
 
-  /** 大纲顶部的“上级路径”：胶囊里不堆层级，层级放这里 */
+  /** Show ancestors inside the drawer instead of expanding the capsule. */
   private renderDrawerPath(snapshot: TrackerSnapshot, presentation: Presentation): void {
     const path = this.drawerPath;
     if (!path) return;
@@ -393,7 +383,7 @@ export class StickyUI {
       button.type = 'button';
       button.className = 'wss-crumb';
       button.dataset.wssIndex = String(headingIndex);
-      button.textContent = ancestor.text || '(无标题)';
+      button.textContent = ancestor.text || t('untitled');
       button.title = ancestor.text;
       path.appendChild(button);
     });
@@ -409,8 +399,6 @@ export class StickyUI {
     }
     if (this.drawerOpen) this.scrollRowIntoDrawer(snapshot.index);
   }
-
-  // ── 抽屉交互 ────────────────────────────────────────
 
   private openDrawer = (): void => {
     this.clearCloseTimer();
@@ -436,7 +424,7 @@ export class StickyUI {
     if (this.drawerOpen) this.closeDrawer();
   }
 
-  /** 点击标题：把大纲钉住 / 取消钉住 */
+  /** Toggle the pinned state of the outline. */
   private togglePin(): void {
     if (this.presentation.compact) return;
     if (this.pinned) {
@@ -463,10 +451,7 @@ export class StickyUI {
     }
   }
 
-  /**
-   * 只滚动抽屉自身，绝不调用 scrollIntoView：
-   * 抽屉挂在 fixed 宿主里，scrollIntoView 会连整页一起滚。
-   */
+  /** Scroll only the drawer; scrollIntoView would also move the host page. */
   private scrollRowIntoDrawer(index: number): void {
     const drawer = this.drawer;
     const row = this.rows.get(index);
@@ -496,20 +481,18 @@ export class StickyUI {
       return;
     }
 
-    const rect = pill.getBoundingClientRect();
-    const height = rect.height || 40;
-    const anchorRange = Math.max(1, window.innerWidth - 16);
-    const maxY = Math.max(0, window.innerHeight - height - 16);
-    const desiredLeft = 8 + (this.floatingPosition.x / 100) * anchorRange;
-    // 旧版本保存的 x/y 使用过不同的归一化基准。夹取一次可避免升级后
-    // 胶囊被定位到视口右缘之外，看起来像“完全不显示”。
     pill.style.removeProperty('max-width');
-    const width = Math.min(480, Math.max(140, pill.getBoundingClientRect().width || 180));
-    const left = Math.max(8, Math.min(desiredLeft, window.innerWidth - width - 8));
-    const availableWidth = Math.max(140, window.innerWidth - left - 16);
-    pill.style.maxWidth = `${Math.min(480, availableWidth)}px`;
-    const top = 8 + (this.floatingPosition.y / 100) * maxY;
-    this.applyPixelPosition(left, top);
+    const rect = pill.getBoundingClientRect();
+    const layout = resolveFloatingLayout(
+      this.floatingPosition,
+      { width: window.innerWidth, height: window.innerHeight },
+      {
+        width: rect.width || 180,
+        height: rect.height || 40,
+      },
+    );
+    pill.style.maxWidth = `${layout.maxWidth}px`;
+    this.applyPixelPosition(layout.left, layout.top);
   }
 
   private applyPixelPosition(left: number, top: number): void {
@@ -521,10 +504,7 @@ export class StickyUI {
     this.layoutDrawer();
   }
 
-  /**
-   * 自由拖动后，目录不能仍然假设自己在顶部。
-   * 下方空间不足就向上展开；胶囊左缘固定，目录使用固定的版心宽度。
-   */
+  /** Flip the drawer above the capsule when there is not enough room below. */
   private layoutDrawer(): void {
     const root = this.root;
     const below = this.below;
@@ -553,23 +533,7 @@ export class StickyUI {
     });
   };
 
-  private normalizedPosition(
-    left: number,
-    top: number,
-    height: number,
-  ): FloatingPosition {
-    const anchorRange = Math.max(1, window.innerWidth - 16);
-    const maxY = Math.max(1, window.innerHeight - height - 16);
-    return {
-      x: Math.round(Math.max(0, Math.min(100, ((left - 8) / anchorRange) * 100)) * 10) / 10,
-      y: Math.round(Math.max(0, Math.min(100, ((top - 8) / maxY) * 100)) * 10) / 10,
-    };
-  }
-
-  /**
-   * 标题决定右边界，左边界只由停靠位置决定。
-   * 这里只收缩最大宽度，避免长标题把胶囊推出视口。
-   */
+  /** Keep the left edge fixed while preventing long titles from overflowing. */
   private syncPillWidthLimit(): void {
     const root = this.root;
     const pill = this.pill;
@@ -600,7 +564,7 @@ export class StickyUI {
       try {
         this.pill.setPointerCapture(event.pointerId);
       } catch {
-        /* pointer capture 不可用时仍可用 window 监听完成拖动 */
+        /* Window listeners still complete the drag without pointer capture. */
       }
     });
   };
@@ -661,9 +625,10 @@ export class StickyUI {
       if (!drag.moved || !pill) return;
 
       this.suppressClickUntil = Date.now() + 350;
-      this.floatingPosition = this.normalizedPosition(
+      this.floatingPosition = normalizeFloatingPosition(
         drag.latestLeft,
         drag.latestTop,
+        { width: window.innerWidth, height: window.innerHeight },
         drag.height,
       );
       this.onFloatingPositionChange?.(this.floatingPosition);
@@ -693,7 +658,7 @@ export class StickyUI {
       const trigger = target?.closest<HTMLElement>('[data-wss-index], [data-wss-role="heading"]');
       if (!trigger) return;
       event.stopPropagation();
-      // 点击胶囊里的标题 → 固定/取消固定目录
+      // The capsule title toggles the pinned outline.
       if (trigger.dataset.wssRole === 'heading') {
         this.togglePin();
         return;
@@ -718,7 +683,7 @@ export class StickyUI {
       const target = event.target as HTMLElement | null;
       if (!target?.closest(HOVER_TARGET)) return;
       this.clearCloseTimer();
-      // 被钉住的大纲不随鼠标离开而收起
+      // Pinned outlines remain open after the pointer leaves.
       if (this.pinned) return;
       this.closeTimer = window.setTimeout(() => {
         this.closeTimer = 0;
@@ -746,7 +711,7 @@ export class StickyUI {
     });
   };
 
-  /** 点到 UI 之外就取消钉住 */
+  /** Clicking outside the extension closes a pinned outline. */
   private handleOutsidePointerDown = (event: Event): void => {
     this.safely('ui:outside', () => {
       if (!this.drawerOpen || !this.host) return;

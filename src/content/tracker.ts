@@ -2,33 +2,33 @@ import { SECTION_PROGRESS_EPS } from '../shared/constants';
 import type { HeadingNode } from './extractor';
 
 export interface TrackerSnapshot {
-  /** 当前活跃标题下标，-1 表示视口还停留在第一个标题之上 */
+  /** Active heading index; -1 means the viewport is above the first heading. */
   index: number;
-  /** 从根到当前的父子链（下标数组） */
+  /** Parent chain from root to the active heading. */
   path: number[];
-  /** 整篇文章的阅读进度 0..1 */
+  /** Article progress in the range 0..1. */
   progress: number;
 }
 
 export interface TrackerOptions {
-  /** 滚动方向回调：1 表示向下、-1 表示向上（用于显示策略） */
+  /** Scroll direction: 1 for down, -1 for up. */
   onActivity?: (direction: 1 | -1) => void;
-  /** 正文容器：用于计算整篇文章的阅读进度 */
+  /** Article scope used to compute overall reading progress. */
   scope?: HTMLElement | null;
-  /** 吸顶区顶部（视口坐标） */
+  /** Docking line in viewport coordinates. */
   dockTop?: () => number;
-  /** 第 index 个标题吸顶后会占用的高度 */
+  /** Height reserved by the heading at the given index. */
   heightOf?: (index: number) => number;
-  /** 滚动回调内的异常交给上层熔断，避免冒泡成页面错误 */
+  /** Route scroll callback failures to the extension failure guard. */
   onError?: (action: string, error: unknown) => void;
 }
 
 const EMPTY_SNAPSHOT: TrackerSnapshot = { index: -1, path: [], progress: 0 };
 
-/** 判定容差：滚动落点都是小数像素，贴近条顶边时算“已滑到条后面” */
+/** Account for fractional scroll positions around the docking line. */
 const ACTIVE_TOLERANCE = 6;
 const DEFAULT_HEIGHT = 44;
-/** 跳转目标落到条下方时，允许它在条附近停留多久（毫秒） */
+/** Maximum time for a programmatic jump override. */
 const OVERRIDE_TTL = 2500;
 
 function clamp01(value: number): number {
@@ -36,16 +36,9 @@ function clamp01(value: number): number {
 }
 
 /**
- * 滚动监听与层级推导。
- *
- * 标题交接只用一个判据：**标题是否已经滑到胶囊停靠线的后面**。
- *
- * - 向下滚动：下一个标题必须完全滑到条后面（被条盖住、屏幕上再也看不到它）才切换，
- *   所以不会出现“标题还在下面露着，条已经提前显示它”的悬浮感；
- * - 向上回滚：当前标题的原文一开始重新露头就立刻退回上一级，
- *   不会出现“上一个标题已经在屏幕上，条还赖着下级标题”；
- * - 判定只看当前几何位置，不依赖历史状态，快速回滚、锚点跳转都不会残留旧状态；
- * - 主动跳转时用 override 让目标章节暂时生效（它的标题是停在条下方给人看的）。
+ * Heading transitions are derived from geometry alone: a heading becomes
+ * active only after crossing the docking line. This keeps fast scrolling,
+ * scroll-back, and programmatic jumps deterministic.
  */
 export class ScrollTracker {
   private rafId = 0;
@@ -74,12 +67,7 @@ export class ScrollTracker {
     this.onError = options.onError;
   }
 
-  setScope(scope: HTMLElement | null): void {
-    this.scope = scope;
-    this.flush();
-  }
-
-  /** 主动跳转后，让目标章节在它落位后保持为当前章节 */
+  /** Keep a jump target active once it reaches the docking zone. */
   focusIndex(index: number): void {
     if (index < 0 || index >= this.headings.length) return;
     this.override = index;
@@ -88,7 +76,6 @@ export class ScrollTracker {
     this.flush();
   }
 
-  /** 吸顶位置或条高变化后调用，重新按新基准判定 */
   refresh(): void {
     this.flush();
   }
@@ -96,7 +83,7 @@ export class ScrollTracker {
   start(): void {
     if (this.running) return;
     this.running = true;
-    // scroll 不冒泡，但会进入捕获阶段：顺带覆盖“滚动容器而非 window”的站点
+    // Capture scroll events from nested scroll containers as well as window.
     document.addEventListener('scroll', this.schedule, { capture: true, passive: true });
     window.addEventListener('scroll', this.schedule, { passive: true });
     window.addEventListener('resize', this.schedule, { passive: true });
@@ -116,7 +103,7 @@ export class ScrollTracker {
     }
   }
 
-  /** 强制重新计算并派发一次快照 */
+  /** Recompute immediately and emit when the observed state changes. */
   flush(): void {
     const next = this.compute();
     if (
@@ -144,10 +131,7 @@ export class ScrollTracker {
     });
   };
 
-  /**
-   * 判断滚动方向。用第一个标题的视口位置而不是 window.scrollY，
-   * 这样在“滚动容器而非 window”的站点上同样有效。
-   */
+  /** Use the first heading as the anchor so nested scrollers work. */
   private emitActivity(): void {
     const anchor = this.headings[0]?.element.getBoundingClientRect().top ?? null;
     if (anchor === null) return;
@@ -163,7 +147,7 @@ export class ScrollTracker {
     return window.scrollY + window.innerHeight >= doc.scrollHeight - 4;
   }
 
-  /** 第 index 个标题吸顶时，它的文字顶部应该落在哪条线上 */
+  /** Top edge of a heading once it crosses the docking line. */
   private behindLine(): number {
     return this.dockTop() + ACTIVE_TOLERANCE;
   }
@@ -178,7 +162,7 @@ export class ScrollTracker {
       tops[i] = headings[i].element.getBoundingClientRect().top;
     }
 
-    // 当前章节：最后一个已经滑到胶囊停靠线后面的标题
+    // The last heading to cross the docking line is the active section.
     const line = this.behindLine();
     let index = -1;
     for (let i = 0; i < count; i += 1) {
@@ -186,9 +170,8 @@ export class ScrollTracker {
     }
     index = this.applyOverride(tops, index, line);
 
-    // 页面已经不能再滚动时，最后一个小节没有机会越过吸顶线。
-    // 只允许“最后这个标题”在真正的终点接替，绝不把中途可见的标题提前提升，
-    // 也不覆盖用户正在进行的主动跳转。
+    // The final heading may never cross the line when the document ends.
+    // Promote it only at the real bottom, and never interrupt a jump override.
     if (this.override === null && this.atPageBottom() && index < count - 1) {
       index = count - 1;
     }
@@ -206,9 +189,9 @@ export class ScrollTracker {
   }
 
   /**
-   * 主动跳转的临时覆盖：
-   * 目标标题停在条下方（给人看），但它并不满足“滑到条后面”，所以需要临时认定它。
-   * 一旦被更深的标题取代，或用户回滚到目标标题重新露头，覆盖立即失效。
+   * A jump target normally lands below the docking line, so it needs a
+   * temporary override. The override ends after the target is observed,
+   * is displaced, leaves the docking zone, or times out.
    */
   private applyOverride(tops: number[], natural: number, line: number): number {
     const target = this.override;
@@ -216,12 +199,11 @@ export class ScrollTracker {
 
     const height = this.heightOf(target);
     const limit = line + height + ACTIVE_TOLERANCE;
-    // “到位”既不能还在条下方很远（跳转还没到），也不能已经跑到条上方很远（那是回滚走了）
+    // The target must be near the dock: neither still approaching nor scrolled away.
     const inZone = tops[target] <= limit && tops[target] >= line - height - ACTIVE_TOLERANCE;
     if (inZone) this.overrideArmed = true;
 
-    // 目标到位之后：被更深的标题取代、或重新露到条下方、或超时 → 覆盖失效。
-    // 注意“被更深的标题取代”必须等目标确实到位过一次，否则向上跳转会在半路上被清掉。
+    // Do not clear an under-armed jump midway through an upward scroll.
     if (
       (this.overrideArmed && (natural > target || !inZone)) ||
       Date.now() > this.overrideExpiresAt
@@ -230,16 +212,12 @@ export class ScrollTracker {
       this.overrideArmed = false;
       return natural;
     }
-    // 还在跳转动画途中：先跟随实际位置
+    // Before the target arrives, follow the natural geometric result.
     if (!this.overrideArmed) return natural;
     return target;
   }
 
-  /**
-   * 整篇文章的阅读进度：
-   * 0 = 正文刚顶到阅读基准线（刚开始读）
-   * 1 = 正文末尾已经进入视口底部（这篇文章读完了）
-   */
+  /** 0 = article starts at the reading line; 1 = article end is visible. */
   private articleProgress(): number {
     const scope = this.scope;
     if (!scope || !scope.isConnected) return 0;
@@ -248,7 +226,7 @@ export class ScrollTracker {
     const line = this.dockTop() + DEFAULT_HEIGHT;
     const viewport = window.innerHeight || 0;
     const range = rect.height + line - viewport;
-    // 正文比视口还短：整篇都在屏幕上，直接算读完
+    // A short article already fits entirely in the viewport.
     if (range <= 1) return 1;
     return clamp01((line - rect.top) / range);
   }

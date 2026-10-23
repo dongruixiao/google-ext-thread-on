@@ -37,7 +37,7 @@ describe('detectConversationSurface', () => {
     document.body.innerHTML = '';
   });
 
-  it('识别带明确用户/助手角色的持续对话', () => {
+  it('detects explicit user and assistant message roles', () => {
     document.body.innerHTML = `
       <main>
         <article data-message-author-role="user"><p>${longText(120)}</p></article>
@@ -57,7 +57,7 @@ describe('detectConversationSurface', () => {
     expect(result.turns).toBe(4);
   });
 
-  it('识别通用语义消息元素组成的对话', () => {
+  it('detects generic semantic message elements', () => {
     document.body.innerHTML = `
       <main>
         <user-query>${longText(80)}</user-query>
@@ -74,7 +74,7 @@ describe('detectConversationSurface', () => {
     });
   });
 
-  it('没有语义角色时，ARIA 对话日志也能作为证据', () => {
+  it('detects an ARIA transcript without explicit roles', () => {
     document.body.innerHTML = `
       <main role="main">
         <div role="log">
@@ -91,7 +91,7 @@ describe('detectConversationSurface', () => {
     });
   });
 
-  it('普通文章底部的静态评论框不会把文章判成聊天页', () => {
+  it('does not classify an article comment form as chat', () => {
     document.body.innerHTML = `
       <article>
         <h1>长文章</h1><p>${longText(800)}</p>
@@ -105,7 +105,7 @@ describe('detectConversationSurface', () => {
     expect(detectConversationSurface().detected).toBe(false);
   });
 
-  it('固定的搜索框不会被当成对话输入区', () => {
+  it('does not classify a fixed search box as a composer', () => {
     document.body.innerHTML = `
       <main><article><h2>结果一</h2><p>${longText(200)}</p></article>
       <article><h2>结果二</h2><p>${longText(200)}</p></article></main>

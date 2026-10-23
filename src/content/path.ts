@@ -1,19 +1,16 @@
-/**
- * 面包屑路径裁剪：决定“哪几级真的显示在胶囊里”。
- * 纯函数，便于单独测试。
- */
+/** Build the ancestor path shown by the outline header. */
 
 export interface VisiblePath {
-  /** 需要展示的标题下标（从根到当前） */
+  /** Visible heading indexes, ordered from root to current. */
   indexes: number[];
-  /** 被折叠掉、可在悬停时展开的祖先下标 */
+  /** Ancestors collapsed behind the overflow affordance. */
   collapsed: number[];
 }
 
 export interface PathOptions {
-  /** 不显示文章大标题（h1 根级） */
+  /** Hide the article-level h1 when nested headings exist. */
   hideArticleTitle: boolean;
-  /** 最多显示几级 */
+  /** Maximum visible levels before collapsing ancestors. */
   maxCrumbs: number;
 }
 
@@ -35,7 +32,7 @@ export function buildVisiblePath(
     indexes = indexes.slice(indexes.length - options.maxCrumbs);
   }
 
-  // 兜底：全部被裁掉时至少保留当前小节，避免出现空胶囊
+  // Never return an empty path after collapsing.
   if (indexes.length === 0) {
     indexes = [path[path.length - 1]];
   }

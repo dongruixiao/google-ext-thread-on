@@ -24,12 +24,12 @@ function candidate(overrides: Partial<ChromeCandidate> = {}): ChromeCandidate {
 }
 
 describe('classifyTopChrome', () => {
-  it('识别站点顶部导航条，并给出避让高度', () => {
+  it('detects a site toolbar and returns its dock offset', () => {
     const result = classifyTopChrome([candidate({ bottom: 64, height: 64 })], VIEWPORT);
     expect(result).toEqual({ bottom: 64, blocked: false });
   });
 
-  it('正文里的 sticky 元素被无视（否则胶囊会掉到页面中间）', () => {
+  it('ignores sticky elements inside the article', () => {
     const result = classifyTopChrome(
       [candidate({ insideContent: true, bottom: 900, height: 900 })],
       VIEWPORT,
@@ -37,7 +37,7 @@ describe('classifyTopChrome', () => {
     expect(result).toEqual({ bottom: 0, blocked: false });
   });
 
-  it('固定侧栏因为不够宽被无视', () => {
+  it('ignores fixed sidebars that are too narrow', () => {
     const result = classifyTopChrome(
       [candidate({ width: 200, height: 800, bottom: 800 })],
       VIEWPORT,
@@ -45,7 +45,7 @@ describe('classifyTopChrome', () => {
     expect(result).toEqual({ bottom: 0, blocked: false });
   });
 
-  it('全屏遮罩层让 UI 收起，而不是贴到它下面', () => {
+  it('hides for a full-page overlay', () => {
     const result = classifyTopChrome(
       [candidate({ height: 800, bottom: 800, opaque: true })],
       VIEWPORT,
@@ -53,7 +53,7 @@ describe('classifyTopChrome', () => {
     expect(result).toEqual({ bottom: 0, blocked: true });
   });
 
-  it('透明的全高容器既不避让也不遮挡（里面可能只是导航条）', () => {
+  it('ignores a transparent full-height container', () => {
     const result = classifyTopChrome(
       [candidate({ height: 800, bottom: 800, opaque: false })],
       VIEWPORT,
@@ -61,21 +61,21 @@ describe('classifyTopChrome', () => {
     expect(result).toEqual({ bottom: 0, blocked: false });
   });
 
-  it('取最高的那个导航条，过高的固定条既不避让也不当遮罩', () => {
+  it('ignores fixed surfaces taller than the toolbar limit', () => {
     const result = classifyTopChrome(
       [candidate({ bottom: 48, height: 48 }), candidate({ bottom: 300, height: 300 })],
       VIEWPORT,
     );
-    // 300px 已经超过“导航条”的合理高度（35% 视口），既不当顶部条也不当遮罩
+    // 300px exceeds the 35% toolbar cap but is not opaque.
     expect(result).toEqual({ bottom: 48, blocked: false });
   });
 
-  it('非 fixed/sticky 的元素一律不算站点框架', () => {
+  it('ignores normal-flow elements', () => {
     const result = classifyTopChrome([candidate({ positioned: false })], VIEWPORT);
     expect(result).toEqual({ bottom: 0, blocked: false });
   });
 
-  it('站点搜索面板 / 对话框盖住顶部时让位', () => {
+  it('yields to site search panels and dialogs', () => {
     const dialog = candidate({
       dialog: true,
       positioned: false,
@@ -87,12 +87,12 @@ describe('classifyTopChrome', () => {
     expect(classifyTopChrome([dialog], VIEWPORT)).toEqual({ bottom: 0, blocked: true });
   });
 
-  it('又小又矮的弹层不值得让位', () => {
+  it('ignores tiny dialogs', () => {
     const tiny = candidate({ dialog: true, positioned: false, width: 120, height: 40, bottom: 40 });
     expect(classifyTopChrome([tiny], VIEWPORT)).toEqual({ bottom: 0, blocked: false });
   });
 
-  it('统计顶部外来 UI 的最高层级，正文里的粘性元素不算', () => {
+  it('finds the highest foreign layer outside article content', () => {
     expect(
       highestForeignZIndex([
         candidate({ zIndex: 30 }),

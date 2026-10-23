@@ -1,6 +1,4 @@
-// 生成扩展图标（16/48/128）：手写 PNG 编码，避免为一个图标引入图像处理依赖。
-//
-// 图形：品牌紫圆角底 + 三条长度递减的圆头横线。
+// Generate 16/48/128 extension icons with a dependency-free PNG encoder.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,8 +38,8 @@ function encodePng(width, height, rgba) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // 位深
-  ihdr[9] = 6; // 颜色类型：RGBA
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // RGBA
   const stride = width * 4;
   const raw = Buffer.alloc((stride + 1) * height);
   for (let y = 0; y < height; y += 1) {
@@ -56,7 +54,7 @@ function encodePng(width, height, rgba) {
   ]);
 }
 
-/** 圆角矩形内部判定（含圆角半径） */
+/** Point-in-rounded-rectangle test. */
 function insideRect(px, py, x, y, width, height, radius) {
   if (px < x || py < y || px > x + width || py > y + height) return false;
   const r = Math.min(radius, width / 2, height / 2);

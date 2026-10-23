@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TopClip · 读长文，不掉线</title>
+    <title>TopClip</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -271,11 +271,9 @@
 
       .row-label small {
         margin-top: 1px;
-        overflow: hidden;
         color: var(--muted);
         font-size: 10.5px;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        line-height: 1.35;
       }
 
       .switch {
@@ -449,8 +447,8 @@
       <header>
         <img class="logo" src="../../icons/icon48.png" alt="" width="42" height="42" />
         <div class="brand">
-          <h1>TopClip</h1>
-          <p>读长文，不掉线</p>
+          <h1 data-i18n="extensionName">TopClip</h1>
+          <p data-i18n="tagline">Read long. Stay on thread.</p>
         </div>
         <span class="version" id="version"></span>
       </header>
@@ -458,16 +456,16 @@
       <section class="status" id="status" data-state="neutral" aria-live="polite">
         <span class="lamp" aria-hidden="true"></span>
         <div class="status-copy">
-          <span class="status-kicker">当前页面</span>
-          <div id="statusText">正在检测页面结构…</div>
+          <span class="status-kicker" data-i18n="statusLabel">Current page</span>
+          <div id="statusText" data-i18n="detectingPage">Inspecting this page…</div>
         </div>
       </section>
 
-      <section class="controls" aria-label="TopClip 设置">
+      <section class="controls" data-i18n-aria-label="settingsAria" aria-label="TopClip settings">
         <label class="row">
           <span class="row-label">
-            <strong>启用 TopClip</strong>
-            <small>关闭后所有网页保持静默</small>
+            <strong data-i18n="enableLabel">Enable TopClip</strong>
+            <small data-i18n="enableHint">Keep every page quiet when off</small>
           </span>
           <span class="switch">
             <input id="enabled" type="checkbox" />
@@ -477,28 +475,32 @@
 
         <div class="row">
           <span class="row-label">
-            <strong>显示方式</strong>
-            <small id="policyHint">阅读时浮现，回看让位</small>
+            <strong data-i18n="displayModeLabel">Visibility</strong>
+            <small id="policyHint" data-i18n="policySmartHint">
+              Appears while reading, yields on scroll-back
+            </small>
           </span>
           <fieldset class="segments">
-            <legend class="sr-only">显示方式</legend>
+            <legend class="sr-only" data-i18n="displayModeLabel">Visibility</legend>
             <label>
               <input type="radio" name="displayPolicy" value="smart" />
-              <span>智能</span>
+              <span data-i18n="policySmart">Smart</span>
             </label>
             <label>
               <input type="radio" name="displayPolicy" value="always" />
-              <span>常驻</span>
+              <span data-i18n="policyAlways">Always</span>
             </label>
           </fieldset>
         </div>
       </section>
 
-      <button class="site-action" id="site" type="button">在此站点禁用</button>
+      <button class="site-action" id="site" type="button" data-i18n="disableSite">
+        Disable on this site
+      </button>
 
       <footer>
-        <span class="hint">悬停标题看目录</span>
-        <span>双击复位</span>
+        <span class="hint" data-i18n="hoverHint">Hover the title for contents</span>
+        <span data-i18n="doubleClickHint">Double-click to reset</span>
       </footer>
     </main>
 

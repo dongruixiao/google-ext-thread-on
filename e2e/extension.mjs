@@ -1,13 +1,10 @@
 /**
- * 端到端验证：用真实浏览器加载打包后的 dist/，
- * 检查注入、可拖动拟物胶囊、层级、跳转、显示策略、原站目录适配与设置链路。
+ * End-to-end checks against the packaged extension:
+ * injection, capsule interaction, hierarchy, navigation, visibility policy,
+ * native contents handling, and popup settings.
  *
- *   npm run build && npm run e2e
- *
- * 浏览器来源（按优先级）：
- *   1. 环境变量 WSS_CHROME_PATH 指定的可执行文件
- *   2. Playwright 自带 Chromium（npx playwright install chromium）
- * 注意：Chrome 137+ 正式版已移除 --load-extension，请使用 Chromium / Chrome for Testing。
+ * Use Chrome for Testing or Chromium because stable Chrome 137+ no longer
+ * supports --load-extension.
  */
 import { createServer } from 'node:http';
 import { readFileSync, mkdtempSync } from 'node:fs';
@@ -18,8 +15,8 @@ import { chromium } from 'playwright-core';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const EXTENSION_DIR = join(HERE, '..', 'dist');
-const EXPECTED_HEADINGS = 7; // h1 + 3×h2 + 3×h3（侧边栏与页脚的标题必须被排除）
-const TOPBAR_HEIGHT = 57; // fixture 顶栏 56px + 1px 边框
+const EXPECTED_HEADINGS = 7; // h1 + 3 h2 + 3 h3; sidebar and footer headings are excluded.
+const TOPBAR_HEIGHT = 57; // 56px fixture toolbar plus a 1px border.
 const READING_LINE = TOPBAR_HEIGHT + 10;
 
 const failures = [];
@@ -146,7 +143,7 @@ try {
   if (!worker) worker = await context.waitForEvent('serviceworker', { timeout: 15000 });
   const extensionId = new URL(worker.url()).host;
 
-  // 用上一版的真实配置启动，验证用户升级后不会因为设置迁移而整页失效。
+  // Start with a real legacy settings payload to verify upgrade migration.
   const setup = await context.newPage();
   await setup.goto(`chrome-extension://${extensionId}/src/popup/popup.html`);
   await setup.evaluate(async () => {
@@ -178,8 +175,8 @@ try {
   await page.mouse.move(10, 600);
   await page.waitForTimeout(1000);
 
-  // 持续对话页：有文章式标题、长段落和语义 article，但底部有对话输入区，
-  // 必须整体保持静默，不能把某一条回复当成独立文章。
+  // Chat pages can contain article-like headings and paragraphs, but the
+  // composer and message turns must keep the extension silent.
   const chatPage = await context.newPage();
   await chatPage.goto(`${url}chat`, { waitUntil: 'load' });
   await chatPage.waitForTimeout(1200);
@@ -235,21 +232,21 @@ try {
   );
 
   const atTop = await probe(page);
-  check('注入到页面', atTop.host && atTop.attachedToHtml, atTop);
+  check('injects into the page', atTop.host && atTop.attachedToHtml, atTop);
   if (!atTop.host) {
     console.log(JSON.stringify(report, null, 2));
-    console.error('内容脚本没有注入，后续断言无法进行');
+    console.error('Content script did not inject; remaining assertions cannot run.');
     process.exit(1);
   }
-  check('默认使用拟物胶囊', atTop.pill === true, atTop.pill);
-  check('页面顶部保持静默', atTop.visible === 'false', atTop);
+  check('uses the capsule surface', atTop.pill === true, atTop.pill);
+  check('stays hidden at the top of the page', atTop.visible === 'false', atTop);
 
-  // 向下滚动：拟物胶囊浮现，且默认不显示文章大标题
+  // Scrolling reveals the capsule; the article-level h1 stays hidden.
   await page.mouse.wheel(0, 1400);
   await page.waitForTimeout(400);
   const scrolled = await probe(page);
-  check('向下滚动后浮现', scrolled.visible === 'true', scrolled);
-  check('拟物胶囊避让固定顶栏', Math.abs(scrolled.top - (TOPBAR_HEIGHT + 10)) <= 1, scrolled.top);
+  check('appears after scrolling down', scrolled.visible === 'true', scrolled);
+  check('clears the fixed toolbar', Math.abs(scrolled.top - (TOPBAR_HEIGHT + 10)) <= 1, scrolled.top);
   check(
     '拟物胶囊保持紧凑单行',
     !!scrolled.title && scrolled.pillHeight === 40,
@@ -260,7 +257,7 @@ try {
     !!scrolled.title && !scrolled.title.includes('端到端验证用文章'),
     scrolled.title,
   );
-  check('大纲包含全部正文标题', scrolled.rows === EXPECTED_HEADINGS, scrolled.rows);
+  check('outline contains every article heading', scrolled.rows === EXPECTED_HEADINGS, scrolled.rows);
   const stickyState = await page.evaluate(() => {
     const sticky = document.querySelector('.sticky-toolbar');
     const rail = document.querySelector('.left-rail');
@@ -275,11 +272,10 @@ try {
     { ...stickyState, pillTop: scrolled.top },
   );
 
-  // 标题交接不变式：胶囊里显示的标题，必须已经滑到停靠线之后
-  // （向下滚不会提前显示还露在下面的标题；回滚时上级标题一露头就会交接）
+  // A displayed heading must already have crossed the docking line.
   const timingScan = await page.evaluate(async () => {
     const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
-    // 用胶囊停靠基准线，而不是入场动画途中的实际位置
+    // Measure against the docking line, not the entrance animation.
     const dockTop = () => Math.round(shadow.querySelector('.wss-root').style.getPropertyValue('--wss-top').replace('px', '')) || 0;
     const visible = () => shadow.querySelector('.wss-root').dataset.visible === 'true';
     const cloneText = () =>
@@ -305,7 +301,7 @@ try {
       const pillRect = shadow.querySelector('.wss-pill').getBoundingClientRect();
       pillLefts.push(Math.round(pillRect.left));
       pillHeights.push(Math.round(pillRect.height));
-      // delta > 0 表示这个标题还露在条下面 —— 不该已经显示在条里
+      // Positive delta means the heading is still visible below the capsule.
       if (delta > 8) {
         violations.push({
           text: text.slice(0, 10),
@@ -349,7 +345,7 @@ try {
     timingScan,
   );
 
-  // 左边缘是锚点：标题变长时只允许右边界增长，高度保持稳定。
+  // The left edge is anchored: longer titles may only grow to the right.
   const titleGrowth = await page.evaluate(async () => {
     const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
     const pill = shadow.querySelector('.wss-pill');
@@ -381,7 +377,7 @@ try {
     titleGrowth,
   );
 
-  // 文章结尾：不能因为“已经到页面底部”就把仍在下方可见的标题提前放进条里
+  // Do not promote still-visible headings before the true document bottom.
   const bottomTiming = await page.evaluate(async () => {
     const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
     const root = shadow.querySelector('.wss-root');
@@ -442,7 +438,7 @@ try {
     bottomTiming,
   );
 
-  // 整篇阅读进度：随滚动单调增长，读到文末接近 100%
+  // Article progress grows monotonically and approaches 100% at the end.
   const readProgress = () =>
     page.evaluate(() => {
       const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
@@ -512,15 +508,15 @@ try {
     progressRing,
   );
 
-  // 原站目录可见时退让：只显示当前小节，且悬停不弹抽屉
+  // Native contents take precedence; compact mode disables the custom drawer.
   const barPoint = await pillPoint(page);
   await page.mouse.move(barPoint.x, barPoint.y);
   await page.waitForTimeout(400);
   const withToc = await probe(page);
-  check('识别到原站目录后退让', withToc.compact === 'true', withToc);
-  check('退让模式不弹重复目录', withToc.drawerOpen === false, withToc.drawerOpen);
+  check('yields to native contents', withToc.compact === 'true', withToc);
+  check('compact mode suppresses the custom outline', withToc.drawerOpen === false, withToc.drawerOpen);
 
-  // 大纲面板结构（产品化）与「点击钉住」
+  // Outline structure and click-to-pin behavior.
   const outlinePanel = await page.evaluate(() => {
     const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
     return {
@@ -549,7 +545,7 @@ try {
     outlinePanel,
   );
 
-  // 关掉原站目录 → 恢复完整功能，并停在三级标题深处
+  // Hide native contents, then restore full functionality deep in an h3.
   await page.mouse.move(10, 600);
   await page.evaluate(() => {
     document.getElementById('site-toc').hidden = true;
@@ -573,7 +569,7 @@ try {
     restored,
   );
 
-  // 点击标题 → 钉住目录；点击界面之外 → 取消钉住
+  // Clicking the title pins the outline; clicking outside releases it.
   await page.evaluate(() => {
     document
       .getElementById('__web_sticky_scroll_host__')
@@ -589,7 +585,7 @@ try {
       pinned: shadow.querySelector('.wss-root').dataset.pinned,
     };
   });
-  check('点击标题可以钉住目录', pinnedState.open === true && pinnedState.pinned === 'true', pinnedState);
+  check('clicking the title pins the outline', pinnedState.open === true && pinnedState.pinned === 'true', pinnedState);
 
   await page.mouse.click(30, 650);
   await page.waitForTimeout(400);
@@ -606,17 +602,17 @@ try {
     unpinnedState,
   );
 
-  // 重新悬停打开，点击第一级（祖先小节）：落点停在胶囊下方
+  // Reopen and click an ancestor; the target lands below the capsule.
   await page.mouse.move(barPoint.x, barPoint.y);
   await page.waitForTimeout(400);
   const reopened = await probe(page);
-  check('移开后再悬停可重新打开目录', reopened.drawerOpen === true, reopened.drawerOpen);
+  check('hover reopens the outline after leaving', reopened.drawerOpen === true, reopened.drawerOpen);
   const clickedText = reopened.drawerPath[0];
   await page.evaluate(() => {
     const shadow = document.getElementById('__web_sticky_scroll_host__').shadowRoot;
     shadow.querySelector('.wss-drawer-path .wss-crumb').click();
   });
-  // 落点期望值由插件自己写在 scroll-margin-top 上（按目标标题的停靠位置算）
+  // The extension writes the expected scroll offset through scroll-margin-top.
   const expectedLanding = await page.evaluate((text) => {
     const heading = [...document.querySelectorAll('h1,h2,h3,h4')].find(
       (node) => node.textContent.trim() === text,
@@ -641,11 +637,11 @@ try {
     expectedLanding !== null && Math.abs(landed.top - expectedLanding) <= 6,
     { ...landed, expectedLanding, readingLine: READING_LINE },
   );
-  check('跳转后吸顶标题跟随目标小节', landed.shown === landed.clicked, landed);
+  check('jump keeps the target heading active', landed.shown === landed.clicked, landed);
   const afterJump = await probe(page);
-  check('跳转后胶囊保持可见', afterJump.visible === 'true', afterJump);
+  check('capsule remains visible after a jump', afterJump.visible === 'true', afterJump);
 
-  // 键盘阅读流：Alt+] / Alt+[ 在相邻标题之间移动
+  // Keyboard flow: Alt+] and Alt+[ move between adjacent headings.
   await page.keyboard.press('Alt+]');
   await page.waitForTimeout(1600);
   const keyboardNext = await probe(page);
@@ -659,7 +655,7 @@ try {
     { next: keyboardNext.title, previous: keyboardPrevious.title },
   );
 
-  // 浏览器页面查找（Ctrl/⌘+F）：不能压住查找条，也不能挡住被滚到顶部的命中文字
+  // Find-in-page must own the top edge while active.
   await page.evaluate(() => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true }));
   });
@@ -676,7 +672,7 @@ try {
     { duringFind: findModeOn.visible, afterEsc: findModeOff.visible },
   );
 
-  // 站点搜索面板 / 对话框盖住顶部 → 让位（与站点无关的通用规则）
+  // Site search panels and dialogs take precedence over the extension.
   await page.evaluate(() => {
     const dialog = document.createElement('div');
     dialog.id = 'e2e-dialog';
@@ -696,7 +692,7 @@ try {
     { dialogOpen: dialogOpen.visible, dialogClosed: dialogClosed.visible },
   );
 
-  // 其它扩展 / 站点注入的更高层浮层：主动降到它下面，不能靠最高 z-index 硬盖
+  // Keep the capsule below foreign UI that already owns a higher layer.
   await page.evaluate(() => {
     const layer = document.createElement('div');
     layer.id = 'e2e-foreign-layer';
@@ -732,7 +728,7 @@ try {
     { ...foreignLayer, restored: foreignLayerGone },
   );
 
-  // 拟物胶囊自带实体表面，网页背景变化不应让标题消失
+  // The capsule surface must remain readable on any page background.
   await page.evaluate(() => {
     document.querySelector('article').style.backgroundImage =
       'linear-gradient(135deg, #ff006e, #3a86ff)';
@@ -750,15 +746,15 @@ try {
     { changed: dynamicUnsafe.visible, restored: dynamicSafe.visible },
   );
 
-  // 失败即静默：连续 3 次测量异常后彻底移除自身，异常不能泄漏到宿主页面
+  // Three repeated layout failures must remove all extension artifacts.
   const faultPage = await context.newPage();
   const faultPageErrors = [];
   faultPage.on('pageerror', (error) => faultPageErrors.push(String(error)));
   await faultPage.goto(url, { waitUntil: 'load' });
   await faultPage.waitForTimeout(1000);
 
-  // 内容脚本运行在独立的 JS world，主页面改原型不会影响它。
-  // 通过 CDP 找到扩展所在的 isolated world，在那里制造真实的布局 API 异常。
+  // Content scripts run in an isolated world. Use CDP to force a layout API
+  // failure in that world rather than modifying the page's prototypes.
   const cdp = await context.newCDPSession(faultPage);
   const executionContexts = new Map();
   cdp.on('Runtime.executionContextCreated', (event) => {
@@ -777,7 +773,7 @@ try {
       break;
     }
   }
-  check('能定位内容脚本隔离环境', extensionContextId !== null, extensionContextId);
+  check('finds the content-script isolated world', extensionContextId !== null, extensionContextId);
 
   const faultHadHost = await faultPage.evaluate(
     () => !!document.getElementById('__web_sticky_scroll_host__'),
@@ -851,7 +847,7 @@ try {
     { ...faultResult, recoveredAfterReload, pageErrors: faultPageErrors },
   );
 
-  // 设置已经合并进弹窗：不再存在独立设置页或二次跳转入口。
+  // All settings live in the popup; there is no secondary options page.
   const control = await context.newPage();
   await control.goto(`chrome-extension://${extensionId}/src/popup/popup.html`);
   await control.waitForTimeout(500);
@@ -976,8 +972,8 @@ try {
   );
 
   await page.setViewportSize({ width: 1280, height: 720 });
-  // 旧版把 x=100 解释为“胶囊左边缘贴近视口右边缘”。新版改为左边缘锚定后，
-  // 必须把这类历史位置夹回视口，否则升级后只会露出几像素，看起来像没有显示。
+  // Legacy x=100 positioning can place the capsule outside the viewport after
+  // the coordinate model changed. Clamp it so upgrades remain visible.
   await control.evaluate(async () => {
     await chrome.storage.sync.set({
       'wss:settings': {
@@ -1008,7 +1004,7 @@ try {
   await page.evaluate(() => window.scrollTo(0, 1400));
   await page.waitForTimeout(500);
   const beforeReset = await probe(page);
-  check('双击复位前胶囊可见', beforeReset.visible === 'true', beforeReset);
+  check('capsule is visible before reset', beforeReset.visible === 'true', beforeReset);
   const resetPoint = await pillPoint(page);
   await page.mouse.dblclick(resetPoint.x, resetPoint.y);
   await page.waitForTimeout(500);
@@ -1029,13 +1025,13 @@ try {
     resetPersisted,
   );
 
-  check('运行期间没有页面报错', pageErrors.length === 0, pageErrors);
+  check('no page errors occur during the run', pageErrors.length === 0, pageErrors);
 
-  // popup：状态 + 一键在站点禁用
+  // Popup status and per-site disable action.
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/popup/popup.html`);
   await page.bringToFront();
-  // 重新加载后台标签里的弹窗：此时活动标签页已是被测页面
+  // Reload the background popup after making the fixture the active tab.
   await popup.reload();
   await popup.waitForTimeout(700);
   const popupState = await popup.evaluate(() => ({
@@ -1049,8 +1045,8 @@ try {
       !!document.querySelector('#enabled') &&
       document.querySelectorAll('input[name="displayPolicy"]').length === 2,
   }));
-  check('popup 正常渲染', popupState.title.includes('TopClip'), popupState);
-  check('popup 能读到当前站点', popupState.siteButtonDisabled === false, popupState);
+  check('popup renders', popupState.title.includes('TopClip'), popupState);
+  check('popup reads the active host', popupState.siteButtonDisabled === false, popupState);
   check(
     'popup 只保留高频操作',
     !popupState.hasOptions &&
@@ -1064,7 +1060,7 @@ try {
   const disabled = await page.evaluate(() => ({
     hostExists: !!document.getElementById('__web_sticky_scroll_host__'),
   }));
-  check('在站点上禁用后立即退出', disabled.hostExists === false, disabled);
+  check('per-site disable removes the UI immediately', disabled.hostExists === false, disabled);
 } catch (error) {
   failures.push(`运行异常: ${error}`);
 } finally {

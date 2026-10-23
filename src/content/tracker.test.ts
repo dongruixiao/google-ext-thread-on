@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { HeadingNode } from './extractor';
 import { ScrollTracker, type TrackerSnapshot } from './tracker';
 
-/** 伪造元素布局：返回 setter，改它的 top 等价于页面滚动 */
+/** Return a setter that simulates scrolling by changing heading positions. */
 function stubRect(element: HTMLElement, top: number, height = 40): (nextTop: number) => void {
   let current = top;
   element.getBoundingClientRect = () =>
@@ -57,24 +57,24 @@ function createRig(heights: number[], dock = 60): Rig {
   };
 }
 
-describe('吸顶时机', () => {
+describe('heading activation timing', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
   });
 
-  it('首次出现：标题完全滑到条后面才浮出，不会提前露出', () => {
-    const rig = createRig([50, 40, 40]); // 条顶边 60，判定线 66
+  it('waits until the first heading crosses the docking line', () => {
+    const rig = createRig([50, 40, 40]); // Toolbar top is 60; active line is 66.
     rig.setTop(0, 300);
     rig.setTop(1, 900);
     rig.setTop(2, 1500);
     rig.flush();
     expect(rig.last()?.index).toBe(-1);
 
-    rig.setTop(0, 90); // 标题还露在条下面
+    rig.setTop(0, 90); // Still visible below the docking line.
     rig.flush();
     expect(rig.last()?.index).toBe(-1);
 
-    rig.setTop(0, 66); // 刚好滑到条后面
+    rig.setTop(0, 66); // Crossed the docking line.
     rig.flush();
     expect(rig.last()?.index).toBe(0);
 
@@ -83,7 +83,7 @@ describe('吸顶时机', () => {
     expect(rig.last()?.index).toBe(0);
   });
 
-  it('向下滚动：下一个标题滑到条后面才切换', () => {
+  it('switches only after the next heading crosses the line', () => {
     const rig = createRig([50, 40, 40]);
     rig.setTop(0, 66);
     rig.setTop(1, 400);
@@ -92,7 +92,7 @@ describe('吸顶时机', () => {
     expect(rig.last()?.index).toBe(0);
 
     rig.setTop(0, -200);
-    rig.setTop(1, 85); // 标题还露在条下面
+    rig.setTop(1, 85); // Still visible below the docking line.
     rig.flush();
     expect(rig.last()?.index).toBe(0);
 
@@ -101,7 +101,7 @@ describe('吸顶时机', () => {
     expect(rig.last()?.index).toBe(1);
   });
 
-  it('向上回滚：下级标题的原文一露头就退回上一级', () => {
+  it('hands back to the parent as soon as a child reappears', () => {
     const rig = createRig([50, 40, 40]);
     rig.setTop(0, 60);
     rig.setTop(1, 60);
@@ -110,16 +110,16 @@ describe('吸顶时机', () => {
     expect(rig.last()?.index).toBe(1);
 
     rig.setTop(0, -50);
-    rig.setTop(1, 70); // 下级标题刚开始重新露头 → 立刻回到上一节
+    rig.setTop(1, 70); // The child heading is visible again.
     rig.flush();
     expect(rig.last()?.index).toBe(0);
 
-    rig.setTop(0, 130); // 连第一级标题也露出来了 → 静默
+    rig.setTop(0, 130); // Even the root heading is below the line.
     rig.flush();
     expect(rig.last()?.index).toBe(-1);
   });
 
-  it('主动跳转后目标章节生效，回滚或继续下滚都会自然交接', () => {
+  it('keeps a jump target active until geometry takes over', () => {
     const rig = createRig([50, 40, 40]);
     rig.setTop(0, 66);
     rig.setTop(1, 400);
@@ -127,7 +127,7 @@ describe('吸顶时机', () => {
     rig.flush();
     expect(rig.last()?.index).toBe(0);
 
-    // 跳转到第 2 节：落地时它的标题停在条下方（66 + 40 + 6 = 112 以内）
+    // A jump lands the target below the capsule, within 66 + 40 + 6.
     rig.setTop(0, -1400);
     rig.setTop(1, -400);
     rig.setTop(2, 110);
@@ -135,14 +135,14 @@ describe('吸顶时机', () => {
     rig.tracker.focusIndex(2);
     expect(rig.last()?.index).toBe(2);
 
-    // 回滚到目标标题重新露头 → 交还给上一节
+    // Scroll-back makes the target visible again.
     rig.setTop(0, -1200);
     rig.setTop(1, -200);
     rig.setTop(2, 140);
     rig.flush();
     expect(rig.last()?.index).toBe(1);
 
-    // 继续下滚，被更深的标题取代 → 交还给下一节
+    // A deeper heading replaces the override.
     rig.setTop(0, -1400);
     rig.setTop(1, -600);
     rig.setTop(2, 60);
@@ -150,20 +150,20 @@ describe('吸顶时机', () => {
     expect(rig.last()?.index).toBe(2);
   });
 
-  it('条高变化后基准线跟着变，不需要重新加载', () => {
+  it('recalculates when the docking height changes', () => {
     const rig = createRig([50, 40, 40]);
     rig.setTop(0, 400);
-    rig.setTop(1, 123); // 比 112 低但比 82 高
+    rig.setTop(1, 123); // Below 112, but above the lower line.
     rig.setTop(2, 900);
     rig.flush();
     expect(rig.last()?.index).toBe(-1);
 
-    rig.setDock(150); // 条整体下移 → 基准线也下移
+    rig.setDock(150); // Move the docking line downward.
     rig.flush();
     expect(rig.last()?.index).toBe(1);
   });
 
-  it('页面触底也不会把尚未越过吸顶线的标题提前提升', () => {
+  it('does not promote visible headings before the real document bottom', () => {
     const descriptor = Object.getOwnPropertyDescriptor(window, 'scrollY');
     let scrollY = 99_000;
     Object.defineProperty(window, 'scrollY', {
@@ -178,7 +178,7 @@ describe('吸顶时机', () => {
       rig.flush();
       expect(rig.last()?.index).toBe(0);
 
-      // 真正到达文档终点后，只允许最后一个标题接替。
+      // Only the final heading may take over at the true document bottom.
       scrollY = 99_900;
       rig.flush();
       expect(rig.last()?.index).toBe(2);
@@ -189,7 +189,7 @@ describe('吸顶时机', () => {
   });
 });
 
-describe('整篇文章的阅读进度', () => {
+describe('article reading progress', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
   });
@@ -205,7 +205,7 @@ describe('整篇文章的阅读进度', () => {
       id: 'h',
       element,
       level: 2,
-      text: '标题',
+      text: 'Heading',
       top: 0,
       parentIndex: -1,
     };
@@ -218,12 +218,12 @@ describe('整篇文章的阅读进度', () => {
     return { snapshots, tracker };
   }
 
-  it('0 表示刚开始读，1 表示正文末尾已进入视口底部', () => {
+  it('moves from 0 at the start to 1 when the article end is visible', () => {
     const scope = document.createElement('article');
     document.body.appendChild(scope);
     const setTop = stubRect(scope, 100, 3000);
     const { snapshots, tracker } = trackScope(scope);
-    const line = 44; // dockTop(0) + 默认条高(44)
+    const line = 44; // dockTop(0) + default capsule height.
     const range = 3000 + line - window.innerHeight;
 
     tracker.flush();
@@ -242,13 +242,13 @@ describe('整篇文章的阅读进度', () => {
     expect(snapshots.at(-1)?.progress).toBeCloseTo(1, 3);
   });
 
-  it('没有正文容器时不计算进度，也不会抛错', () => {
+  it('returns zero progress without an article scope', () => {
     const { snapshots, tracker } = trackScope(null);
     tracker.flush();
     expect(snapshots.at(-1)?.progress ?? 0).toBe(0);
   });
 
-  it('正文比视口还短时直接算读完', () => {
+  it('treats an article shorter than the viewport as complete', () => {
     const scope = document.createElement('article');
     document.body.appendChild(scope);
     stubRect(scope, 300, 200);

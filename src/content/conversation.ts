@@ -30,10 +30,7 @@ const EXPLICIT_TURN_SELECTOR = [
 
 const SEMANTIC_TRANSCRIPT_SELECTOR = '[role="log"], [role="feed"]';
 
-/**
- * 通用的对话/代理组件命名。按元素语义判断，不按站点域名判断。
- * 这些标签名描述的是“消息轮次”，而不是某个具体产品。
- */
+/** Generic message-turn elements used by chat and agent interfaces. */
 const SEMANTIC_TURN_SELECTOR = [
   'user-query',
   'model-response',
@@ -130,7 +127,7 @@ function ariaTranscriptCount(root: ParentNode): number {
   return 0;
 }
 
-/** 同一父级下至少两段有实质文字的消息容器，避免把单篇文章误认为对话 */
+/** Sibling article-like containers are weak evidence of a conversation. */
 function repeatedTurnCount(root: ParentNode): number {
   const groups = new Map<Element, Element[]>();
   for (const element of root.querySelectorAll<HTMLElement>(REPEATED_TURN_SELECTOR)) {
@@ -148,10 +145,8 @@ function repeatedTurnCount(root: ParentNode): number {
 }
 
 /**
- * 判断当前页面是否是一个持续对话 / 代理工作区。
- *
- * 必须同时看到底部或固定输入区，以及明确的多轮消息结构。
- * 普通文章底部的评论框、固定搜索框、单条 AI 摘要卡片都不会满足这个组合。
+ * Conversation surfaces require both a composer and multiple message turns.
+ * A comment form, search box, or single AI summary card must not match.
  */
 export function detectConversationSurface(root: ParentNode = document): ConversationSurface {
   if (!hasConversationComposer(root)) {

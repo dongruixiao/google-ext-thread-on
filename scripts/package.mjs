@@ -1,8 +1,4 @@
-/**
- * 打包上架用的 zip：
- *   npm run package
- * 产物在 release/web-sticky-scroll-<version>.zip，并顺带做几项上架前自检。
- */
+/** Build the store ZIP and run manifest sanity checks. */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -25,6 +21,11 @@ const notes = [];
 
 if (manifest.version !== packageJson.version) {
   problems.push(`manifest.version(${manifest.version}) 与 package.json(${packageJson.version}) 不一致`);
+}
+
+for (const locale of ['en', 'zh_CN']) {
+  const file = join(DIST, '_locales', locale, 'messages.json');
+  if (!existsSync(file)) problems.push(`missing locale catalog: ${locale}`);
 }
 
 const referenced = [

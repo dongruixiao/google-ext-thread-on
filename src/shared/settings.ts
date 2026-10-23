@@ -1,22 +1,21 @@
-/** 显示策略：smart 智能浮现 / always 常驻 */
+/** Smart mode yields on scroll-back; always mode remains visible. */
 export type DisplayPolicy = 'smart' | 'always';
 
 export interface FloatingPosition {
-  /** 可移动区域内相对横坐标，0..100 */
+  /** Horizontal position in the movable viewport area, 0..100. */
   x: number;
-  /** 可移动区域内相对纵坐标，0..100 */
+  /** Vertical position in the movable viewport area, 0..100. */
   y: number;
 }
 
 export interface WssSettings {
   version: number;
-  /** 总开关：关闭后不再注入任何 UI */
+  /** Global switch. No UI is mounted while disabled. */
   enabled: boolean;
-  /** 显示策略 */
   displayPolicy: DisplayPolicy;
-  /** 用户主动停用 TopClip 的站点 */
+  /** Hosts where the user explicitly disabled the extension. */
   disabledSites: string[];
-  /** 按站点保存的拟物胶囊位置 */
+  /** Per-host floating capsule positions. */
   floatingPositions: Record<string, FloatingPosition>;
 }
 
@@ -42,7 +41,7 @@ function pick<T extends string>(value: unknown, allowed: readonly T[], fallback:
   return allowed.includes(value as T) ? (value as T) : fallback;
 }
 
-/** 域名归一化：去掉协议、路径、端口与前置的 *. */
+/** Normalize a URL, hostname, or wildcard rule to a bare hostname. */
 export function normalizeHost(input: string): string {
   let host = input.trim().toLowerCase();
   const schemeIndex = host.indexOf('://');
@@ -90,7 +89,7 @@ function normalizeFloatingPositions(raw: unknown): Record<string, FloatingPositi
   return result;
 }
 
-/** 兼容旧版本并做全量校验。 */
+/** Migrate supported legacy fields and validate all persisted values. */
 export function normalizeSettings(raw: unknown): WssSettings {
   const input = (raw ?? {}) as Record<string, unknown>;
   const displayPolicy =
@@ -98,7 +97,8 @@ export function normalizeSettings(raw: unknown): WssSettings {
       ? 'smart'
       : pick(input.displayPolicy, POLICIES, DEFAULT_SETTINGS.displayPolicy);
 
-  // v5 只支持黑名单式站点禁用；旧的白名单不做反向迁移，避免升级后整网失效。
+  // Allowlists are intentionally not inverted: doing so would silently disable
+  // the extension on every unrelated host after an upgrade.
   const disabledSites =
     input.disabledSites !== undefined
       ? normalizeSites(input.disabledSites)
@@ -115,7 +115,7 @@ export function normalizeSettings(raw: unknown): WssSettings {
   };
 }
 
-/** 命中站点规则（支持 example.com 覆盖其子域），未命中返回 undefined */
+/** Rules match the exact host and its subdomains. */
 export function matchSite(sites: string[], hostname: string): string | undefined {
   const host = normalizeHost(hostname);
   if (!host) return undefined;
@@ -127,7 +127,6 @@ export function isSiteEnabled(settings: WssSettings, hostname: string): boolean 
   return matchSite(settings.disabledSites, hostname) === undefined;
 }
 
-/** 在当前站点上切换启用状态。 */
 export function toggleSite(settings: WssSettings, hostname: string): WssSettings {
   const host = normalizeHost(hostname);
   if (!host) return settings;
@@ -137,8 +136,6 @@ export function toggleSite(settings: WssSettings, hostname: string): WssSettings
     : [...settings.disabledSites, host];
   return { ...settings, disabledSites };
 }
-
-// ── 读写 ─────────────────────────────────────────────
 
 function hasChromeStorage(): boolean {
   return typeof chrome !== 'undefined' && !!chrome?.storage?.sync;
@@ -167,14 +164,14 @@ export async function saveSettings(next: WssSettings): Promise<void> {
     try {
       window.localStorage.setItem(LS_KEY, JSON.stringify(normalized));
     } catch {
-      /* 忽略隐私模式下的写入失败 */
+      /* Private-mode storage may be unavailable. */
     }
     return;
   }
   try {
     await chrome.storage.sync.set({ [SETTINGS_KEY]: normalized });
   } catch {
-    /* 忽略写入失败，使用默认值继续运行 */
+    /* Settings failures must not break page rendering. */
   }
 }
 
@@ -185,7 +182,7 @@ export function subscribeSettings(callback: (settings: WssSettings) => void): ()
       try {
         callback(normalizeSettings(event.newValue ? JSON.parse(event.newValue) : undefined));
       } catch {
-        /* 忽略非法 JSON */
+        /* Ignore malformed fallback storage. */
       }
     };
     window.addEventListener('storage', onStorage);

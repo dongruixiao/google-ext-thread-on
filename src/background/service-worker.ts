@@ -7,8 +7,9 @@ import {
   toggleSite,
   type WssSettings,
 } from '../shared/settings';
+import { MESSAGE } from '../shared/protocol';
 
-/** 首次安装时写入默认设置 */
+/** Seed default settings only on the first install. */
 chrome.runtime.onInstalled.addListener(() => {
   void chrome.storage.sync.get(SETTINGS_KEY).then((stored) => {
     if (stored?.[SETTINGS_KEY] !== undefined) return;
@@ -16,7 +17,7 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-/** 跨标签页状态管理：设置变化时广播给所有已注入内容脚本的标签页 */
+/** Keep already-open content scripts in sync with settings changes. */
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== 'sync') return;
   const change = changes[SETTINGS_KEY];
@@ -35,15 +36,14 @@ async function broadcast(settings: WssSettings): Promise<void> {
     tabs.map(async (tab) => {
       if (tab.id == null) return;
       try {
-        await chrome.tabs.sendMessage(tab.id, { type: 'wss:settings', settings });
+        await chrome.tabs.sendMessage(tab.id, { type: MESSAGE.settings, settings });
       } catch {
-        // 该标签页没有内容脚本（内置页 / 未注入），忽略
+        // Built-in pages and tabs without a content script reject this message.
       }
     }),
   );
 }
 
-/** 快捷键：在没有界面的情况下也能快速开关 */
 chrome.commands?.onCommand.addListener((command) => {
   void handleCommand(command);
 });
@@ -61,7 +61,7 @@ async function handleCommand(command: string): Promise<void> {
   }
 }
 
-/** 通过内容脚本获取当前标签页域名（无需额外申请 tabs 权限） */
+/** Read the host through the content script to avoid requesting tabs permission. */
 async function activeTabHost(): Promise<string | null> {
   let tabId: number | undefined;
   try {
@@ -72,7 +72,7 @@ async function activeTabHost(): Promise<string | null> {
   }
   if (tabId == null) return null;
   try {
-    const status = (await chrome.tabs.sendMessage(tabId, { type: 'wss:status' })) as
+    const status = (await chrome.tabs.sendMessage(tabId, { type: MESSAGE.status })) as
       | { host?: string }
       | null;
     return status?.host ?? null;

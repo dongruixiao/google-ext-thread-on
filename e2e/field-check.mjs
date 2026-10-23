@@ -1,12 +1,12 @@
 /**
- * 实地检查：拿打包好的扩展去跑真实网站，看看它在"不是我们写的页面"上表现如何。
+ * Field check against real websites using the packaged extension.
  *
  *   npm run build
- *   WSS_CHROME_PATH=... npm run field-check              # 跑内置站点列表
- *   WSS_CHROME_PATH=... npm run field-check https://...  # 只跑指定页面
+ *   WSS_CHROME_PATH=... npm run field-check
+ *   WSS_CHROME_PATH=... npm run field-check https://...
  *
- * 输出每个站点的：是否注入、识别到的正文容器、标题数量、胶囊状态、
- * 是否与原站目录共存、以及页面报错。
+ * Reports injection, article scope, heading count, capsule state, native
+ * contents coexistence, performance observations, and page errors.
  */
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -17,41 +17,40 @@ import { chromium } from 'playwright-core';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const EXTENSION_DIR = join(HERE, '..', 'dist');
 
-/** 应该激活：长文 / 文档 / 百科 / README */
+/** Expected to activate: articles, documentation, encyclopedias, and READMEs. */
 const DEFAULT_TARGETS = [
-  { name: 'MDN 文档', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions', expect: 'active' },
-  { name: 'Python 文档', url: 'https://docs.python.org/3/tutorial/controlflow.html', expect: 'active' },
-  { name: 'React 文档', url: 'https://react.dev/learn/thinking-in-react', expect: 'active' },
+  { name: 'MDN docs', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions', expect: 'active' },
+  { name: 'Python docs', url: 'https://docs.python.org/3/tutorial/controlflow.html', expect: 'active' },
+  { name: 'React docs', url: 'https://react.dev/learn/thinking-in-react', expect: 'active' },
   { name: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Web_browser', expect: 'active' },
   { name: 'GitHub README', url: 'https://github.com/vitejs/vite', expect: 'active' },
-  { name: 'Vite 官网文档', url: 'https://vite.dev/guide/', expect: 'active' },
-  { name: 'web.dev 长文', url: 'https://web.dev/articles/rendering-performance', expect: 'active' },
-  { name: 'TypeScript 手册', url: 'https://www.typescriptlang.org/docs/handbook/2/everyday-types.html', expect: 'active' },
+  { name: 'Vite docs', url: 'https://vite.dev/guide/', expect: 'active' },
+  { name: 'web.dev article', url: 'https://web.dev/articles/rendering-performance', expect: 'active' },
+  { name: 'TypeScript handbook', url: 'https://www.typescriptlang.org/docs/handbook/2/everyday-types.html', expect: 'active' },
   { name: 'Rust Book', url: 'https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html', expect: 'active' },
   { name: 'WHATWG HTML', url: 'https://html.spec.whatwg.org/multipage/dom.html', expect: 'active' },
   { name: 'W3C WCAG', url: 'https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html', expect: 'active' },
   { name: 'Martin Fowler', url: 'https://martinfowler.com/articles/microservices.html', expect: 'active' },
-  // 长文但没有章节标题：没有可吸顶的对象，按产品边界保持静默
-  { name: 'Paul Graham 长文', url: 'https://paulgraham.com/lisp.html', expect: 'silent', note: '无小节标题' },
-  { name: 'ar5iv 论文', url: 'https://ar5iv.labs.arxiv.org/html/1706.03762', expect: 'active' },
-  { name: 'Cornell 法律条目', url: 'https://www.law.cornell.edu/wex/contract', expect: 'active' },
-  // 整宽 main 里塞了左侧目录的文档站：胶囊与原站目录应能共存
-  { name: 'pi.dev 文档', url: 'https://pi.dev/docs/latest', expect: 'active' },
-  // 不该激活：列表页、搜索结果、营销首页
-  { name: 'HN 列表', url: 'https://news.ycombinator.com/', expect: 'silent' },
-  { name: 'MDN 目录页', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide', expect: 'silent' },
-  { name: '搜索结果页', url: 'https://html.duckduckgo.com/html/?q=web+browser', expect: 'silent' },
-  { name: 'GitHub 趋势页', url: 'https://github.com/trending', expect: 'silent' },
-  { name: 'npm 搜索', url: 'https://www.npmjs.com/search?q=web', expect: 'silent' },
-  { name: 'Wikipedia 分类', url: 'https://en.wikipedia.org/wiki/Category:Web_browsers', expect: 'silent' },
-  { name: 'YouTube 首页', url: 'https://www.youtube.com/', expect: 'silent' },
-  // 持续对话 / 代理工作区：即使回答里有长标题，也不能当成独立文章
-  { name: 'ChatGPT 对话', url: 'https://chatgpt.com/', expect: 'silent' },
-  { name: 'Gemini 对话', url: 'https://gemini.google.com/app', expect: 'silent' },
-  // 这一页是一篇很长的营销长文（6.7k 字、单栏、段落为主、章节 1.5k 字），
-  // 结构上和长文一致，因此判定为激活——属于可接受的边界情况。
-  { name: 'Tailwind 首页', url: 'https://tailwindcss.com/', expect: 'active', note: '长营销页，边界情况' },
-  { name: 'Apple 首页', url: 'https://www.apple.com/', expect: 'silent' },
+  // Long prose without headings has nothing to anchor.
+  { name: 'Paul Graham essay', url: 'https://paulgraham.com/lisp.html', expect: 'silent', note: 'No section headings' },
+  { name: 'ar5iv paper', url: 'https://ar5iv.labs.arxiv.org/html/1706.03762', expect: 'active' },
+  { name: 'Cornell Law entry', url: 'https://www.law.cornell.edu/wex/contract', expect: 'active' },
+  // A docs page with a native contents sidebar should support compact mode.
+  { name: 'pi.dev docs', url: 'https://pi.dev/docs/latest', expect: 'active' },
+  // Expected silent: lists, search results, and marketing pages.
+  { name: 'HN list', url: 'https://news.ycombinator.com/', expect: 'silent' },
+  { name: 'MDN index', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide', expect: 'silent' },
+  { name: 'Search results', url: 'https://html.duckduckgo.com/html/?q=web+browser', expect: 'silent' },
+  { name: 'GitHub trending', url: 'https://github.com/trending', expect: 'silent' },
+  { name: 'npm search', url: 'https://www.npmjs.com/search?q=web', expect: 'silent' },
+  { name: 'Wikipedia category', url: 'https://en.wikipedia.org/wiki/Category:Web_browsers', expect: 'silent' },
+  { name: 'YouTube home', url: 'https://www.youtube.com/', expect: 'silent' },
+  // Chat and agent workspaces must not treat individual replies as articles.
+  { name: 'ChatGPT conversation', url: 'https://chatgpt.com/', expect: 'silent' },
+  { name: 'Gemini conversation', url: 'https://gemini.google.com/app', expect: 'silent' },
+  // Article-like marketing content is an accepted boundary case.
+  { name: 'Tailwind home', url: 'https://tailwindcss.com/', expect: 'active', note: 'Long marketing article' },
+  { name: 'Apple home', url: 'https://www.apple.com/', expect: 'silent' },
 ];
 
 const targets = process.argv.slice(2).length
@@ -70,7 +69,7 @@ const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir()
   ],
 });
 
-/** 在页面里读取插件的实际状态 */
+/** Read the extension's observable state from the host page. */
 const inspect = (page) =>
   page.evaluate(() => {
     const host = document.getElementById('__web_sticky_scroll_host__');
@@ -83,7 +82,7 @@ const inspect = (page) =>
     const scope = document.querySelector('[data-wss-scope], [data-wss-stats]');
     const dockTop = Number.parseFloat(root?.style.getPropertyValue('--wss-top') ?? 'NaN');
 
-    // 站点自己的固定顶栏高度（用来对比我们的吸附位置）
+    // Native fixed-header height, used to verify the dock offset.
     let siteHeader = 0;
     for (const ratio of [0.5, 0.08, 0.92]) {
       const x = Math.round(window.innerWidth * ratio);
@@ -104,7 +103,7 @@ const inspect = (page) =>
       ? [...document.querySelectorAll('h1,h2,h3,h4')].find((node) => node.textContent.trim() === shownHeading)
       : null;
 
-    // 结构指标：用来区分「长文」和「导航/营销/搜索页」
+    // Structural metrics distinguish long-form content from page chrome.
     const metrics = (() => {
       if (!scope) return null;
       const text = (element) => (element.textContent ?? '').replace(/\s+/g, '').length;
@@ -170,16 +169,13 @@ const inspect = (page) =>
     };
   });
 
-/**
- * 把页面往下滚一段。
- * 注意：直接在页面左侧滚轮经常滚到的是侧边栏，所以这里用 window 或最大的滚动容器。
- */
+/** Scroll through the window or the largest nested scroll container. */
 const scrollPage = (page, delta) =>
   page.evaluate((amount) => {
     const before = window.scrollY;
     window.scrollBy(0, amount);
     if (window.scrollY !== before) return;
-    // 页面自身不滚（内容在容器里滚动）：找最大的可滚动容器
+    // Some sites scroll inside a container instead of the window.
     let best = null;
     for (const element of document.querySelectorAll('*')) {
       if (!(element instanceof HTMLElement)) continue;
@@ -204,7 +200,7 @@ const startInstrumentation = (page) =>
         state.longTasks += list.getEntries().filter((entry) => entry.duration > 50).length;
       }).observe({ type: 'longtask', buffered: false });
     } catch {
-      /* 浏览器不支持 longtask 时保留为 0 */
+      /* Keep zero when longtask observation is unsupported. */
     }
     try {
       new PerformanceObserver((list) => {
@@ -248,9 +244,9 @@ for (const target of targets) {
     entry.deeper = await inspect(page);
     entry.performance = await page.evaluate(() => window.__wssFieldPerformance);
     entry.errors = errors;
-    // 以插件自己的判定为准（页面正文可能在首屏之外，用“条是否可见”会误判）
+    // Trust the detector; the capsule may be off-screen on the first pass.
     const statsText = entry.deeper.stats ?? entry.scrolled.stats ?? '';
-    const activated = /(^|\s)art=1(\s|$)/.test(statsText);
+    const activated = /(^|\s)reading=1(\s|$)/.test(statsText);
     const pillVisible = entry.deeper.visible === 'true' || entry.scrolled.visible === 'true';
     const surface = entry.deeper.pillRect ?? entry.scrolled.pillRect;
     entry.pillVisible = pillVisible;
@@ -268,8 +264,8 @@ for (const target of targets) {
       !pillVisible ||
       (progressValue >= 0 && progressValue <= 100 && progressOffset >= 0 && progressOffset <= 88);
     if (entry.progressPass === false) mismatches += 1;
-    // 真实站点自身的长任务无法可靠归因给扩展，因此作为观测值记录；
-    // 只有明确由插件宿主造成的布局位移才判失败。
+    // Site long tasks cannot be attributed to the extension. Only layout
+    // shifts caused by the extension host count as failures.
     entry.performancePass =
       !entry.performance || entry.performance.pluginLayoutShifts === 0;
     if (entry.performancePass === false) mismatches += 1;

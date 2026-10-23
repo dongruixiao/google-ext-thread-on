@@ -7,27 +7,17 @@ import {
   type DisplayPolicy,
   type WssSettings,
 } from '../shared/settings';
+import { localizeDocument, t, type MessageKey } from '../shared/i18n';
+import { MESSAGE, type ContentStatus } from '../shared/protocol';
 
-interface PageStatus {
-  active: boolean;
-  enabled: boolean;
-  siteEnabled: boolean;
-  host: string;
-  headings: number;
-  pageTocVisible: boolean;
-  contentVersion?: string;
-  currentSection: string | null;
-  statusReason: string;
-}
-
-const POLICY_HINTS: Record<DisplayPolicy, string> = {
-  smart: '阅读时浮现，回看让位',
-  always: '始终显示，可自由拖动',
+const POLICY_HINTS: Record<DisplayPolicy, MessageKey> = {
+  smart: 'policySmartHint',
+  always: 'policyAlwaysHint',
 };
 
 function getElement<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
-  if (!element) throw new Error(`popup 元素缺失: ${selector}`);
+  if (!element) throw new Error(`Missing popup element: ${selector}`);
   return element;
 }
 
@@ -42,14 +32,15 @@ const policyInputs = [
 ];
 
 let settings: WssSettings = { ...DEFAULT_SETTINGS };
-let pageStatus: PageStatus | null = null;
+let pageStatus: ContentStatus | null = null;
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+function renderStatusMessage(message: string, currentSection?: string | null): void {
+  statusText.textContent = message;
+  if (!currentSection) return;
+  const current = document.createElement('span');
+  current.className = 'current';
+  current.textContent = currentSection;
+  statusText.append(current);
 }
 
 function render(): void {
@@ -58,12 +49,12 @@ function render(): void {
     input.checked = input.value === settings.displayPolicy;
     input.disabled = !settings.enabled;
   }
-  policyHint.textContent = POLICY_HINTS[settings.displayPolicy];
+  policyHint.textContent = t(POLICY_HINTS[settings.displayPolicy]);
 
   const host = pageStatus?.host;
   siteButton.disabled = !host;
   siteButton.textContent =
-    host && !isSiteEnabled(settings, host) ? '在此站点启用' : '在此站点禁用';
+    host && !isSiteEnabled(settings, host) ? t('enableSite') : t('disableSite');
 }
 
 function renderStatus(): void {
@@ -72,41 +63,38 @@ function renderStatus(): void {
   statusBox.dataset.state = 'neutral';
   if (!status) {
     statusBox.dataset.state = 'attention';
-    statusText.textContent = '当前页面无法使用 TopClip。';
+    renderStatusMessage(t('pageUnavailable'));
     return;
   }
   if (status.contentVersion !== chrome.runtime.getManifest().version) {
     statusBox.dataset.stale = 'true';
     statusBox.dataset.state = 'attention';
-    statusText.innerHTML = '<strong>刷新页面后生效</strong><br>TopClip 已更新。';
+    renderStatusMessage(`${t('refreshToApply')} ${t('extensionUpdated')}`);
     return;
   }
   if (!status.enabled) {
-    statusText.textContent = 'TopClip 已关闭。';
+    renderStatusMessage(t('disabledGlobally'));
     return;
   }
   if (!status.siteEnabled) {
-    statusText.innerHTML = `已在 <strong>${escapeHtml(status.host)}</strong> 上停用。`;
+    renderStatusMessage(t('siteDisabled', [status.host]));
     return;
   }
   if (status.active) {
     statusBox.dataset.state = 'active';
-    const toc = status.pageTocVisible ? ' · 原站目录可见，已自动退让' : '';
-    const current = status.currentSection
-      ? `<br><span class="current">${escapeHtml(status.currentSection)}</span>`
-      : '';
-    statusText.innerHTML = `正在提醒当前章节${toc}${current}`;
+    const toc = status.pageTocVisible ? ` · ${t('originalTocVisible')}` : '';
+    renderStatusMessage(`${t('remindingChapter')}${toc}`, status.currentSection);
     return;
   }
   if (status.statusReason === 'conversation-surface') {
-    statusText.textContent = '当前是对话页面，TopClip 保持静默。';
+    renderStatusMessage(t('conversationPage'));
     return;
   }
   if (status.headings > 0) {
-    statusText.textContent = '当前页面不是稳定的长文结构，TopClip 保持静默。';
+    renderStatusMessage(t('unsupportedStructure'));
     return;
   }
-  statusText.textContent = '当前页面没有可用章节标题。';
+  renderStatusMessage(t('noHeadings'));
 }
 
 async function activeTabId(): Promise<number | null> {
@@ -119,7 +107,7 @@ async function activeTabId(): Promise<number | null> {
       const [tab] = await chrome.tabs.query(query);
       if (tab?.id != null) return tab.id;
     } catch {
-      /* 尝试下一种窗口定位方式 */
+      /* Try the next window query. */
     }
   }
   return null;
@@ -131,7 +119,9 @@ async function refreshStatus(): Promise<void> {
     pageStatus = null;
   } else {
     try {
-      pageStatus = (await chrome.tabs.sendMessage(tabId, { type: 'wss:status' })) as PageStatus;
+      pageStatus = (await chrome.tabs.sendMessage(tabId, {
+        type: MESSAGE.status,
+      })) as ContentStatus;
     } catch {
       pageStatus = null;
     }
@@ -145,6 +135,8 @@ function persist(): void {
 }
 
 async function main(): Promise<void> {
+  localizeDocument(document);
+  document.title = t('popupTitle');
   versionLabel.textContent = `v${chrome.runtime.getManifest().version}`;
   settings = await loadSettings();
   render();

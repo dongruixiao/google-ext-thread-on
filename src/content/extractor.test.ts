@@ -44,7 +44,7 @@ function listPage(): void {
   document.body.innerHTML = `<main>${cards}</main>`;
 }
 
-/** 营销首页：文字几乎都在链接/卡片里 */
+/** Marketing page with almost all content inside links and cards. */
 function marketingPage(): void {
   const cards = Array.from(
     { length: 8 },
@@ -58,7 +58,7 @@ function marketingPage(): void {
   document.body.innerHTML = `<main><h1>把一切连接起来</h1>${cards}</main>`;
 }
 
-/** 正文里混着侧栏导航标题（GitHub 仓库页那种结构） */
+/** Article surface mixed with sidebar navigation headings. */
 function pageWithSidebarHeadings(): void {
   document.body.innerHTML = `
     <main>
@@ -150,13 +150,13 @@ describe('buildHeadingIndex', () => {
     document.body.innerHTML = '';
   });
 
-  it('在文章页构建出层级链，并排除站点框架里的标题', () => {
+  it('builds a hierarchy while excluding site chrome headings', () => {
     articlePage();
     const index = buildHeadingIndex();
     expect(index).not.toBeNull();
     if (!index) return;
 
-    expect(index.isArticle).toBe(true);
+    expect(index.isReadingCandidate).toBe(true);
     expect(index.headings.map((node) => node.text)).toEqual([
       '一篇文章的标题',
       '第一节标题',
@@ -168,7 +168,7 @@ describe('buildHeadingIndex', () => {
     expect(index.scope.tagName.toLowerCase()).toBe('article');
   });
 
-  it('标题缺少 id 时生成占位标识', () => {
+  it('generates stable IDs for headings without native IDs', () => {
     articlePage();
     const index = buildHeadingIndex();
     const withoutNativeId = index?.headings.find((node) => node.text === '小节标题');
@@ -179,30 +179,30 @@ describe('buildHeadingIndex', () => {
     expect(withNativeId?.id).toBe('first');
   });
 
-  it('列表页 / 卡片聚合页不会误判为文章', () => {
+  it('rejects list and card aggregation pages', () => {
     listPage();
     const index = buildHeadingIndex();
     expect(index).not.toBeNull();
-    expect(index?.isArticle).toBe(false);
+    expect(index?.isReadingCandidate).toBe(false);
   });
 
-  it('营销首页（文字大多在链接里）不会误激活', () => {
+  it('rejects marketing pages dominated by links', () => {
     marketingPage();
     const index = buildHeadingIndex();
-    expect(index?.isArticle).toBe(false);
+    expect(index?.isReadingCandidate).toBe(false);
   });
 
-  it('持续对话页面即使有长标题和多级结构也保持静默', () => {
+  it('keeps conversation pages silent', () => {
     conversationPage();
     const index = buildHeadingIndex();
     expect(index).not.toBeNull();
     expect(index?.isConversation).toBe(true);
     expect(index?.conversationReason).toBe('explicit-message-roles');
-    expect(index?.isArticle).toBe(false);
+    expect(index?.isReadingCandidate).toBe(false);
     expect(index?.diagnostics).toContain('conv=1');
   });
 
-  it('渐变背景不影响文章识别，玻璃标题不依赖网页背景色', () => {
+  it('does not depend on the page background palette', () => {
     document.body.innerHTML = `
       <article style="background-image: linear-gradient(red, blue)">
         <h1 style="color: white; font-size: 40px">文章标题</h1>
@@ -215,18 +215,17 @@ describe('buildHeadingIndex', () => {
     `;
     const index = buildHeadingIndex();
     expect(index?.isReadingCandidate).toBe(true);
-    expect(index?.isArticle).toBe(true);
   });
 
-  it('侧栏导航标题没有正文，不进入大纲', () => {
+  it('omits sidebar navigation headings without section text', () => {
     pageWithSidebarHeadings();
     const index = buildHeadingIndex();
     const texts = index?.headings.map((node) => node.text) ?? [];
     expect(texts).toEqual(['项目说明', '安装', '使用']);
-    expect(index?.isArticle).toBe(true);
+    expect(index?.isReadingCandidate).toBe(true);
   });
 
-  it('保留文末短总结，并保留它所属的必要父级结构', () => {
+  it('keeps short summaries and their required ancestors', () => {
     document.body.innerHTML = `
       <article>
         <h1>文章标题</h1>
@@ -251,12 +250,12 @@ describe('buildHeadingIndex', () => {
     expect(index?.headings.at(-1)?.parentIndex).toBe(0);
   });
 
-  it('没有标题时返回 null', () => {
+  it('returns null when no headings exist', () => {
     document.body.innerHTML = '<main><p>只有正文，没有标题</p></main>';
     expect(buildHeadingIndex()).toBeNull();
   });
 
-  it('索引指纹随标题结构变化', () => {
+  it('changes the signature when heading structure changes', () => {
     articlePage();
     const first = buildHeadingIndex();
     const before = first ? headingSignature(first) : '';
@@ -267,7 +266,7 @@ describe('buildHeadingIndex', () => {
     expect(before).not.toBe(after);
   });
 
-  it('结构签名相同但 DOM 节点被整体替换时，旧索引不可复用', () => {
+  it('rejects a reused index after identical DOM is replaced', () => {
     articlePage();
     const first = buildHeadingIndex();
     expect(first).not.toBeNull();
@@ -288,8 +287,8 @@ describe('buildHeadingIndex', () => {
   });
 });
 
-describe('标题几何可靠性门禁', () => {
-  it('同一正文列、彼此独立的标题可以激活', () => {
+describe('heading geometry gate', () => {
+  it('accepts independent headings in one reading column', () => {
     const geometry = assessHeadingGeometry(
       geometryHeadings([
         { left: 320, top: 100 },
@@ -303,7 +302,7 @@ describe('标题几何可靠性门禁', () => {
     expect(geometry.overlapRatio).toBe(0);
   });
 
-  it('标题散落在不同栏位时保持静默', () => {
+  it('rejects headings spread across columns', () => {
     const geometry = assessHeadingGeometry(
       geometryHeadings([
         { left: 80, top: 100 },
@@ -315,7 +314,7 @@ describe('标题几何可靠性门禁', () => {
     expect(geometry.reliable).toBe(false);
   });
 
-  it('隐藏副本大量叠在同一点时保持静默', () => {
+  it('rejects many hidden headings stacked at one point', () => {
     const geometry = assessHeadingGeometry(
       geometryHeadings([
         { left: 320, top: 100 },
@@ -328,7 +327,7 @@ describe('标题几何可靠性门禁', () => {
     expect(geometry.overlapRatio).toBe(1);
   });
 
-  it('标题尺寸不可测量或横向越界时保持静默', () => {
+  it('rejects unmeasurable or horizontally clipped headings', () => {
     const geometry = assessHeadingGeometry(
       geometryHeadings([
         { left: 320, top: 100, width: 0 },

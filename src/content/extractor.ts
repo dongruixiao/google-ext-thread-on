@@ -2,15 +2,15 @@ import { HOST_ID } from '../shared/constants';
 import { detectConversationSurface, type ConversationReason } from './conversation';
 
 export interface HeadingNode {
-  /** 原生 id 或自动生成的占位 id */
+  /** Native ID or a generated stable identifier. */
   id: string;
   element: HTMLElement;
-  /** 1 代表 h1，2 代表 h2，以此类推 */
+  /** 1 = h1, 2 = h2, and so on. */
   level: number;
   text: string;
-  /** 距离文档顶部的绝对偏移量（文档坐标系，单位 px） */
+  /** Document-space top offset in pixels. */
   top: number;
-  /** 父级标题在数组中的下标，-1 表示顶层 */
+  /** Parent index, or -1 for a root heading. */
   parentIndex: number;
 }
 
@@ -18,45 +18,42 @@ export interface HeadingStats {
   headingCount: number;
   scopeText: number;
   bodyText: number;
-  /** 选中容器正文占全页的比例（用于排除“列表中一张卡片”） */
+  /** Scope text as a share of the full document. */
   scopeShare: number;
-  /** 选中容器的段落文字占全页段落文字的比例：比总字数更能识别“卡片” */
+  /** Paragraph text as a share of all page paragraph text. */
   paragraphShare: number;
-  /** 选中容器的有效标题占全页有效标题的比例 */
+  /** Effective headings as a share of all page headings. */
   headingShare: number;
-  /** 标题是否基本排在同一列（营销首页往往多栏/居中混排） */
+  /** Whether headings share a stable reading column. */
   columnAligned: boolean;
-  /** 标题几何是否足以让我们安全地执行吸顶（无法确认时宁可不显示） */
+  /** Whether geometry is reliable enough to avoid false activation. */
   geometryReliable: boolean;
-  /** 最长小节的正文长度（用于排除列表页/搜索页） */
+  /** Text length of the longest section. */
   longestSection: number;
-  /** 是否存在层级嵌套（h1 > h2 > h3） */
+  /** Whether the heading tree contains nested levels. */
   hasHierarchy: boolean;
-  /** 正文里落在链接中的文字比例：导航/营销/搜索页会非常高 */
+  /** Link text as a share of scope text. */
   linkRatio: number;
-  /** 段落类文字占正文的比例：长文很高，导航/卡片式页面很低 */
+  /** Paragraph text as a share of scope text. */
   paragraphRatio: number;
 }
 
 export interface HeadingIndex {
   scope: HTMLElement;
   headings: HeadingNode[];
-  /** 智能阅读模式判定：只有“像文章/文档”的页面才自动激活 */
-  isArticle: boolean;
-  /** 内容结构上像可阅读文章，值得提供章节提醒 */
+  /** Whether the page has a trustworthy long-form structure. */
   isReadingCandidate: boolean;
-  /** 持续对话 / 代理工作区：即使有过长标题也不展示 */
+  /** Conversation and agent workspaces must remain silent. */
   isConversation: boolean;
   conversationReason: ConversationReason;
   stats: HeadingStats;
-  /** 稳定的本地诊断快照，不依赖页面后续是否保留 data 属性 */
+  /** Stable diagnostics snapshot captured during indexing. */
   diagnostics: string;
 }
 
-/** 优先级 1：语义化正文容器 */
+/** Semantic containers take precedence over class-name heuristics. */
 const SEMANTIC_SELECTOR = 'article, main, [role="main"]';
 
-/** 优先级 2：常见正文类名（越靠前越具体） */
 const HEURISTIC_SELECTOR = [
   '.post-content',
   '.post-body',
@@ -72,7 +69,7 @@ const HEURISTIC_SELECTOR = [
   '.content',
 ].join(',');
 
-/** 站点框架与噪音区域：其中的标题不应进入面包屑 */
+/** Headings inside site chrome are not article structure. */
 export const SITE_CHROME_SELECTOR = [
   'nav',
   'aside',
@@ -96,17 +93,12 @@ export const SITE_CHROME_SELECTOR = [
 const HEADING_SELECTOR = 'h1, h2, h3, h4';
 const MAX_LEVEL = 4;
 /**
- * 标题后面至少要有这么多字符，才算“这个标题确实带着内容”。
- * 不能用更长的篇幅门槛筛标题：README、法律条文和结尾总结常有
- * 只有几个字但完全合法的独立小节。段落水位等页面级指标仍负责区分列表页。
+ * Very short sections are valid in READMEs, legal texts, and summaries.
+ * Page-level density metrics handle list and search pages instead.
  */
 const MIN_SECTION_TEXT = 4;
 
-/**
- * 计算正文长度时必须跳过的标签：
- * 很多现代站点把整页数据塞在内联 <script> 里（Next.js / React 等），
- * 直接用 textContent 会把它们当成正文，导致判定完全失真。
- */
+/** Inline framework payloads must not count as readable page text. */
 const SKIP_TEXT_TAGS = new Set([
   'SCRIPT',
   'STYLE',
@@ -117,7 +109,7 @@ const SKIP_TEXT_TAGS = new Set([
   'SVG',
 ]);
 
-/** 一次索引过程内共享的文本度量（带缓存，避免同一子树被反复遍历） */
+/** Shared, cached text measurement for one indexing pass. */
 type Measure = (element: Element) => number;
 
 function createMeasure(): Measure {
@@ -157,7 +149,7 @@ function isVisible(el: HTMLElement): boolean {
   }
 }
 
-/** 清理标题文本：去掉零宽字符、折叠空白、去掉 Markdown 锚点残留的 # */
+/** Normalize whitespace, zero-width characters, and Markdown heading marks. */
 function normalizeHeadingText(el: HTMLElement): string {
   return (el.textContent ?? '')
     .replace(/[\u200b-\u200d\ufeff]/g, '')
@@ -173,24 +165,20 @@ function levelOf(el: HTMLElement): number {
   return Number.isFinite(level) ? Math.min(level, MAX_LEVEL) : MAX_LEVEL;
 }
 
-/**
- * 正文容器启发式识别：
- * 收集候选容器并按“标题数 + 文本量”打分，再往里细化到最像正文的那一层。
- */
 interface ScopeCandidate {
   element: HTMLElement;
   headings: number;
   text: number;
-  /** 段落类文本：衡量“真正的正文”有多少 */
+  /** Text inside paragraph-like content blocks. */
   paragraphText: number;
-  /** 是否来自语义标签（article / main）而不是类名启发式 */
+  /** Whether the candidate came from a semantic element. */
   semantic: boolean;
   score: number;
 }
 
-/** 真正的正文块：用来判断“这个容器里是文章还是导航/表格/卡片” */
+/** Blocks used to distinguish prose from navigation, cards, and tables. */
 const CONTENT_BLOCK_SELECTOR = 'p, li, pre, blockquote';
-/** 更宽的内容块：用来估算每个标题后面跟了多少东西 */
+/** Broader blocks used to measure section depth. */
 const SECTION_BLOCK_SELECTOR = 'p, li, pre, blockquote, td, dd';
 
 function collectScopeCandidates(measure: Measure): ScopeCandidate[] {
@@ -223,15 +211,13 @@ function collectScopeCandidates(measure: Measure): ScopeCandidate[] {
 }
 
 /**
- * 选正文容器，然后往里细化：
- * 如果某个后代候选“几乎拿走了父容器的全部段落文字”，而且「每标题字数」明显更高
- * （说明父容器把导航/侧栏也算进来了），就换用这个后代。
- * 例：GitHub 仓库页的 main 里混了侧栏导航，真正的正文是里面的 .markdown-body。
+ * Refine a broad semantic container into a denser descendant when that
+ * descendant owns most paragraph text and has less navigation noise.
  */
 function pickScope(candidates: ScopeCandidate[]): ScopeCandidate | null {
   if (candidates.length === 0) return null;
   const best = candidates.reduce((top, item) => (item.score > top.score ? item : top));
-  // 分数接近、且互相包含的候选里，先选最紧凑的一层（article 通常比 main 更贴近正文）
+  // Prefer the tightest overlapping candidate when scores are close.
   let chosen = candidates
     .filter(
       (candidate) =>
@@ -245,14 +231,14 @@ function pickScope(candidates: ScopeCandidate[]): ScopeCandidate | null {
     for (const candidate of candidates) {
       if (candidate.element === chosen.element) continue;
       if (!chosen.element.contains(candidate.element)) continue;
-      // 段落覆盖度：父容器的“真正文”有多少落在这个后代里
+      // Coverage prevents moving into a small aside or subtitle block.
       const coverage = chosen.paragraphText > 0 ? candidate.paragraphText / chosen.paragraphText : 0;
       if (coverage < 0.6) continue;
-      // 每标题的正文量：父容器混进导航/文件列表时，这个值会明显偏低
+      // Dense prose per heading is a strong article signal.
       const density = candidate.paragraphText / Math.max(1, candidate.headings);
       const chosenDensity = chosen.paragraphText / Math.max(1, chosen.headings);
       if (density < chosenDensity * 1.4) continue;
-      // 多个合格后代里取最紧凑的那一层
+      // Choose the tightest qualifying descendant.
       if (!next || candidate.text < next.text) next = candidate;
     }
     if (!next) break;
@@ -261,7 +247,7 @@ function pickScope(candidates: ScopeCandidate[]): ScopeCandidate | null {
   return chosen;
 }
 
-/** 在指定作用域内抽取标题节点（过滤噪音区域、不可见节点与空标题） */
+/** Collect visible, non-empty headings outside site chrome. */
 function collectHeadings(scope: HTMLElement, scopeIsBodyish: boolean): HeadingNode[] {
   const ignoreSelector = scopeIsBodyish ? `${SITE_CHROME_SELECTOR}, header` : SITE_CHROME_SELECTOR;
   const nodes: HeadingNode[] = [];
@@ -283,7 +269,7 @@ function collectHeadings(scope: HTMLElement, scopeIsBodyish: boolean): HeadingNo
   return nodes;
 }
 
-/** 构建层级链：用栈把扁平的标题数组还原成树 */
+/** Reconstruct parent links from document order and heading levels. */
 function linkParents(headings: HeadingNode[]): void {
   const stack: number[] = [];
   headings.forEach((node, index) => {
@@ -295,7 +281,7 @@ function linkParents(headings: HeadingNode[]): void {
   });
 }
 
-/** 为缺少 id 的标题补上占位属性，便于调试与锚点定位 */
+/** Add stable IDs for jumping and diagnostics without changing native IDs. */
 function ensureIds(headings: HeadingNode[], scope: HTMLElement): void {
   const used = new Set<string>();
   headings.forEach((node, index) => {
@@ -314,12 +300,7 @@ function ensureIds(headings: HeadingNode[], scope: HTMLElement): void {
   scope.dataset.wssScope = 'true';
 }
 
-/**
- * 统计每个标题后面跟了多少正文（到下一个标题为止）。
- * 文本块归到它前面最近的一个标题，用于两件事：
- * 1. 判断这个标题是不是真的带内容（导航栏/侧栏/搜索结果标题往往只有几个字）；
- * 2. 计算“最长小节”，作为是否为长文的判据。
- */
+/** Assign paragraph-like text to the heading immediately before it. */
 function sectionTexts(
   scope: HTMLElement,
   headings: HeadingNode[],
@@ -352,11 +333,8 @@ function sectionTexts(
 }
 
 /**
- * 选出真正属于正文的标题。
- *
- * 普通小节仍需达到最小正文量；结尾小节允许更短，因为总结往往只有一两句话。
- * 一旦保留某个子标题，也要保留它在原始标题树里的祖先，否则层级会被压平，
- * 甚至让子标题错误地挂到别的小节下面。
+ * Remove headings that own no content, while retaining their ancestors so
+ * the surviving subtree keeps its original hierarchy.
  */
 function selectSectionHeadings(raw: HeadingNode[], lengths: number[]): HeadingNode[] {
   linkParents(raw);
@@ -376,28 +354,27 @@ function selectSectionHeadings(raw: HeadingNode[], lengths: number[]): HeadingNo
   return raw.filter((_, index) => selected.has(index));
 }
 
-/** 智能阅读模式：判断当前页面是否值得激活章节胶囊 */
+/** Page-level gate for article-like long-form content. */
 function decideArticle(stats: HeadingStats, semanticScope: boolean): boolean {
   if (stats.headingCount < 2) return false;
   if (stats.scopeText < 400) return false;
-  // 容器里的有效标题只占全页一小部分 → 很可能是列表页里的一张卡片。
-  // 用标题占比而不是总字数：仓库页/文档站的侧栏、文件列表会把总字数撑得很大。
+  // A card on a list page owns only a small share of page headings.
   if (stats.headingShare < 0.25 && stats.bodyText >= 800) return false;
 
-  // 导航 / 营销首页 / 搜索结果：文字大多在链接里，段落很少
+  // Navigation, marketing, and search results are mostly links.
   if (stats.linkRatio > 0.55) return false;
   if (stats.paragraphRatio < 0.4) return false;
 
-  // 兜底到 body 的页面（没有语义容器匹配）：要求标题基本排在同一列，排除多栏营销页
+  // Body-level fallbacks need column evidence to reject multi-column pages.
   if (!semanticScope && !stats.columnAligned) return false;
 
-  // 存在超长小节 → 正文无疑
+  // A long section is sufficient on its own.
   if (stats.longestSection >= 500) return true;
-  // 否则要求“有层级嵌套 + 小节水位够深”：用来排除搜索结果页 / 文章卡片列表
+  // Short pages still need hierarchy and enough section depth.
   return stats.hasHierarchy && stats.headingCount >= 3 && stats.longestSection >= 280;
 }
 
-/** 结构指标：链接文字占比与段落文字占比 */
+/** Compute structural ratios used by the article gate. */
 function computeRatios(scope: HTMLElement, measure: Measure): {
   linkRatio: number;
   paragraphRatio: number;
@@ -415,10 +392,6 @@ function computeRatios(scope: HTMLElement, measure: Measure): {
   };
 }
 
-/**
- * 标题是否基本排在同一列。
- * 长文/文档的标题都在正文那一栏；营销首页的多栏网格、居中大标题会让它们散开。
- */
 export interface HeadingGeometry {
   reliable: boolean;
   measurable: number;
@@ -434,11 +407,8 @@ interface MeasuredHeading {
 }
 
 /**
- * 标题几何可信度门禁。
- *
- * 只要无法确认“这些是正文里彼此独立、排在同一列的可读标题”，就不激活。
- * 个别标题落在屏幕横向之外、尺寸为零、或大量互相叠置时，通常意味着
- * 页面用了虚拟列表、隐藏副本、绝对定位装饰或多栏布局；这种页面宁可漏掉。
+ * Reject virtualized, hidden, overlapping, or multi-column heading sets.
+ * A false negative is preferable to anchoring the wrong text.
  */
 export function assessHeadingGeometry(
   headings: HeadingNode[],
@@ -468,7 +438,7 @@ export function assessHeadingGeometry(
         bottom: rect.bottom,
       });
     } catch {
-      /* 单个标题量不到就不把它算作可信证据 */
+      /* An unmeasurable heading cannot count as positive evidence. */
     }
   }
 
@@ -506,7 +476,7 @@ export function assessHeadingGeometry(
   };
 }
 
-/** 扫描文档并构建标题层级索引；没有可用标题时返回 null */
+/** Build the heading index, returning null when no trustworthy scope exists. */
 export function buildHeadingIndex(): HeadingIndex | null {
   const body = document.body;
   if (!body) return null;
@@ -516,7 +486,7 @@ export function buildHeadingIndex(): HeadingIndex | null {
   const bodyText = measure(body);
   const bodyParagraphText = computeRatios(body, measure).paragraphText;
 
-  // 全页“有效标题”数量：过滤掉侧栏/导航那种没有正文的标题之后再数
+  // Count effective headings after removing empty site chrome.
   const countEffectiveHeadings = (scope: HTMLElement, scopeIsBodyish: boolean): number => {
     const raw = collectHeadings(scope, scopeIsBodyish);
     if (raw.length < 2) return raw.length;
@@ -533,8 +503,7 @@ export function buildHeadingIndex(): HeadingIndex | null {
     const rawHeadings = collectHeadings(attempt.scope, attempt.scopeIsBodyish);
     if (rawHeadings.length < 2) continue;
 
-    // 丢掉“标题后面几乎没有正文”的项：侧栏导航、搜索结果标题、卡片列表标题都会长这样。
-    // 文末短总结与必要父级是例外，见 selectSectionHeadings。
+    // Drop headings without section text; keep required ancestors.
     const sectionLengths = sectionTexts(attempt.scope, rawHeadings, measure);
     const headings = selectSectionHeadings(rawHeadings, sectionLengths);
     const selectedSet = new Set(headings);
@@ -543,7 +512,7 @@ export function buildHeadingIndex(): HeadingIndex | null {
       .filter((item) => selectedSet.has(item.node));
     if (headings.length < 2) continue;
 
-    // selectSectionHeadings 已经为原始树连过父级；过滤后的树需要重新计算相对索引。
+    // Filtering changes array indexes, so rebuild parent links.
     linkParents(headings);
     measureHeadings(headings);
     const scopeText = measure(attempt.scope);
@@ -578,9 +547,8 @@ export function buildHeadingIndex(): HeadingIndex | null {
       !conversation.detected &&
       geometry.reliable &&
       decideArticle(stats, attempt.semantic);
-    const isArticle = isReadingCandidate;
-    if (isArticle) ensureIds(headings, attempt.scope);
-    // 判定依据挂在 DOM 上，便于排查“为什么这个页面激活/没激活”
+    if (isReadingCandidate) ensureIds(headings, attempt.scope);
+    // Expose metrics on the scope for local field diagnostics.
     const diagnostics = [
       `h=${stats.headingCount}`,
       `text=${stats.scopeText}`,
@@ -602,13 +570,11 @@ export function buildHeadingIndex(): HeadingIndex | null {
       `convReason=${conversation.reason}`,
       `convTurns=${conversation.turns}`,
       `reading=${isReadingCandidate ? 1 : 0}`,
-      `art=${isArticle ? 1 : 0}`,
     ].join(' ');
     attempt.scope.dataset.wssStats = diagnostics;
     return {
       scope: attempt.scope,
       headings,
-      isArticle,
       isReadingCandidate,
       isConversation: conversation.detected,
       conversationReason: conversation.reason,
@@ -620,7 +586,7 @@ export function buildHeadingIndex(): HeadingIndex | null {
   return null;
 }
 
-/** 批量测量标题的绝对偏移量（文档坐标系） */
+/** Measure heading positions in document coordinates. */
 export function measureHeadings(headings: HeadingNode[]): void {
   const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
   for (const heading of headings) {
@@ -628,16 +594,13 @@ export function measureHeadings(headings: HeadingNode[]): void {
   }
 }
 
-/** 索引指纹：用于 MutationObserver 触发后判断结构是否真的变化 */
+/** Signature used to avoid rebuilding an unchanged heading tree. */
 export function headingSignature(index: HeadingIndex): string {
   const parts = index.headings.map((node) => `${node.level}:${node.id}:${node.text}`);
   return [location.pathname, location.search, parts.join('|')].join('#');
 }
 
-/**
- * 结构指纹相同并不代表节点还有效：React/Vue 等站点可能用完全相同的标题
- * 重建 DOM。此时旧索引里的 element 已脱离文档，必须重新建立索引。
- */
+/** Identical text can belong to replaced DOM nodes, so verify attachment. */
 export function headingIndexStillAttached(index: HeadingIndex): boolean {
   if (!index.scope.isConnected) return false;
   return index.headings.every((node) => node.element.isConnected);

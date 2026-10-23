@@ -1,0 +1,109 @@
+{
+  "extensionName": {
+    "message": "TopClip"
+  },
+  "extensionDescription": {
+    "message": "阅读长文和文档时保持当前章节可见，不让上下文中断。"
+  },
+  "commandToggleSite": {
+    "message": "在当前站点启用或停用 TopClip"
+  },
+  "commandToggleGlobal": {
+    "message": "全局启用或停用 TopClip"
+  },
+  "popupTitle": {
+    "message": "TopClip"
+  },
+  "settingsAria": {
+    "message": "TopClip 设置"
+  },
+  "tagline": {
+    "message": "读长文，不掉线"
+  },
+  "statusLabel": {
+    "message": "当前页面"
+  },
+  "detectingPage": {
+    "message": "正在检测页面结构…"
+  },
+  "pageUnavailable": {
+    "message": "当前页面无法使用 TopClip。"
+  },
+  "refreshToApply": {
+    "message": "刷新页面后生效。"
+  },
+  "extensionUpdated": {
+    "message": "TopClip 已更新。"
+  },
+  "disabledGlobally": {
+    "message": "TopClip 已关闭。"
+  },
+  "siteDisabled": {
+    "message": "已在 $HOST$ 上停用。",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "remindingChapter": {
+    "message": "正在提醒当前章节"
+  },
+  "originalTocVisible": {
+    "message": "检测到原站目录 · 已自动简化"
+  },
+  "conversationPage": {
+    "message": "当前是对话页面，TopClip 保持静默。"
+  },
+  "unsupportedStructure": {
+    "message": "当前页面不是稳定的长文结构。"
+  },
+  "noHeadings": {
+    "message": "当前页面没有可用章节标题。"
+  },
+  "enableLabel": {
+    "message": "启用 TopClip"
+  },
+  "enableHint": {
+    "message": "关闭后所有网页保持静默"
+  },
+  "displayModeLabel": {
+    "message": "显示方式"
+  },
+  "policySmart": {
+    "message": "智能"
+  },
+  "policyAlways": {
+    "message": "常驻"
+  },
+  "policySmartHint": {
+    "message": "阅读时浮现，回看让位"
+  },
+  "policyAlwaysHint": {
+    "message": "始终显示，可自由拖动"
+  },
+  "enableSite": {
+    "message": "在此站点启用"
+  },
+  "disableSite": {
+    "message": "在此站点禁用"
+  },
+  "hoverHint": {
+    "message": "悬停标题看目录"
+  },
+  "doubleClickHint": {
+    "message": "双击复位"
+  },
+  "untitled": {
+    "message": "（无标题）"
+  },
+  "currentChapterAria": {
+    "message": "当前章节位置"
+  },
+  "readingProgressAria": {
+    "message": "整篇阅读进度"
+  },
+  "outlineToggleAria": {
+    "message": "展开或固定文章目录"
+  }
+}

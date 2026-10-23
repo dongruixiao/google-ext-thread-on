@@ -1,11 +1,7 @@
 import { HOST_ID } from '../shared/constants';
 import type { HeadingNode } from './extractor';
 
-/**
- * 原站目录探测：
- * 如果页面本身已经有「当前可见」的目录（sticky 侧栏 / 文内 TOC），
- * 我们就退让成极简指示器，避免和原站目录抢戏。
- */
+/** Detect a visible native table of contents and defer to it. */
 
 const TOC_SELECTORS = [
   '#toc',
@@ -22,10 +18,10 @@ const TOC_SELECTORS = [
   '[aria-label*="on this page" i]',
 ].join(',');
 
-/** 兜底扫描范围：只在这些结构性容器里找目录，避免全页扫描 */
+/** Fallback scan is limited to structural containers. */
 const FALLBACK_SELECTORS = 'nav, aside, [role="navigation"], [role="complementary"]';
 
-/** 至少多少个指向正文标题的链接才算目录 */
+/** Minimum number of links to article headings. */
 const MIN_TOC_LINKS = 3;
 
 function collectTargetIds(headings: HeadingNode[]): Set<string> {
@@ -48,7 +44,7 @@ function countHeadingLinks(root: HTMLElement, targets: Set<string>): number {
   return count;
 }
 
-/** 找出页面上可能是目录的容器（按文档顺序，最多 12 个） */
+/** Return document-ordered candidates, capped to bound scanning cost. */
 export function findTocCandidates(headings: HeadingNode[]): HTMLElement[] {
   if (headings.length < MIN_TOC_LINKS) return [];
   const targets = collectTargetIds(headings);
@@ -72,7 +68,7 @@ export function findTocCandidates(headings: HeadingNode[]): HTMLElement[] {
   return [...found];
 }
 
-/** 目录此刻是否真的出现在视口里（贴在屏幕外的目录帮不了用户） */
+/** Off-screen native contents provide no value to the reader. */
 export function isAnyTocVisible(candidates: HTMLElement[]): boolean {
   for (const element of candidates) {
     if (!element.isConnected) continue;

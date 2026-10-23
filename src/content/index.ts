@@ -19,6 +19,7 @@ import {
   type FloatingPosition,
   type WssSettings,
 } from '../shared/settings';
+import { MESSAGE, type ContentStatus } from '../shared/protocol';
 import {
   buildHeadingIndex,
   headingSignature,
@@ -26,22 +27,13 @@ import {
   type HeadingIndex,
 } from './extractor';
 import { FailureGuard } from './failure-guard';
-import {
-  classifyTopChrome,
-  effectiveZIndex,
-  hasSurface,
-  highestForeignZIndex,
-  isPositionedWithin,
-  type ChromeCandidate,
-} from './chrome-detect';
 import { findTocCandidates, isAnyTocVisible } from './page-toc';
 import { ScrollTracker, type TrackerSnapshot } from './tracker';
+import { detectTopChrome } from './top-chrome';
 import { StickyUI } from './ui';
 
 declare const __WSS_VERSION__: string;
 
-/** 探测点：网页顶部附近，用于识别原站自带的固定导航栏 */
-const OVERLAY_PROBES = [0.5, 0.08, 0.92];
 class StickyScrollApp {
   private readonly guard = new FailureGuard({
     onFailSafe: (reason) => this.failSafe(reason),
@@ -53,27 +45,24 @@ class StickyScrollApp {
   private signature = '';
   private running = false;
   private siteAllowed = true;
-  private forced = false;
   private overlayHeight = 0;
   private foreignZIndex = 0;
-  /** 顶部被遮罩层挡住（对话框 / cookie 墙），此时收起 UI */
+  /** A dialog or overlay owns the top edge. */
   private overlayBlocked = false;
-  /** 用户正在用浏览器的页面查找（Ctrl/⌘+F）：收起 UI，别挡住查找条与命中的文字 */
+  /** Native find-in-page needs exclusive access to the top edge. */
   private findMode = false;
   private findTimer = 0;
 
-  // 显示策略状态
   private snapshot: TrackerSnapshot | null = null;
   private shown = true;
   private dimmed = false;
   private failSafeTripped = false;
   private lastActivityAt = 0;
-  /** 主动跳转期间不要因为“向上滚动”就把胶囊收起来 */
+  /** Keep the capsule visible briefly after an intentional jump. */
   private keepVisibleUntil = 0;
-  /** 空闲计时器节拍，用于低频校准 */
+  /** Used to amortize periodic layout calibration. */
   private ticks = 0;
 
-  // 原站目录适配
   private tocCandidates: HTMLElement[] = [];
   private tocVisible = false;
 
@@ -98,13 +87,13 @@ class StickyScrollApp {
     try {
       await this.boot();
     } catch {
-      // 启动没有后续重试机会，任何失败都立刻完整退出。
+      // Startup has no retry path; leave the page clean on any failure.
       this.failSafe('boot failed');
     }
   }
 
   private async boot(): Promise<void> {
-    // 只在顶层窗口运行（manifest 也已限制 all_frames: false）
+    // Manifest already limits execution to the top frame; keep a guard for dev builds.
     if (window.self !== window.top) return;
     this.settings = await loadSettings();
     this.unsubscribeSettings = subscribeSettings((next) => {
@@ -113,8 +102,6 @@ class StickyScrollApp {
     this.listenForMessages();
     this.applySettings(this.settings);
   }
-
-  // ── 生命周期 ────────────────────────────────────────
 
   private applySettings(next: WssSettings): void {
     const previousPolicy = this.settings.displayPolicy;
@@ -136,7 +123,6 @@ class StickyScrollApp {
       this.dimmed = false;
       this.lastActivityAt = Date.now();
     }
-    this.ui?.setPathOptions({ hideArticleTitle: true, maxCrumbs: 3 });
     this.ui?.setFloatingPosition(next.floatingPositions[location.hostname] ?? null);
     this.refreshLayout();
   }
@@ -161,9 +147,8 @@ class StickyScrollApp {
     this.urlTimer = window.setInterval(() => {
       this.guard.run('url-poll', () => {
         if (location.href === this.lastUrl) return;
-        // SPA 路由变化：pushState 不会触发任何事件，只能轮询兜底
+        // pushState emits no event, so route changes need polling.
         this.lastUrl = location.href;
-        this.forced = false;
         this.scheduleReindex();
       });
     }, URL_POLL_INTERVAL);
@@ -178,26 +163,26 @@ class StickyScrollApp {
     try {
       this.tracker?.stop();
     } catch {
-      /* 清理阶段继续销毁其它资源 */
+      /* Continue cleanup if a subsystem is already detached. */
     }
     this.tracker = null;
     try {
       this.ui?.destroy();
     } catch {
-      /* Shadow DOM 已不可用时也不能让清理中断 */
+      /* A detached shadow root must not block the rest of cleanup. */
     }
     this.ui = null;
     try {
       this.unobserve();
       this.observer?.disconnect();
     } catch {
-      /* 监听器可能已随页面卸载 */
+      /* Page teardown may already have removed listeners. */
     }
     this.observer = null;
     try {
       this.resizeObserver?.disconnect();
     } catch {
-      /* ResizeObserver 可能已失效 */
+      /* ResizeObserver may already be invalid. */
     }
     this.resizeObserver = null;
     for (const timer of [this.reindexTimer, this.layoutTimer, this.urlTimer, this.idleTimer, this.tocTimer]) {
@@ -223,16 +208,13 @@ class StickyScrollApp {
     this.tocVisible = false;
   }
 
-  // ── 索引与渲染 ──────────────────────────────────────
-
-  /** 重新扫描页面；结构未变化时只做一次轻量的位置刷新 */
-  private rebuild(force = false): void {
+  /** Reuse an attached, unchanged tree and refresh measurements only. */
+  private rebuild(): void {
     if (!this.running) return;
     const index = buildHeadingIndex();
     const signature = index ? headingSignature(index) : '';
 
     if (
-      !force &&
       index &&
       this.index &&
       signature === this.signature &&
@@ -251,7 +233,7 @@ class StickyScrollApp {
     this.signature = signature;
 
     if (!index || !this.canActivate(index)) {
-      // 非文章页（列表页 / 搜索页 / 应用页）：保持静默，不注入任何 UI
+      // Unsupported pages remain completely silent.
       this.snapshot = null;
       return;
     }
@@ -261,10 +243,6 @@ class StickyScrollApp {
       (action, error) => this.guard.report(action, error),
       (position) => this.saveFloatingPosition(position),
     );
-    ui.setPathOptions({
-      hideArticleTitle: true,
-      maxCrumbs: 3,
-    });
     ui.mount(index.headings);
     ui.setFloatingPosition(this.settings.floatingPositions[location.hostname] ?? null);
     ui.setDiagnostics(
@@ -329,7 +307,7 @@ class StickyScrollApp {
     window.addEventListener('resize', this.scheduleLayoutRefresh, { passive: true });
     window.addEventListener('popstate', this.scheduleReindex);
     window.addEventListener('hashchange', this.scheduleLayoutRefresh);
-    // 后台标签页里 rAF 不会运行，回到前台时补一次状态刷新
+    // rAF pauses in background tabs, so refresh when visibility resumes.
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
     window.addEventListener('keydown', this.handleGlobalKeyDown, true);
     window.addEventListener('pointerdown', this.handleGlobalPointerDown, true);
@@ -353,9 +331,8 @@ class StickyScrollApp {
   };
 
   /**
-   * 浏览器页面查找（Ctrl/⌘+F）：查找条就在页面顶部，而我们用的是最高层级，
-   * 不收起来就会压住它、也会挡住被滚到顶部的命中文字。
-   * 恢复时机：按 Esc、回到页面里点击、或 20 秒兜底。
+   * Find-in-page occupies the same top layer as the capsule. Hide our UI on
+   * Ctrl/Cmd+F and restore it on Escape, pointer input, or a timeout.
    */
   private handleGlobalKeyDown = (event: KeyboardEvent): void => {
     this.guard.run('global-key', () => {
@@ -444,7 +421,7 @@ class StickyScrollApp {
     });
   };
 
-  /** 刷新与布局相关的度量：固定导航栏高度、阅读基准线、胶囊位置 */
+  /** Refresh site chrome, docking line, and layering metrics. */
   private refreshLayout(): void {
     if (!this.index) return;
     this.updateLayoutMetrics();
@@ -456,75 +433,18 @@ class StickyScrollApp {
   }
 
   private updateLayoutMetrics(): void {
-    const { bottom, blocked, foreignZIndex } = this.detectTopChrome();
+    const { bottom, blocked, foreignZIndex } = detectTopChrome(this.index?.scope ?? null);
     this.overlayHeight = bottom;
     this.overlayBlocked = blocked;
     this.foreignZIndex = foreignZIndex;
   }
 
   private pillTop(): number {
-    // 默认位置自动避让站点固定导航栏；拖动后使用站点级自定义位置。
+    // Default position clears native chrome; custom positions are per host.
     return this.overlayHeight + PILL_GAP;
   }
 
-  /**
-   * 探测页面顶部是什么：
-   * - 站点导航条（又宽又矮的固定条）→ 默认胶囊贴在它下面；
-   * - 正文里的粘性元素 → 无视（不然会带着胶囊掉到页面中间）；
-   * - 全屏遮罩 → 收起 UI，不要浮在它上面。
-   */
-  private detectTopChrome(): { bottom: number; blocked: boolean; foreignZIndex: number } {
-    const probeY = 4;
-    const viewport = { width: window.innerWidth, height: window.innerHeight };
-    const scope = this.index?.scope ?? null;
-    const candidates: ChromeCandidate[] = [];
-
-    for (const ratio of OVERLAY_PROBES) {
-      const x = Math.round(viewport.width * ratio);
-      let elements: Element[] = [];
-      try {
-        elements = document.elementsFromPoint(x, probeY);
-      } catch {
-        elements = [];
-      }
-      for (const element of elements) {
-        if (!(element instanceof HTMLElement)) continue;
-        if (element.id === HOST_ID || element.closest(`#${HOST_ID}`)) continue;
-        let style: CSSStyleDeclaration;
-        try {
-          style = getComputedStyle(element);
-        } catch {
-          continue;
-        }
-        const rect = element.getBoundingClientRect();
-        candidates.push({
-          top: rect.top,
-          bottom: rect.bottom,
-          width: rect.width,
-          height: rect.height,
-          positioned: isPositionedWithin(element),
-          insideContent: scope !== null && scope !== element && scope.contains(element),
-          opaque: hasSurface(style),
-          zIndex: effectiveZIndex(element),
-          // 站点搜索面板 / 对话框：native <dialog>、aria-modal、role=dialog
-          dialog:
-            element.matches('dialog[open], [aria-modal="true"], [role="dialog"]') ||
-            element.closest('dialog[open], [aria-modal="true"], [role="dialog"]') !== null,
-          visible:
-            style.display !== 'none' &&
-            style.visibility !== 'hidden' &&
-            (style.opacity === '' || Number(style.opacity) > 0.05),
-        });
-      }
-    }
-
-    return {
-      ...classifyTopChrome(candidates, viewport),
-      foreignZIndex: highestForeignZIndex(candidates),
-    };
-  }
-
-  /** 足够高，但主动退到已在顶部的更高层 UI 下方 */
+  /** Stay below any foreign UI already using the top layer. */
   private layerZIndex(): number {
     return this.foreignZIndex >= Z_INDEX ? Math.max(1, this.foreignZIndex - 1) : Z_INDEX;
   }
@@ -539,7 +459,7 @@ class StickyScrollApp {
     this.tracker?.focusIndex(headingIndex);
     const element = heading.element;
     const previousMargin = element.style.scrollMarginTop;
-    // 用临时 scroll-margin-top 让原生平滑滚动停在“该标题吸顶后的位置”上
+    // Temporarily offset native smooth scrolling by the capsule height.
     element.style.scrollMarginTop = `${this.pillTop() + PILL_HEIGHT + 2}px`;
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     element.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
@@ -547,8 +467,6 @@ class StickyScrollApp {
       element.style.scrollMarginTop = previousMargin;
     }, 1000);
   }
-
-  // ── 显示策略 ────────────────────────────────────────
 
   private handleScrollActivity = (direction: 1 | -1): void => {
     this.lastActivityAt = Date.now();
@@ -559,8 +477,7 @@ class StickyScrollApp {
         this.shown = true;
         break;
       default:
-        // 智能：向下滚动浮现，向上滚动（回看）让位给正文
-        // 例外：刚刚通过面包屑主动跳转时保持可见，否则用户点一下工具就消失了
+        // Smart mode yields on scroll-back except immediately after a jump.
         this.shown = direction === 1 || Date.now() < this.keepVisibleUntil;
         break;
     }
@@ -569,7 +486,7 @@ class StickyScrollApp {
 
   private idleTick = (): void => {
     if (!this.running) return;
-    // 站点导航栏可能随滚动出现/隐藏（隐藏式顶栏很常见），定期重新校准吸附位置
+    // Auto-hiding headers change the useful docking line during scroll.
     this.ticks += 1;
     if (this.ticks % 2 === 0) {
       this.recalibrateOverlay();
@@ -587,7 +504,7 @@ class StickyScrollApp {
 
   private recalibrateOverlay(): void {
     if (!this.index) return;
-    const { bottom, blocked, foreignZIndex } = this.detectTopChrome();
+    const { bottom, blocked, foreignZIndex } = detectTopChrome(this.index?.scope ?? null);
     if (
       bottom === this.overlayHeight &&
       blocked === this.overlayBlocked &&
@@ -606,7 +523,7 @@ class StickyScrollApp {
 
   private applyPresentation(): void {
     this.ui?.setPresentation({
-      // 顶部被遮罩层盖住时不显示，免得浮在对话框上面
+      // Never float above a blocking overlay.
       visible: this.shown && !this.overlayBlocked && !this.findMode,
       dim: this.dimmed,
       compact: this.tocVisible,
@@ -615,7 +532,7 @@ class StickyScrollApp {
 
   private canActivate(index: HeadingIndex | null): boolean {
     if (!index || index.isConversation) return false;
-    return index.isReadingCandidate || this.forced;
+    return index.isReadingCandidate;
   }
 
   private saveFloatingPosition(position: FloatingPosition | null): void {
@@ -627,8 +544,6 @@ class StickyScrollApp {
     this.ui?.setFloatingPosition(position);
     void saveSettings(this.settings);
   }
-
-  // ── 原站目录适配 ────────────────────────────────────
 
   private collectTocCandidates(): HTMLElement[] {
     if (!this.index) return [];
@@ -647,8 +562,6 @@ class StickyScrollApp {
     this.applyPresentation();
   };
 
-  // ── 与 popup / background 的通信 ────────────────────
-
   private listenForMessages(): void {
     if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
     const listener = (
@@ -658,25 +571,11 @@ class StickyScrollApp {
     ): void => {
       const type = (message as { type?: string } | null)?.type;
       this.guard.run(`message:${type ?? 'unknown'}`, () => {
-        if (type === 'wss:status') {
+        if (type === MESSAGE.status) {
           sendResponse(this.status());
           return;
         }
-        if (type === 'wss:rescan') {
-          if (!this.running) this.activate();
-          else this.rebuild(true);
-          sendResponse(this.status());
-          return;
-        }
-        if (type === 'wss:force') {
-          // 在当前页面临时绕过“智能阅读模式”判定
-          this.forced = true;
-          if (!this.running) this.activate();
-          else this.rebuild(true);
-          sendResponse(this.status());
-          return;
-        }
-        if (type === 'wss:settings') {
+        if (type === MESSAGE.settings) {
           this.applySettings(normalizeSettings((message as { settings?: unknown }).settings));
           sendResponse(this.status());
         }
@@ -685,8 +584,6 @@ class StickyScrollApp {
     this.messageListener = listener;
     chrome.runtime.onMessage.addListener(listener);
   }
-
-  // ── 失败即静默 ──────────────────────────────────────
 
   private failSafe(_reason: string): void {
     if (this.failSafeTripped) return;
@@ -717,31 +614,11 @@ class StickyScrollApp {
       delete index.scope.dataset.wssScope;
       delete index.scope.dataset.wssStats;
     } catch {
-      /* 页面已卸载或节点被冻结时无需继续 */
+      /* The page may already be gone or frozen. */
     }
   }
 
-  private status(): {
-    active: boolean;
-    enabled: boolean;
-    siteEnabled: boolean;
-    host: string;
-    url: string;
-    title: string;
-    viewport: string;
-    headings: number;
-    scope: string | null;
-    stats: string | null;
-    statusReason: string;
-    isArticle: boolean;
-    geometryReliable: boolean;
-    pageTocVisible: boolean;
-    dockTop: number;
-    layerZIndex: number;
-    contentVersion: string;
-    displayPolicy: string;
-    currentSection: string | null;
-  } {
+  private status(): ContentStatus {
     const index = this.index;
     return {
       active: this.canActivate(index) && !!this.ui && !!this.tracker,
@@ -757,7 +634,7 @@ class StickyScrollApp {
         : null,
       stats: index?.diagnostics ?? null,
       statusReason: this.statusReason(index),
-      isArticle: index?.isArticle ?? false,
+      isReadingCandidate: index?.isReadingCandidate ?? false,
       geometryReliable: index?.stats.geometryReliable ?? false,
       pageTocVisible: this.tocVisible,
       dockTop: this.pillTop(),
@@ -776,7 +653,7 @@ class StickyScrollApp {
     if (!this.siteAllowed) return 'site-disabled';
     if (!index) return 'no-heading-index';
     if (index.isConversation) return 'conversation-surface';
-    if (!index.isReadingCandidate && !this.forced) {
+    if (!index.isReadingCandidate) {
       return index.stats.geometryReliable ? 'content-not-article' : 'heading-geometry-unreliable';
     }
     return this.canActivate(index) && this.ui && this.tracker ? 'active' : 'inactive';
