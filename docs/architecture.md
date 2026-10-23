@@ -28,7 +28,7 @@ The DOM is observed only for structural invalidation. Scroll processing is
 coalesced through `requestAnimationFrame`.
 
 Settings use one propagation path: `chrome.storage.onChanged` is consumed
-directly by the content script. The service worker does not rebroadcast them.
+directly by the content script.
 
 ## Modules
 
