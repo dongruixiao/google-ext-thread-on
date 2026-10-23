@@ -5,6 +5,5 @@
 - English descriptor: **Read long. Stay on thread.**
 - Chinese descriptor: **读长文，不掉线。**
 
-The repository remains `web-sticky-scroll` because the public privacy-policy URL
-and existing development links depend on it. Storage keys also remain unchanged
+The repository is named `google-ext-thread-on`. Internal storage keys remain unchanged
 for upgrade compatibility.

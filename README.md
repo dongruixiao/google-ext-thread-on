@@ -1,9 +1,9 @@
 # Thread On
 
-[![CI](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml/badge.svg)](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml)
+[![CI](https://github.com/dongruixiao/google-ext-thread-on/actions/workflows/ci.yml/badge.svg)](https://github.com/dongruixiao/google-ext-thread-on/actions/workflows/ci.yml)
 
 > **Thread On — 读长文，不掉线**
-> 仓库名 `web-sticky-scroll` 是技术标识；面向用户的产品名是 Thread On。
+> 仓库名 `google-ext-thread-on` 是工程仓库标识；面向用户的产品名是 Thread On。
 
 阅读长文时，真正容易丢失的往往不是导航，而是**当前这一节在讲什么**。往下滚动几屏后，眼睛还在正文里，
 上下文却已经断了。Thread On 用一枚始终显示当前章节的拟物胶囊，帮你保持内容记忆；目录和进度是顺带的辅助。
@@ -113,7 +113,7 @@ Thread On 保持静默，不在页面上留下空胶囊或异常 DOM。
 模块边界、运行链路和核心不变量见 [`docs/architecture.md`](docs/architecture.md)。
 
 ```text
-web-sticky-scroll/
+google-ext-thread-on/
 ├── manifest.json
 ├── _locales/                 # English and Simplified Chinese UI catalogs
 ├── src/
@@ -178,7 +178,7 @@ npm run package
 - `storage` 权限与实际行为一致，内容脚本只匹配 `http/https`。
 - 更新商店截图与隐私政策后重新打包。
 
-版本历史见 [Releases](https://github.com/dongruixiao/web-sticky-scroll/releases)。
+版本历史见 [Releases](https://github.com/dongruixiao/google-ext-thread-on/releases)。
 
 ## 当前取舍
 

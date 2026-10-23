@@ -60,7 +60,7 @@ PDF 内置阅读器不在网页 DOM 中，无法支持；没有小节标题或�
 - 是否收集用户数据：不收集
 - 是否使用远程代码：否，所有代码随扩展包分发
 - 是否使用分析 / 统计：否
-- 隐私政策链接：https://dongruixiao.github.io/web-sticky-scroll/privacy.html
+- 隐私政策链接：https://dongruixiao.github.io/google-ext-thread-on/privacy.html
 
 ## 素材清单
 
@@ -69,7 +69,7 @@ PDF 内置阅读器不在网页 DOM 中，无法支持；没有小节标题或�
 | 商店图标 | 128×128 PNG | icons/icon128.png |
 | 截图 | 1280×800 PNG，1–5 张 | store/screenshots/ |
 | 小型宣传图 | 440×280 PNG（可选） | 可不填 |
-| 隐私政策链接 | 公开 URL | https://dongruixiao.github.io/web-sticky-scroll/privacy.html |
+| 隐私政策链接 | 公开 URL | https://dongruixiao.github.io/google-ext-thread-on/privacy.html |
 
 ## 上传与发布流程
 
