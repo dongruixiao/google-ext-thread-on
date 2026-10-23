@@ -36,7 +36,7 @@ function createRig(heights: number[], dock = 60, scope: HTMLElement | null = nul
     const element = document.createElement('h2');
     element.textContent = `小节 ${index + 1}`;
     document.body.appendChild(element);
-    return { id: `h${index}`, element, level: index === 0 ? 1 : 2, text: `小节 ${index + 1}`, top: 0, parentIndex: index === 0 ? -1 : 0 };
+    return { id: `h${index}`, element, level: index === 0 ? 1 : 2, text: `小节 ${index + 1}`, parentIndex: index === 0 ? -1 : 0 };
   });
   const setters = nodes.map((node) => stubRect(node.element, 10_000));
   let dockTop = dock;
@@ -223,7 +223,6 @@ describe('article reading progress', () => {
       element,
       level: 2,
       text: 'Heading',
-      top: 0,
       parentIndex: -1,
     };
     const snapshots: TrackerSnapshot[] = [];

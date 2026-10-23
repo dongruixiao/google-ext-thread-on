@@ -139,7 +139,6 @@ function geometryHeadings(
       element,
       level: 2,
       text: `标题 ${index + 1}`,
-      top: box.top,
       parentIndex: -1,
     };
   });

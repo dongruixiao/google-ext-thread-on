@@ -1,6 +1,6 @@
 import styleText from './style.css?inline';
 import type { HeadingNode } from './extractor';
-import { buildVisiblePath, type PathOptions } from './path';
+import { buildAncestorPath } from './path';
 import type { FloatingPosition } from '../shared/settings';
 import { HOST_ID, Z_INDEX } from '../shared/constants';
 
@@ -30,7 +30,6 @@ export interface Presentation {
 }
 
 const DEFAULT_PRESENTATION: Presentation = { visible: true, dim: false, compact: false };
-const DEFAULT_PATH_OPTIONS: PathOptions = { hideArticleTitle: true, maxCrumbs: 3 };
 
 const HOVER_TARGET = '.wss-pill, .wss-drawer';
 
@@ -50,7 +49,6 @@ export class CapsuleUI {
 
   private headings: HeadingNode[] = [];
   private levels: number[] = [];
-  private readonly pathOptions: PathOptions = DEFAULT_PATH_OPTIONS;
   private snapshot: TrackerSnapshot = { ...EMPTY_SNAPSHOT };
   private presentation: Presentation = { ...DEFAULT_PRESENTATION };
 
@@ -262,7 +260,6 @@ export class CapsuleUI {
     // Keep the article-level h1 out of the chapter capsule.
     const suppressed =
       !!current &&
-      this.pathOptions.hideArticleTitle &&
       current.level === 1 &&
       this.levels.some((level) => level > 1);
     const visible = !!current && !suppressed && presentation.visible;
@@ -287,12 +284,7 @@ export class CapsuleUI {
 
     this.renderChapterTitle(snapshot.index);
 
-    const key = [
-      snapshot.path.join('>'),
-      this.pathOptions.hideArticleTitle ? 'h1-hidden' : 'h1-shown',
-      this.pathOptions.maxCrumbs,
-      presentation.compact ? 'compact' : 'full',
-    ].join('|');
+    const key = `${snapshot.path.join('>')}|${presentation.compact ? 'compact' : 'full'}`;
     if (key !== this.pathKey) {
       this.renderDrawerPath(snapshot, presentation);
       this.pathKey = key;
@@ -365,13 +357,9 @@ export class CapsuleUI {
     const node = this.headings[snapshot.index];
     if (!node) return;
 
-    let ancestors: number[] = [];
-    if (!presentation.compact) {
-      const visible = buildVisiblePath(snapshot.path, this.levels, this.pathOptions);
-      ancestors = [...visible.collapsed, ...visible.indexes].filter(
-        (index) => index !== snapshot.index,
-      );
-    }
+    const ancestors = presentation.compact
+      ? []
+      : buildAncestorPath(snapshot.path, this.levels);
     if (ancestors.length === 0) {
       path.hidden = true;
       return;

@@ -1,48 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { buildVisiblePath } from './path';
+import { buildAncestorPath } from './path';
 
-const LEVELS = [1, 2, 3, 3];
+const LEVELS = [1, 2, 3, 4];
 
-describe('buildVisiblePath', () => {
-  it('hides the article title by default', () => {
-    const result = buildVisiblePath([0, 1, 2], LEVELS, {
-      hideArticleTitle: true,
-      maxCrumbs: 3,
-    });
-    expect(result.indexes).toEqual([1, 2]);
-    expect(result.collapsed).toEqual([]);
+describe('buildAncestorPath', () => {
+  it('excludes the article title and current section by default', () => {
+    expect(buildAncestorPath([0, 1, 2], LEVELS)).toEqual([1]);
+    expect(buildAncestorPath([0, 1, 2, 3], LEVELS)).toEqual([1, 2]);
   });
 
-  it('keeps the article title when configured', () => {
-    const result = buildVisiblePath([0, 1, 2], LEVELS, {
-      hideArticleTitle: false,
-      maxCrumbs: 3,
-    });
-    expect(result.indexes).toEqual([0, 1, 2]);
+  it('keeps the article title when requested', () => {
+    expect(buildAncestorPath([0, 1, 2], LEVELS, false)).toEqual([0, 1]);
   });
 
-  it('collapses ancestors from the top when over the limit', () => {
-    const result = buildVisiblePath([0, 1, 2, 3], LEVELS, {
-      hideArticleTitle: true,
-      maxCrumbs: 2,
-    });
-    expect(result.indexes).toEqual([2, 3]);
-    expect(result.collapsed).toEqual([1]);
+  it('keeps a non-h1 root ancestor', () => {
+    expect(buildAncestorPath([0, 1, 2], [2, 3, 4])).toEqual([0, 1]);
   });
 
-  it('always keeps the current section', () => {
-    const result = buildVisiblePath([0], LEVELS, {
-      hideArticleTitle: true,
-      maxCrumbs: 1,
-    });
-    expect(result.indexes).toEqual([0]);
-    expect(result.collapsed).toEqual([]);
-  });
-
-  it('returns an empty path for empty input', () => {
-    expect(buildVisiblePath([], LEVELS, { hideArticleTitle: true, maxCrumbs: 3 })).toEqual({
-      indexes: [],
-      collapsed: [],
-    });
+  it('returns an empty list when there are no visible ancestors', () => {
+    expect(buildAncestorPath([], LEVELS)).toEqual([]);
+    expect(buildAncestorPath([0], LEVELS)).toEqual([]);
+    expect(buildAncestorPath([0, 1], LEVELS)).toEqual([]);
   });
 });

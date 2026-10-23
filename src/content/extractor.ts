@@ -8,8 +8,6 @@ export interface HeadingNode {
   /** 1 = h1, 2 = h2, and so on. */
   level: number;
   text: string;
-  /** Document-space top offset in pixels. */
-  top: number;
   /** Parent index, or -1 for a root heading. */
   parentIndex: number;
 }
@@ -262,7 +260,6 @@ function collectHeadings(scope: HTMLElement, scopeIsBodyish: boolean): HeadingNo
       element: el,
       level: levelOf(el),
       text,
-      top: 0,
       parentIndex: -1,
     });
   }
@@ -514,7 +511,6 @@ export function buildHeadingIndex(): HeadingIndex | null {
 
     // Filtering changes array indexes, so rebuild parent links.
     linkParents(headings);
-    measureHeadings(headings);
     const scopeText = measure(attempt.scope);
     const ratios = computeRatios(attempt.scope, measure);
     const longestSection =
@@ -586,14 +582,6 @@ export function buildHeadingIndex(): HeadingIndex | null {
   }
 
   return null;
-}
-
-/** Measure heading positions in document coordinates. */
-export function measureHeadings(headings: HeadingNode[]): void {
-  const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-  for (const heading of headings) {
-    heading.top = heading.element.getBoundingClientRect().top + scrollY;
-  }
 }
 
 /** Signature used to avoid rebuilding an unchanged heading tree. */
