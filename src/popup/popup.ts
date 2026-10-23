@@ -8,7 +8,7 @@ import {
   type WssSettings,
 } from '../shared/settings';
 import { localizeDocument, t, type MessageKey } from '../shared/i18n';
-import { MESSAGE, type ContentStatus } from '../shared/protocol';
+import { STATUS_MESSAGE, type ContentStatus } from '../shared/protocol';
 
 const POLICY_HINTS: Record<DisplayPolicy, MessageKey> = {
   smart: 'policySmartHint',
@@ -120,7 +120,7 @@ async function refreshStatus(): Promise<void> {
   } else {
     try {
       pageStatus = (await chrome.tabs.sendMessage(tabId, {
-        type: MESSAGE.status,
+        type: STATUS_MESSAGE,
       })) as ContentStatus;
     } catch {
       pageStatus = null;

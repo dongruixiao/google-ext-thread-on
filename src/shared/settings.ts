@@ -132,7 +132,9 @@ export function toggleSite(settings: WssSettings, hostname: string): WssSettings
   if (!host) return settings;
   const matched = matchSite(settings.disabledSites, host);
   const disabledSites = matched
-    ? settings.disabledSites.filter((entry) => entry !== matched)
+    ? settings.disabledSites.filter(
+        (entry) => host !== entry && !host.endsWith(`.${entry}`),
+      )
     : [...settings.disabledSites, host];
   return { ...settings, disabledSites };
 }

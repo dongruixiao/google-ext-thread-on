@@ -20,6 +20,9 @@ content script
 The DOM is observed only for structural invalidation. Scroll processing is
 coalesced through `requestAnimationFrame`.
 
+Settings use one propagation path: `chrome.storage.onChanged` is consumed
+directly by the content script. The service worker does not rebroadcast them.
+
 ## Modules
 
 | Module | Responsibility |
@@ -48,6 +51,8 @@ coalesced through `requestAnimationFrame`.
 5. Capsule coordinates are clamped to the viewport after settings migration.
 6. A failed extraction or geometry check produces no extension UI.
 7. Repeated runtime failures leave no listeners, timers, markers, or host nodes.
+8. Hidden pages never run layout calibration or native-contents probes.
+9. Article-end detection uses article geometry so nested scrollers work.
 
 ## Localization
 

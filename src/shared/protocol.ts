@@ -1,9 +1,6 @@
 import type { DisplayPolicy } from './settings';
 
-export const MESSAGE = {
-  status: 'wss:status',
-  settings: 'wss:settings',
-} as const;
+export const STATUS_MESSAGE = 'wss:status';
 
 export interface ContentStatus {
   active: boolean;

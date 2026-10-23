@@ -13,13 +13,12 @@ import {
   DEFAULT_SETTINGS,
   isSiteEnabled,
   loadSettings,
-  normalizeSettings,
   saveSettings,
   subscribeSettings,
   type FloatingPosition,
   type WssSettings,
 } from '../shared/settings';
-import { MESSAGE, type ContentStatus } from '../shared/protocol';
+import { STATUS_MESSAGE, type ContentStatus } from '../shared/protocol';
 import {
   buildHeadingIndex,
   headingSignature,
@@ -423,10 +422,10 @@ class ReadingContextApp {
 
   /** Refresh site chrome, docking line, and layering metrics. */
   private refreshLayout(): void {
-    if (!this.index) return;
+    if (!this.index || !this.ui) return;
     this.updateLayoutMetrics();
-    this.ui?.setTop(this.pillTop());
-    this.ui?.setZIndex(this.layerZIndex());
+    this.ui.setTop(this.pillTop());
+    this.ui.setZIndex(this.layerZIndex());
     this.tracker?.refresh();
     this.probeToc();
     this.applyPresentation();
@@ -485,7 +484,7 @@ class ReadingContextApp {
   };
 
   private idleTick = (): void => {
-    if (!this.running) return;
+    if (!this.running || !this.ui || document.visibilityState !== 'visible') return;
     // Auto-hiding headers change the useful docking line during scroll.
     this.ticks += 1;
     if (this.ticks % 2 === 0) {
@@ -503,7 +502,7 @@ class ReadingContextApp {
   };
 
   private recalibrateOverlay(): void {
-    if (!this.index) return;
+    if (!this.index || !this.ui) return;
     const { bottom, blocked, foreignZIndex } = detectTopChrome(this.index?.scope ?? null);
     if (
       bottom === this.overlayHeight &&
@@ -555,7 +554,7 @@ class ReadingContextApp {
   }
 
   private probeToc = (): void => {
-    if (!this.running) return;
+    if (!this.running || !this.ui || document.visibilityState !== 'visible') return;
     const next = this.evaluateToc();
     if (next === this.tocVisible) return;
     this.tocVisible = next;
@@ -571,13 +570,9 @@ class ReadingContextApp {
     ): void => {
       const type = (message as { type?: string } | null)?.type;
       this.guard.run(`message:${type ?? 'unknown'}`, () => {
-        if (type === MESSAGE.status) {
+        if (type === STATUS_MESSAGE) {
           sendResponse(this.status());
           return;
-        }
-        if (type === MESSAGE.settings) {
-          this.applySettings(normalizeSettings((message as { settings?: unknown }).settings));
-          sendResponse(this.status());
         }
       });
     };

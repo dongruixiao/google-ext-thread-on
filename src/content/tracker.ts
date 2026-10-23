@@ -143,6 +143,13 @@ export class ScrollTracker {
   }
 
   private atPageBottom(): boolean {
+    const scope = this.scope;
+    if (scope?.isConnected) {
+      const rect = scope.getBoundingClientRect();
+      if (Number.isFinite(rect.bottom)) {
+        return rect.bottom <= window.innerHeight + 4;
+      }
+    }
     const doc = document.documentElement;
     return window.scrollY + window.innerHeight >= doc.scrollHeight - 4;
   }

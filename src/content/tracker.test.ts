@@ -31,7 +31,7 @@ interface Rig {
   last: () => TrackerSnapshot | undefined;
 }
 
-function createRig(heights: number[], dock = 60): Rig {
+function createRig(heights: number[], dock = 60, scope: HTMLElement | null = null): Rig {
   const nodes: HeadingNode[] = heights.map((_, index) => {
     const element = document.createElement('h2');
     element.textContent = `小节 ${index + 1}`;
@@ -42,6 +42,7 @@ function createRig(heights: number[], dock = 60): Rig {
   let dockTop = dock;
   const snapshots: TrackerSnapshot[] = [];
   const tracker = new ScrollTracker(nodes, (snapshot) => snapshots.push(snapshot), {
+    scope,
     dockTop: () => dockTop,
     heightOf: (index) => heights[index] ?? 44,
   });
@@ -186,6 +187,22 @@ describe('heading activation timing', () => {
       if (descriptor) Object.defineProperty(window, 'scrollY', descriptor);
       else Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
     }
+  });
+
+  it('uses article geometry for nested scroll containers', () => {
+    const scope = document.createElement('article');
+    document.body.appendChild(scope);
+    const setScopeTop = stubRect(scope, 100, 3000);
+    const rig = createRig([50, 40, 40], 60, scope);
+    rig.setTop(0, 66);
+    rig.setTop(1, 180);
+    rig.setTop(2, 360);
+    rig.flush();
+    expect(rig.last()?.index).toBe(0);
+
+    setScopeTop(window.innerHeight - 3000);
+    rig.flush();
+    expect(rig.last()?.index).toBe(2);
   });
 });
 

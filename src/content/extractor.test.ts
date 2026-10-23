@@ -184,12 +184,18 @@ describe('buildHeadingIndex', () => {
     const index = buildHeadingIndex();
     expect(index).not.toBeNull();
     expect(index?.isReadingCandidate).toBe(false);
+    expect(
+      document.querySelector('[data-wss-id], [data-wss-scope], [data-wss-stats]'),
+    ).toBeNull();
   });
 
   it('rejects marketing pages dominated by links', () => {
     marketingPage();
     const index = buildHeadingIndex();
     expect(index?.isReadingCandidate).toBe(false);
+    expect(
+      document.querySelector('[data-wss-id], [data-wss-scope], [data-wss-stats]'),
+    ).toBeNull();
   });
 
   it('keeps conversation pages silent', () => {
@@ -200,6 +206,9 @@ describe('buildHeadingIndex', () => {
     expect(index?.conversationReason).toBe('explicit-message-roles');
     expect(index?.isReadingCandidate).toBe(false);
     expect(index?.diagnostics).toContain('conv=1');
+    expect(
+      document.querySelector('[data-wss-id], [data-wss-scope], [data-wss-stats]'),
+    ).toBeNull();
   });
 
   it('does not depend on the page background palette', () => {

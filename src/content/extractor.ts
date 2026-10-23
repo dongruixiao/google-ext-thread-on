@@ -547,8 +547,6 @@ export function buildHeadingIndex(): HeadingIndex | null {
       !conversation.detected &&
       geometry.reliable &&
       decideArticle(stats, attempt.semantic);
-    if (isReadingCandidate) ensureIds(headings, attempt.scope);
-    // Expose metrics on the scope for local field diagnostics.
     const diagnostics = [
       `h=${stats.headingCount}`,
       `text=${stats.scopeText}`,
@@ -571,7 +569,11 @@ export function buildHeadingIndex(): HeadingIndex | null {
       `convTurns=${conversation.turns}`,
       `reading=${isReadingCandidate ? 1 : 0}`,
     ].join(' ');
-    attempt.scope.dataset.wssStats = diagnostics;
+    if (isReadingCandidate) {
+      ensureIds(headings, attempt.scope);
+      // Expose metrics only for active article scopes used by field diagnostics.
+      attempt.scope.dataset.wssStats = diagnostics;
+    }
     return {
       scope: attempt.scope,
       headings,

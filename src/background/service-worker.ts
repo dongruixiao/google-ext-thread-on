@@ -2,12 +2,10 @@ import {
   DEFAULT_SETTINGS,
   SETTINGS_KEY,
   loadSettings,
-  normalizeSettings,
   saveSettings,
   toggleSite,
-  type WssSettings,
 } from '../shared/settings';
-import { MESSAGE } from '../shared/protocol';
+import { STATUS_MESSAGE } from '../shared/protocol';
 
 /** Seed default settings only on the first install. */
 chrome.runtime.onInstalled.addListener(() => {
@@ -16,33 +14,6 @@ chrome.runtime.onInstalled.addListener(() => {
     return chrome.storage.sync.set({ [SETTINGS_KEY]: DEFAULT_SETTINGS });
   });
 });
-
-/** Keep already-open content scripts in sync with settings changes. */
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== 'sync') return;
-  const change = changes[SETTINGS_KEY];
-  if (!change) return;
-  void broadcast(normalizeSettings(change.newValue));
-});
-
-async function broadcast(settings: WssSettings): Promise<void> {
-  let tabs: chrome.tabs.Tab[] = [];
-  try {
-    tabs = await chrome.tabs.query({});
-  } catch {
-    return;
-  }
-  await Promise.all(
-    tabs.map(async (tab) => {
-      if (tab.id == null) return;
-      try {
-        await chrome.tabs.sendMessage(tab.id, { type: MESSAGE.settings, settings });
-      } catch {
-        // Built-in pages and tabs without a content script reject this message.
-      }
-    }),
-  );
-}
 
 chrome.commands?.onCommand.addListener((command) => {
   void handleCommand(command);
@@ -72,7 +43,7 @@ async function activeTabHost(): Promise<string | null> {
   }
   if (tabId == null) return null;
   try {
-    const status = (await chrome.tabs.sendMessage(tabId, { type: MESSAGE.status })) as
+    const status = (await chrome.tabs.sendMessage(tabId, { type: STATUS_MESSAGE })) as
       | { host?: string }
       | null;
     return status?.host ?? null;

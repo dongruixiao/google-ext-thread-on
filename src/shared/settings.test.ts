@@ -80,4 +80,14 @@ describe('site rules', () => {
     expect(twice.disabledSites).toEqual([]);
     expect(isSiteEnabled(twice, 'example.com')).toBe(true);
   });
+
+  it('removes every overlapping parent and child rule when enabling a host', () => {
+    const settings = normalizeSettings({
+      disabledSites: ['example.com', 'sub.example.com'],
+    });
+    const enabled = toggleSite(settings, 'sub.example.com');
+
+    expect(enabled.disabledSites).toEqual([]);
+    expect(isSiteEnabled(enabled, 'sub.example.com')).toBe(true);
+  });
 });
