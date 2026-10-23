@@ -161,7 +161,7 @@ async function main(): Promise<void> {
       if (!input.checked) return;
       settings = { ...settings, displayPolicy: input.value as DisplayPolicy };
       render();
-      persist();
+      void persist();
     });
   }
 

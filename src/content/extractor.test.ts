@@ -197,6 +197,22 @@ describe('buildHeadingIndex', () => {
     ).toBeNull();
   });
 
+  it('does not let nested paragraph blocks inflate a descendant scope', () => {
+    document.body.innerHTML = `
+      <main>
+        <h1>Article title</h1>
+        <p>${paragraph(500)}</p>
+        <h2>Main section</h2>
+        <section class="article-content">
+          <h3>Nested section</h3>
+          <ul><li><p>${paragraph(600)}</p></li></ul>
+        </section>
+      </main>
+    `;
+    const index = buildHeadingIndex();
+    expect(index?.scope.tagName.toLowerCase()).toBe('main');
+  });
+
   it('keeps conversation pages silent', () => {
     conversationPage();
     const index = buildHeadingIndex();

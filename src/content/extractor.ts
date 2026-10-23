@@ -193,6 +193,7 @@ function collectScopeCandidates(measure: Measure): ScopeCandidate[] {
       if (text < 200) continue;
       let paragraphText = 0;
       for (const block of element.querySelectorAll(CONTENT_BLOCK_SELECTOR)) {
+        if (block.parentElement?.closest(CONTENT_BLOCK_SELECTOR)) continue;
         paragraphText += measure(block);
       }
       candidates.push({
