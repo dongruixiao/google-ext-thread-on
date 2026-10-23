@@ -18,5 +18,5 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      # 顺带做上架自检：manifest 引用是否齐全、版本号是否一致、有无远程代码
+      # Validate manifest references, version consistency, and remote-code usage.
       - run: node scripts/package.mjs

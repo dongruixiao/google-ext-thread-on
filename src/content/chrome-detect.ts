@@ -78,7 +78,7 @@ export function classifyTopChrome(candidates: ChromeCandidate[], viewport: Viewp
       bottom = Math.max(bottom, candidate.bottom);
       continue;
     }
-    // A wide, tall surface is more likely a modal backdrop than a toolbar.
+    // A wide, tall surface is more likely a blocking overlay than a toolbar.
     if (candidate.opaque && candidate.height >= viewport.height * MIN_BLOCKER_HEIGHT_RATIO) {
       blocked = true;
     }

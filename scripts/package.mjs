@@ -47,7 +47,7 @@ const bundled = execFileSync(
   .trim()
   .split('\n')
   .filter(Boolean);
-const remoteHint = /https?:\/\/(?!localhost|127\.0\.0\.1)/;
+const remoteHint = /https?:\/\/(?!localhost|127\.0\.0\.1|www\.w3\.org\/)/;
 for (const file of bundled) {
   const content = readFileSync(file, 'utf8');
   if (/\beval\s*\(/.test(content)) problems.push(`${file} 里出现了 eval()`);

@@ -72,7 +72,7 @@ const light = await context.newPage();
 await light.goto(url, { waitUntil: 'load' });
 await light.mouse.move(640, 400);
 await light.waitForTimeout(1200);
-await shoot(light, '01-sticky-heading.png', 1000);
+await shoot(light, '01-current-section.png', 1000);
 
 // Light theme: expanded outline.
 await shoot(light, '02-outline.png', 1500, { hover: true });
@@ -88,38 +88,38 @@ await dark.close();
 
 // Dragged capsule near the lower-right edge; the outline opens upward.
 await applySettings({ floatingPositions: {} });
-const pill = await context.newPage();
-await pill.goto(url, { waitUntil: 'load' });
-await pill.mouse.move(640, 400);
-await pill.waitForTimeout(1200);
-await pill.evaluate(() => window.scrollTo(0, 1100));
-await pill.waitForTimeout(500);
-const start = await pill.evaluate(() => {
+const capsule = await context.newPage();
+await capsule.goto(url, { waitUntil: 'load' });
+await capsule.mouse.move(640, 400);
+await capsule.waitForTimeout(1200);
+await capsule.evaluate(() => window.scrollTo(0, 1100));
+await capsule.waitForTimeout(500);
+const start = await capsule.evaluate(() => {
   const rect = document
     .getElementById('__web_sticky_scroll_host__')
     .shadowRoot.querySelector('.wss-pill')
     .getBoundingClientRect();
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 });
-await pill.mouse.move(start.x, start.y);
-await pill.mouse.down();
-await pill.mouse.move(960, 680, { steps: 12 });
-await pill.mouse.up();
-await pill.waitForTimeout(500);
-const end = await pill.evaluate(() => {
+await capsule.mouse.move(start.x, start.y);
+await capsule.mouse.down();
+await capsule.mouse.move(960, 680, { steps: 12 });
+await capsule.mouse.up();
+await capsule.waitForTimeout(500);
+const end = await capsule.evaluate(() => {
   const rect = document
     .getElementById('__web_sticky_scroll_host__')
     .shadowRoot.querySelector('.wss-pill')
     .getBoundingClientRect();
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 });
-await pill.mouse.move(20, 450);
-await pill.waitForTimeout(150);
-await pill.mouse.move(end.x, end.y);
-await pill.waitForTimeout(500);
-await pill.screenshot({ path: join(OUT_DIR, '04-draggable-pill.png') });
-console.log('✓', '04-draggable-pill.png');
-await pill.close();
+await capsule.mouse.move(20, 450);
+await capsule.waitForTimeout(150);
+await capsule.mouse.move(end.x, end.y);
+await capsule.waitForTimeout(500);
+await capsule.screenshot({ path: join(OUT_DIR, '04-draggable-capsule.png') });
+console.log('✓', '04-draggable-capsule.png');
+await capsule.close();
 
 // Restore the default position.
 await applySettings({ floatingPositions: {} });

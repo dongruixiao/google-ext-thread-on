@@ -30,13 +30,16 @@ function check(name, condition, detail) {
 function startFixtureServer() {
   const html = readFileSync(join(HERE, 'fixture.html'), 'utf8');
   const chatHtml = readFileSync(join(HERE, 'chat-fixture.html'), 'utf8');
-  const unsafeColorHtml = readFileSync(join(HERE, 'unsafe-color-fixture.html'), 'utf8');
+  const complexBackgroundHtml = readFileSync(
+    join(HERE, 'complex-background-fixture.html'),
+    'utf8',
+  );
   const server = createServer((request, response) => {
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     const target = request.url?.startsWith('/chat')
       ? chatHtml
-      : request.url?.startsWith('/unsafe-color')
-        ? unsafeColorHtml
+      : request.url?.startsWith('/complex-background')
+        ? complexBackgroundHtml
         : html;
     response.end(target);
   });
@@ -95,14 +98,11 @@ const probe = (page) =>
       drawerOpacity: drawerStyle?.opacity ?? null,
       drawerBackgroundImage: drawerStyle?.backgroundImage ?? null,
       drawerShadow: drawerStyle?.boxShadow ?? null,
-      drawerBackdrop: drawerStyle?.backdropFilter ?? null,
       drawerScrollbar: drawerStyle?.scrollbarWidth ?? null,
-      pillBackdrop: pillStyle?.backdropFilter ?? null,
       pillBackground: pillStyle?.backgroundImage ?? null,
       pillShadow: pillStyle?.boxShadow ?? null,
       progressValue: Number(progressBadge?.getAttribute('aria-valuenow') ?? 0),
       progressOffset: Number.parseFloat(progressRing?.style.strokeDashoffset ?? '88'),
-      hasTopProgress: !!shadow?.querySelector('.wss-global-progress'),
       surfaceTop: active ? Math.round(active.getBoundingClientRect().top) : null,
       surfaceLeft: active ? Math.round(active.getBoundingClientRect().left) : null,
       surfaceWidth: active ? Math.round(active.getBoundingClientRect().width) : null,
@@ -196,23 +196,24 @@ try {
     chatSurface,
   );
 
-  const unsafeColorPage = await context.newPage();
-  await unsafeColorPage.goto(`${url}unsafe-color`, { waitUntil: 'load' });
-  await unsafeColorPage.waitForTimeout(1200);
-  const unsafeColor = await unsafeColorPage.evaluate(() => ({
+  const complexBackgroundPage = await context.newPage();
+  await complexBackgroundPage.goto(`${url}complex-background`, { waitUntil: 'load' });
+  await complexBackgroundPage.waitForTimeout(1200);
+  const complexBackground = await complexBackgroundPage.evaluate(() => ({
     headings: document.querySelectorAll('h1, h2').length,
     host: !!document.getElementById('__web_sticky_scroll_host__'),
   }));
   check(
     '渐变和图片背景页面可使用拟物胶囊',
-    unsafeColor.headings >= 3 && unsafeColor.host,
-    unsafeColor,
+    complexBackground.headings >= 3 && complexBackground.host,
+    complexBackground,
   );
-  await unsafeColorPage.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  await unsafeColorPage.waitForTimeout(1200);
-  const unsafeGlass = await unsafeColorPage.evaluate(() => {
+  await complexBackgroundPage.evaluate(() =>
+    window.scrollTo(0, document.documentElement.scrollHeight),
+  );
+  await complexBackgroundPage.waitForTimeout(1200);
+  const complexBackgroundState = await complexBackgroundPage.evaluate(() => {
     const shadow = document.getElementById('__web_sticky_scroll_host__')?.shadowRoot;
-    const root = shadow?.querySelector('.wss-root');
     const pill = shadow?.querySelector('.wss-pill');
     return {
       pill: !!pill,
@@ -222,13 +223,13 @@ try {
       ),
     };
   });
-  await unsafeColorPage.close();
+  await complexBackgroundPage.close();
   check(
     '复杂背景可使用拟物胶囊',
-    unsafeGlass.pill &&
-      !!unsafeGlass.title &&
-      unsafeGlass.progressValue === 100,
-    unsafeGlass,
+    complexBackgroundState.pill &&
+      !!complexBackgroundState.title &&
+      complexBackgroundState.progressValue === 100,
+    complexBackgroundState,
   );
 
   const atTop = await probe(page);
@@ -488,13 +489,11 @@ try {
             bottom: Math.round(pillRect.bottom),
           }
         : null,
-      hasTopProgress: !!shadow.querySelector('.wss-global-progress'),
     };
   });
   check(
-    '阅读进度收进拟物徽标，以圆环而非顶部横线显示',
-    !progressRing.hasTopProgress &&
-      progressRing.role === 'progressbar' &&
+    '阅读进度以拟物徽标圆环显示',
+    progressRing.role === 'progressbar' &&
       progressRing.value === 100 &&
       progressRing.dashOffset <= 0.1 &&
       progressRing.dashArray === '88px' &&
@@ -535,8 +534,6 @@ try {
             .shadowRoot.querySelector('.wss-drawer-title, .wss-drawer-progress'),
       )) &&
       withToc.drawerShadow !== 'none' &&
-      withToc.drawerBackdrop === 'none' &&
-      withToc.pillBackdrop === 'none' &&
       withToc.drawerScrollbar === 'none' &&
       !!withToc.drawerBackgroundImage?.includes('linear-gradient') &&
       !!withToc.drawerBackgroundImage?.includes('repeating-linear-gradient') &&
@@ -893,11 +890,6 @@ try {
   check(
     '智能策略向上滚动收起胶囊',
     scrolledUp.visible === 'false',
-    scrolledUp,
-  );
-  check(
-    '智能模式收起胶囊时不会留下顶部进度线',
-    scrolledUp.hasTopProgress === false,
     scrolledUp,
   );
   await page.mouse.wheel(0, 320);

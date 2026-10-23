@@ -1,123 +1,36 @@
-# 对外名称：暂用 TopClip（待定）
+# Product name
 
-**当前工作名称：`TopClip — 读长文，不掉线`。品牌名尚未最终确定，代码和发布包暂不改名。**
+## Current state
 
-- 名字：clip = 曲别针把标题夹在顶部（动作）；避开 pin（Pinterest 淹没）、Clipper（= 网页剪藏品类）、Sticky Scroll（已有同名）
-- Slogan：**读长文，不掉线**（讲读者得到的结果，而不是罗列功能）；英文 *Never lose the thread.*
-- 仓库名保持 `web-sticky-scroll` 不变（GitHub Pages 隐私链接依赖它）
+`TopClip — 读长文，不掉线` is a working name only.
 
-已排除的候选与原因见下（保留备查）。
+The final brand name is intentionally undecided. Do not rename the product,
+repository, extension ID, privacy URL, or published package until a final name
+has been approved.
 
-## 定位（决定取名方向）
+## Naming direction
 
-**这个产品卖的是"内容锚点"，不是导航**：读长文时人最先丢的是"这一节在讲什么"，
-标题常驻就是把上下文钉在视线里。导航（大纲/跳转）是顺带，进度条是增值。
-因此名字应该指向「提醒 / 常驻 / 夹住」的意象，而不是 "navigate / TOC"。
+The product keeps the current section of a long-form article visible. It is not
+primarily a table-of-contents replacement, a bookmark manager, or a page
+customization tool.
 
-> 当前状态：**暂用 TopClip，等待最终命名**。仓库名 `web-sticky-scroll` 作为技术标识保持不变；
-> 下面所有重名检查都是 2026-10-13 在 Chrome 应用商店搜索页实测的。
+Names should therefore emphasize:
 
-## 命名约束（踩过的坑）
+- remembering the current section
+- preserving the thread of an article
+- a quiet, compact reading companion
+- a portable physical object or editorial cue
 
-1. 商店名称字段 **≤ 45 字符**，建议「品牌 + 一句功能说明」的结构。
-2. **别用 "Sticky Scroll" 全词**：商店里已有一个同名插件（功能也是 pin 元素），会互相干扰。
-3. **"pin" 开头的词搜索吃亏**：实测搜 `heading pin` 返回的 8 个结果全是 Pinterest 相关扩展，
-   我们的插件会被淹没——名字里带 pin 可以，但别指望靠品类词被搜到。
-4. 仓库名一旦改动，GitHub Pages 的隐私政策链接会变（上架必填项），所以**仓库名不动，只改对外展示名**。
+Avoid:
 
-## 候选清单（按查重结果分组）
+- generic navigation labels such as “目录” as the product name
+- names that imply AI summaries or reading advice
+- “Sticky Scroll” because an existing extension already uses that name
 
-### 方向一：曲别针 / 夹子（意象准，无重名）
+## Before renaming
 
-| 候选 | 含义 | 查重 |
-| --- | --- | --- |
-| **TopClip** | 把标题「夹」在顶部 | ✅ 无同名 |
-| **ClipRead** | 曲别针 + 阅读 | ✅ 无同名 |
-| **ClipHead** | 夹住标题（head 有"头"的歧义） | ✅ 无同名 |
-| 回形针（纯中文名） | 最形象的比喻 | ✅ 无同名；英文市场为零 |
-
-### 方向二：clamp（CSS `clamp()` 的梗，开发者一眼懂）
-
-| 候选 | 含义 | 查重 |
-| --- | --- | --- |
-| TopClamp / ClampHead / TitleClamp / StickyClamp | 把标题钳在顶部 | ✅ 均无同名 |
-| Clamp | 单词最干净 | ❌ 已有同名扩展（还有 tab-clamp、clamptastic） |
-
-### 方向三：title sticky（最好搜，最没个性）
-
-| 候选 | 含义 | 查重 |
-| --- | --- | --- |
-| StickyTitle / TitleSticky | 直白描述 | ✅ 无同名（但搜索结果会被一堆便签类 "sticky notes" 占满） |
-| StickyHeadings | 你原本的提议 | ✅ 无同名；⚠️ 实测搜索会被 "Disable Sticky Headers / Sticky Header Hider" 这类**反向工具**包围 |
-
-### 方向四：pinner（有个性，但搜索吃亏）
-
-| 候选 | 含义 | 查重 |
-| --- | --- | --- |
-| TitlePin / TopPinner / HeadPinner | 大头针钉住标题 | ✅ 未见同名；⚠️ 见约束 3，"pin" 品类词被 Pinterest 生态淹没 |
-| Pinnit | — | ❌ 已被占用 |
-
-### 方向五：tip（用户提出）
-
-| 候选 | 含义 | 查重 |
-| --- | --- | --- |
-| Top Tip | "顶部提示" | ⚠️ 英文里 `top tip` = **小窍门**的固定说法，商店里还有 `tip-top`，语义会跑偏 |
-| Clip Tip | 曲别针 + 提示 | ✅ 无同名，但 `tip` 同样暗示"技巧/提示"，不如 TopClip 干净 |
-
-### 方向六：内容常驻（贴合新定位）
-
-| 候选 | 含义 | 查重 |
-| --- | --- | --- |
-| **InView** | "一直在你视野里"（也是前端术语 InView），字面即产品价值 | ✅ 无同名 |
-| Cling / TopCling | 紧紧贴住 | ❌ `cling` 已被占用 |
-| Sightline | 视线 | ❌ `sightline` 已被占用 |
-
-### 方向七：anchor clip 融合（用户提出）
-
-把两个隐喻合起来：**clip = 动作**（曲别针夹在顶部），**anchor = 目的**（把上下文锚在视线里）。
-正好对应新定位"产品是内容锚点，不是导航"。
-
-| 候选 | 含义 | 查重 |
-| --- | --- | --- |
-| **AnchorClip** | 夹住标题、锚住上下文 | ✅ 无同名 |
-| ClipAnchor | 同上，但语感偏"剪贴板" | ✅ 无同名（不推荐） |
-| TopAnchor | 锚在顶部（丢了曲别针意象） | ✅ 无同名 |
-| AnchorBar | 锚定条 | ✅ 无同名 |
-
-**一句 slogan 可以直接把融合说清**：中文「夹住标题，锚住上下文」/ 英文 "Clip the heading. Anchor the context."
-
-⚠️ 一个诚实的风险：在网页语境里 `anchor` 也指"锚点链接"（<a>），商店里搜 anchor 出来的多是
-锚点链接分析工具。所以 **anchor 更适合当"品牌词"而不是"品类搜索词"**——用户按名字找你没问题，
-但别指望靠它被搜到；品类词（sticky / 吸顶 / 目录）继续放在简短说明里。
-
-### 融合方案对比（可直接用的商店名写法，均 ≤45 字符）
-
-| 方案 | 商店名写法 | 特点 |
-| --- | --- | --- |
-| A. 名字即融合 | `AnchorClip — 夹住标题，锚住上下文` | 名字自带定位；稍长（10 字母） |
-| B. 短名 + 融合副标 | `TopClip（曲别针）— 夹住标题，锚住上下文` | 名字最短最好念，anchor 概念留在副标 |
-| C. 内容常驻向 | `InView — 标题一直在你视野里` | 最贴"内容锚点"的字面意思 |
-
-## 曾经的推荐（已由上面的定稿取代）
-
-**已定稿：TopClip（中文可叫「曲别针」）**
-
-**当时的首选：TopClip**
-
-- 意象正是你要的"曲别针把标题别在页面顶部"，英文一个词、好念好记，中文名可以并行使用
-- 商店名写成 `TopClip（曲别针）— 网页章节吸顶导航`，中英双市场都能命中
-- 无重名；不含 pin，不会和 Pinterest 生态打架
-
-**次选**：`StickyTitle`（最好搜、最稳，但没个性）；`TopClamp`（开发者梗，冷峻）。
-
-**如果更想突出"内容常驻"而不是"夹住"**：`InView`（无同名，"一直在你视野里"）。
-
-**如果坚持 pin 系列**：可以接受"只靠品牌词被搜到、不靠品类词"，那就 `TitlePin`。
-
-## 定了之后要改哪些地方
-
-1. `manifest.json` 的 `name` / `description`
-2. `src/popup/popup.html` 的标题与品牌文案
-3. `store/listing.md` 的名称与简短说明（**简短说明里保留 Sticky / 吸顶 / 目录等关键词**，不影响搜索）
-4. `README.md` 顶部那行"对外名称"
-5. 重新 `npm run package` 并出 release（仓库名**不动**）
+1. Update `manifest.json`, locale catalogs, popup copy, README, and store listing.
+2. Generate a new icon set that remains legible at 16px.
+3. Verify English and Simplified Chinese layouts.
+4. Bump the extension version and create a new release package.
+5. Keep the repository name unless the public privacy-policy URL is migrated too.

@@ -30,18 +30,18 @@ import { FailureGuard } from './failure-guard';
 import { findTocCandidates, isAnyTocVisible } from './page-toc';
 import { ScrollTracker, type TrackerSnapshot } from './tracker';
 import { detectTopChrome } from './top-chrome';
-import { StickyUI } from './ui';
+import { CapsuleUI } from './ui';
 
 declare const __WSS_VERSION__: string;
 
-class StickyScrollApp {
+class ReadingContextApp {
   private readonly guard = new FailureGuard({
     onFailSafe: (reason) => this.failSafe(reason),
   });
   private settings: WssSettings = { ...DEFAULT_SETTINGS };
   private index: HeadingIndex | null = null;
   private tracker: ScrollTracker | null = null;
-  private ui: StickyUI | null = null;
+  private ui: CapsuleUI | null = null;
   private signature = '';
   private running = false;
   private siteAllowed = true;
@@ -238,7 +238,7 @@ class StickyScrollApp {
       return;
     }
 
-    const ui = new StickyUI(
+    const ui = new CapsuleUI(
       (headingIndex) => this.jumpTo(headingIndex),
       (action, error) => this.guard.report(action, error),
       (position) => this.saveFloatingPosition(position),
@@ -660,5 +660,5 @@ class StickyScrollApp {
   }
 }
 
-const app = new StickyScrollApp();
+const app = new ReadingContextApp();
 void app.start();

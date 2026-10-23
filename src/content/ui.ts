@@ -34,7 +34,7 @@ const DEFAULT_PATH_OPTIONS: PathOptions = { hideArticleTitle: true, maxCrumbs: 3
 const HOVER_TARGET = '.wss-pill, .wss-drawer';
 
 /** Isolated view for the floating chapter capsule and outline. */
-export class StickyUI {
+export class CapsuleUI {
   private host: HTMLDivElement | null = null;
   private root: HTMLDivElement | null = null;
   private pill: HTMLDivElement | null = null;
@@ -65,8 +65,8 @@ export class StickyUI {
         pointerId: number;
         startX: number;
         startY: number;
-        offsetX: number;
-        offsetY: number;
+        pointerOffsetX: number;
+        pointerOffsetY: number;
         width: number;
         height: number;
         moved: boolean;
@@ -276,7 +276,7 @@ export class StickyUI {
 
     if (presentation.compact && this.drawerOpen) this.closeDrawer();
 
-    this.renderGlassTitle(snapshot.index);
+    this.renderChapterTitle(snapshot.index);
 
     const key = [
       snapshot.path.join('>'),
@@ -296,7 +296,7 @@ export class StickyUI {
 
   }
 
-  private renderGlassTitle(index: number): void {
+  private renderChapterTitle(index: number): void {
     const title = this.chapterTitle;
     const node = this.headings[index];
     if (!title || !node) return;
@@ -552,8 +552,8 @@ export class StickyUI {
         pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
-        offsetX: event.clientX - rect.left,
-        offsetY: event.clientY - rect.top,
+        pointerOffsetX: event.clientX - rect.left,
+        pointerOffsetY: event.clientY - rect.top,
         width: rect.width,
         height: rect.height,
         moved: false,
@@ -582,8 +582,8 @@ export class StickyUI {
       root.dataset.dragging = 'true';
       const maxX = Math.max(8, window.innerWidth - drag.width - 8);
       const maxY = Math.max(8, window.innerHeight - drag.height - 8);
-      const left = Math.max(8, Math.min(maxX, event.clientX - drag.offsetX));
-      const top = Math.max(8, Math.min(maxY, event.clientY - drag.offsetY));
+      const left = Math.max(8, Math.min(maxX, event.clientX - drag.pointerOffsetX));
+      const top = Math.max(8, Math.min(maxY, event.clientY - drag.pointerOffsetY));
       drag.latestLeft = left;
       drag.latestTop = top;
       if (this.dragFrame === 0) {

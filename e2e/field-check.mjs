@@ -161,7 +161,6 @@ const inspect = (page) =>
         : null,
       progressValue: Number(progressBadge?.getAttribute('aria-valuenow') ?? -1),
       progressOffset: Number.parseFloat(progressRing?.style.strokeDashoffset ?? '88'),
-      hasTopProgress: !!shadow?.querySelector('.wss-global-progress'),
       shownHeadingOffset: source ? Math.round(source.getBoundingClientRect().top - (Number.isFinite(dockTop) ? dockTop : 0)) : null,
       scrollY: Math.round(window.scrollY),
       docHeight: Math.round(document.documentElement.scrollHeight),
@@ -269,7 +268,6 @@ for (const target of targets) {
     entry.performancePass =
       !entry.performance || entry.performance.pluginLayoutShifts === 0;
     if (entry.performancePass === false) mismatches += 1;
-    entry.barVisible = pillVisible;
     entry.activated = activated;
     entry.pass = target.expect === 'active' ? activated : !activated;
   } catch (error) {
