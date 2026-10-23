@@ -3,7 +3,7 @@
   "default_locale": "en",
   "name": "__MSG_extensionName__",
   "description": "__MSG_extensionDescription__",
-  "version": "0.16.2",
+  "version": "0.16.3",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon16.png",
@@ -22,20 +22,6 @@
   "background": {
     "service_worker": "src/background/service-worker.ts",
     "type": "module"
-  },
-  "commands": {
-    "toggle-site": {
-      "suggested_key": {
-        "default": "Alt+Shift+S"
-      },
-      "description": "__MSG_commandToggleSite__"
-    },
-    "toggle-global": {
-      "suggested_key": {
-        "default": "Alt+Shift+W"
-      },
-      "description": "__MSG_commandToggleGlobal__"
-    }
   },
   "content_scripts": [
     {

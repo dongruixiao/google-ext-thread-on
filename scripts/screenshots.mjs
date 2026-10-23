@@ -80,6 +80,7 @@ await light.close();
 
 // Dark site: the capsule follows the system color scheme.
 const dark = await context.newPage();
+await dark.emulateMedia({ colorScheme: 'dark' });
 await dark.goto(`${url}?dark=1`, { waitUntil: 'load' });
 await dark.mouse.move(640, 400);
 await dark.waitForTimeout(1200);

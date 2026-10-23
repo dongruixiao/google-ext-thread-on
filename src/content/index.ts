@@ -340,42 +340,9 @@ class ReadingContextApp {
         this.setFindMode(true);
         return;
       }
-      if (
-        event.altKey &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        (key === '[' || key === ']') &&
-        !this.isEditableTarget(event.target)
-      ) {
-        event.preventDefault();
-        this.jumpAdjacent(key === ']' ? 1 : -1);
-        return;
-      }
       if (key === 'escape' && this.findMode) this.setFindMode(false);
     });
   };
-
-  private isEditableTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false;
-    return (
-      target.isContentEditable ||
-      target.matches('input, textarea, select, [contenteditable="true"]')
-    );
-  }
-
-  private jumpAdjacent(direction: 1 | -1): void {
-    const headings = this.index?.headings;
-    if (!headings || headings.length === 0 || !this.ui || !this.tracker) return;
-    const current = this.snapshot?.index ?? -1;
-    let next = current + direction;
-    if (current < 0 && direction === 1) {
-      next = headings.some((node) => node.level > 1)
-        ? headings.findIndex((node) => node.level > 1)
-        : 0;
-    }
-    if (next < 0 || next >= headings.length) return;
-    this.jumpTo(next);
-  }
 
   private handleGlobalPointerDown = (): void => {
     this.guard.run('global-pointer', () => {
@@ -459,7 +426,7 @@ class ReadingContextApp {
     const element = heading.element;
     const previousMargin = element.style.scrollMarginTop;
     // Temporarily offset native smooth scrolling by the capsule height.
-    element.style.scrollMarginTop = `${this.pillTop() + PILL_HEIGHT + 2}px`;
+    element.style.scrollMarginTop = `${this.ui?.getJumpMarginTop(this.pillTop()) ?? this.pillTop()}px`;
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     element.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     window.setTimeout(() => {

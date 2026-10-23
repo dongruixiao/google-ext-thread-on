@@ -1,4 +1,4 @@
-# Web Sticky Scroll
+# TopClip
 
 [![CI](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml/badge.svg)](https://github.com/dongruixiao/web-sticky-scroll/actions/workflows/ci.yml)
 
@@ -42,7 +42,6 @@ TopClip 现在只有一种稳定形态：**可自由拖动的拟物章节胶囊*
 
 - 悬停胶囊展开完整目录树，当前小节高亮，上级路径可点击回溯。
 - 点击胶囊标题可钉住目录；再次点击、点击页面空白处或按 `Esc` 收起。
-- `Alt+[` / `Alt+]` 跳到上一节 / 下一节。
 - 页面自带目录可见时自动退让为当前小节指示器，避免两套目录互相打架；目录滚出视口后恢复完整功能。
 
 **阅读进度**

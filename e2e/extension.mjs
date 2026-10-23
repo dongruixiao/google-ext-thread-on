@@ -638,20 +638,6 @@ try {
   const afterJump = await probe(page);
   check('capsule remains visible after a jump', afterJump.visible === 'true', afterJump);
 
-  // Keyboard flow: Alt+] and Alt+[ move between adjacent headings.
-  await page.keyboard.press('Alt+]');
-  await page.waitForTimeout(1600);
-  const keyboardNext = await probe(page);
-  await page.keyboard.press('Alt+[');
-  await page.waitForTimeout(1600);
-  const keyboardPrevious = await probe(page);
-  check(
-    '键盘可跳到下一节 / 上一节',
-    keyboardNext.title === '小节二：边界处理' &&
-      keyboardPrevious.title === '第二节：实现方式',
-    { next: keyboardNext.title, previous: keyboardPrevious.title },
-  );
-
   // Find-in-page must own the top edge while active.
   await page.evaluate(() => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true }));
@@ -852,6 +838,7 @@ try {
     policy:
       document.querySelector('input[name="displayPolicy"]:checked')?.value ?? '',
     hasOptionsPage: !!chrome.runtime.getManifest().options_ui,
+    hasCommands: !!chrome.runtime.getManifest().commands,
     hasOptionsButton: !!document.querySelector('#options'),
     hasCoreControls:
       !!document.querySelector('#enabled') &&
@@ -859,9 +846,10 @@ try {
       !!document.querySelector('#site'),
   }));
   check(
-    '所有设置已合并进弹窗且没有重复入口',
+    '设置已合并进弹窗，且没有遗留快捷键',
     controlState.policy === 'always' &&
       !controlState.hasOptionsPage &&
+      !controlState.hasCommands &&
       !controlState.hasOptionsButton &&
       controlState.hasCoreControls,
     controlState,

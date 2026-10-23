@@ -9,6 +9,7 @@ import { t } from '../shared/i18n';
 import {
   normalizeFloatingPosition,
   resolveFloatingLayout,
+  resolveJumpMarginTop,
 } from './floating-position';
 
 const ICON_SVG = `<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.75 4h10.5M2.75 8h7.5M2.75 12h4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/></svg>`;
@@ -232,6 +233,14 @@ export class CapsuleUI {
   setFloatingPosition(position: FloatingPosition | null): void {
     this.floatingPosition = position;
     this.applyFloatingPosition();
+  }
+
+  getJumpMarginTop(dockTop: number): number {
+    const rect = this.pill?.getBoundingClientRect();
+    return resolveJumpMarginTop(
+      dockTop,
+      rect ? { top: rect.top, height: rect.height } : null,
+    );
   }
 
   update(snapshot: TrackerSnapshot): void {

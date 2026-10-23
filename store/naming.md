@@ -25,7 +25,7 @@ Avoid:
 
 - generic navigation labels such as “目录” as the product name
 - names that imply AI summaries or reading advice
-- “Sticky Scroll” because an existing extension already uses that name
+- the legacy repository slug, which is only a technical identifier
 
 ## Before renaming
 

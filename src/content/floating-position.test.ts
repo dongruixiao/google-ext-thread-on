@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeFloatingPosition,
   resolveFloatingLayout,
+  resolveJumpMarginTop,
 } from './floating-position';
 
 describe('floating capsule geometry', () => {
@@ -39,5 +40,11 @@ describe('floating capsule geometry', () => {
 
     expect(Math.abs(layout.left - 432)).toBeLessThanOrEqual(1);
     expect(Math.abs(layout.top - 240)).toBeLessThanOrEqual(1);
+  });
+
+  it('adds jump clearance only when the capsule overlaps the docking line', () => {
+    expect(resolveJumpMarginTop(57, { top: 57, height: 40 })).toBe(99);
+    expect(resolveJumpMarginTop(57, { top: 600, height: 40 })).toBe(57);
+    expect(resolveJumpMarginTop(57, null)).toBe(57);
   });
 });

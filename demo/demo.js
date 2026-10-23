@@ -14,7 +14,7 @@ document.querySelector('#btn-append').addEventListener('click', () => {
     <h3>小节 ${appended}.1</h3>
     <p>
       这里顺便验证层级链：新插入的 h3 应当挂在上面这个 h2 下面，
-      因此滚动到这一段时，面包屑会显示 文章标题 › 动态追加的小节 › 小节。
+      因此滚动到这一段时，胶囊应切换到动态追加的小节标题。
     </p>
   `;
   post.appendChild(section);

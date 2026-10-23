@@ -5,12 +5,6 @@
   "extensionDescription": {
     "message": "阅读长文和文档时保持当前章节可见，不让上下文中断。"
   },
-  "commandToggleSite": {
-    "message": "在当前站点启用或停用 TopClip"
-  },
-  "commandToggleGlobal": {
-    "message": "全局启用或停用 TopClip"
-  },
   "popupTitle": {
     "message": "TopClip"
   },

@@ -5,12 +5,6 @@
   "extensionDescription": {
     "message": "Keep the current chapter in view while reading long articles and documentation."
   },
-  "commandToggleSite": {
-    "message": "Enable or disable TopClip on the current site"
-  },
-  "commandToggleGlobal": {
-    "message": "Enable or disable TopClip everywhere"
-  },
   "popupTitle": {
     "message": "TopClip"
   },

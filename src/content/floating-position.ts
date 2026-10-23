@@ -21,6 +21,11 @@ export interface FloatingLayout {
   maxWidth: number;
 }
 
+export interface CapsuleRect {
+  top: number;
+  height: number;
+}
+
 export function resolveFloatingLayout(
   position: FloatingPosition,
   viewport: ViewportSize,
@@ -79,4 +84,14 @@ export function normalizeFloatingPosition(
         Math.max(0, Math.min(100, ((top - VIEWPORT_MARGIN) / maxY) * 100)) * 10,
       ) / 10,
   };
+}
+
+/** Add top clearance only when the capsule can cover the jump target. */
+export function resolveJumpMarginTop(
+  dockTop: number,
+  capsule: CapsuleRect | null,
+): number {
+  if (!capsule || capsule.height <= 0) return dockTop;
+  const overlapsDock = capsule.top < dockTop + capsule.height + 2;
+  return overlapsDock ? dockTop + capsule.height + 2 : dockTop;
 }

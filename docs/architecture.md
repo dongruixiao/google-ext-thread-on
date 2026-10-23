@@ -6,6 +6,10 @@ TopClip is a read-only layer over an existing page. It does not rewrite article
 markup, reserve layout space, or replace native navigation. When page structure
 cannot be trusted, the correct behavior is to render nothing.
 
+There are no extension-level keyboard commands. Browser find-in-page is still
+detected so the capsule can yield to it, but the extension defines no shortcut
+of its own.
+
 ## Runtime flow
 
 ```text
